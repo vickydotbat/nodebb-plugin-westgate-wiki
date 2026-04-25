@@ -100,7 +100,10 @@
     <article class="wiki-topic-card">
       <h2>
         <a href="{config.relative_path}{section.topics.wikiPath}">
-          {section.topics.title}
+          <!-- IF section.topics.hasParentPath -->
+          <span class="wiki-topic-parent-path">{section.topics.parentTitlePathText}</span>
+          <!-- ENDIF section.topics.hasParentPath -->
+          <span class="wiki-topic-title-leaf">{section.topics.titleLeaf}</span>
         </a>
       </h2>
 

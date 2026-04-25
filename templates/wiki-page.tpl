@@ -3,7 +3,7 @@
     <p class="wiki-page-kicker">
       <a href="{config.relative_path}/wiki/category/{category.slug}">{category.name}</a>
     </p>
-    <h1>{topic.title}</h1>
+    <h1>{pageTitle}</h1>
 
     <!-- IF ancestorSections.length -->
     <div class="wiki-namespace-path">
@@ -16,6 +16,22 @@
       <a href="{config.relative_path}/wiki/category/{category.slug}">{category.name}</a>
     </div>
     <!-- ENDIF ancestorSections.length -->
+
+    <!-- IF hasPageParents -->
+    <div class="wiki-page-path">
+      <a href="{config.relative_path}/wiki/category/{category.slug}">{category.name}</a>
+      <span>/</span>
+      <!-- BEGIN parentPages -->
+      <!-- IF parentPages.url -->
+      <a href="{config.relative_path}{parentPages.url}">{parentPages.text}</a>
+      <!-- ELSE -->
+      <span>{parentPages.text}</span>
+      <!-- ENDIF parentPages.url -->
+      <span>/</span>
+      <!-- END parentPages -->
+      <span>{pageTitle}</span>
+    </div>
+    <!-- ENDIF hasPageParents -->
 
     <div class="wiki-page-meta">
       <!-- IF mainPost.user -->
@@ -50,7 +66,10 @@
           <!-- BEGIN sectionNavigation.topics -->
           <li class="<!-- IF (sectionNavigation.topics.tid == topic.tid) -->is-active<!-- ENDIF (sectionNavigation.topics.tid == topic.tid) -->">
             <a href="{config.relative_path}{sectionNavigation.topics.wikiPath}">
-              {sectionNavigation.topics.title}
+              <!-- IF sectionNavigation.topics.hasParentPath -->
+              <span class="wiki-sidebar-parent-path">{sectionNavigation.topics.parentTitlePathText}</span>
+              <!-- ENDIF sectionNavigation.topics.hasParentPath -->
+              <span class="wiki-sidebar-page-title">{sectionNavigation.topics.titleLeaf}</span>
             </a>
           </li>
           <!-- END sectionNavigation.topics -->

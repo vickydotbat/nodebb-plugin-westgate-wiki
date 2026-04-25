@@ -49,7 +49,10 @@
         <!-- BEGIN ./topics -->
         <li>
           <a href="{config.relative_path}{./wikiPath}">
-            {./title}
+            <!-- IF ./hasParentPath -->
+            <span class="wiki-topic-parent-path">{./parentTitlePathText}</span>
+            <!-- ENDIF ./hasParentPath -->
+            <span class="wiki-topic-title-leaf">{./titleLeaf}</span>
           </a>
         </li>
         <!-- END ./topics -->

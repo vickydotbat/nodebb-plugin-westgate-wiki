@@ -7,6 +7,9 @@
   "scripts": [
     "public/wiki.js"
   ],
+  "css": [
+    "public/wiki.css"
+  ],
   "modules": {
     "../admin/plugins/westgate-wiki.js": "./public/admin.js"
   },
@@ -22,7 +25,7 @@
     {
       "hook": "filter:parse.post",
       "method": "transformWikiPostContent",
-      "priority": 3
+      "priority": 6
     },
     {
       "hook": "filter:admin.header.build",

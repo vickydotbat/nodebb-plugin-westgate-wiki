@@ -118,8 +118,12 @@ function register(params) {
         text: wikiPage.category.name,
         url: serializer.buildWikiSectionPath(wikiPage.category)
       },
+      ...wikiPage.parentPages.map((page) => ({
+        text: page.text,
+        url: page.url || undefined
+      })),
       {
-        text: wikiPage.topic.title
+        text: wikiPage.pageTitlePath.length ? wikiPage.pageTitlePath[wikiPage.pageTitlePath.length - 1] : wikiPage.topic.title
       }
     ];
 
@@ -127,6 +131,10 @@ function register(params) {
       title: wikiPage.topic.title,
       breadcrumbs: pageBreadcrumbs,
       topic: wikiPage.topic,
+      pageTitle: wikiPage.pageTitlePath.length ? wikiPage.pageTitlePath[wikiPage.pageTitlePath.length - 1] : wikiPage.topic.title,
+      pageTitlePath: wikiPage.pageTitlePath,
+      hasPageParents: wikiPage.parentPages.length > 0,
+      parentPages: wikiPage.parentPages,
       category: wikiPage.category,
       canCreateSiblingPage: !!wikiPage.categoryPrivileges["topics:create"],
       sectionNavigation: wikiPage.sectionNavigation,

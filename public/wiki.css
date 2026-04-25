@@ -49,6 +49,19 @@
   text-decoration: none;
 }
 
+.wiki-page-path {
+  color: rgba(255, 248, 237, 0.68);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.85rem;
+}
+
+.wiki-page-path a {
+  color: #d7b26e;
+  text-decoration: none;
+}
+
 .wiki-hero p,
 .wiki-page-hero p,
 .wiki-card-description,
@@ -200,7 +213,22 @@
 
 .wiki-sidebar-list a {
   color: rgba(255, 248, 237, 0.82);
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.1rem;
   text-decoration: none;
+}
+
+.wiki-sidebar-parent-path,
+.wiki-topic-parent-path {
+  color: rgba(255, 248, 237, 0.56);
+  display: block;
+  font-size: 0.78rem;
+}
+
+.wiki-sidebar-page-title,
+.wiki-topic-title-leaf {
+  display: block;
 }
 
 .wiki-sidebar-list .is-active a {
@@ -255,7 +283,8 @@
 .westgate-wiki .wiki-page-content a.wiki-redlink,
 .westgate-wiki .wiki-section-description a.wiki-redlink,
 .westgate-wiki .wiki-card-description a.wiki-redlink,
-.westgate-wiki .wiki-status-card a.wiki-redlink {
+.westgate-wiki .wiki-status-card a.wiki-redlink,
+a[href*="/wiki/category/"][href*="redlink=1"] {
   color: #d77979 !important;
   text-decoration: underline dotted;
   text-underline-offset: 0.16em;

@@ -106,6 +106,20 @@ $(document).ready(function () {
     });
   }
 
+  function handleWikiCreateLinkClick(event) {
+    const link = event.target && event.target.closest ? event.target.closest("a") : null;
+    const intent = link ? getCreateIntentFromUrl(link.getAttribute("href")) : null;
+
+    if (!intent) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    pendingAutoCreateHref = intent.href;
+    launchWikiCreate(intent);
+  }
+
   require(["hooks"], function (hooks) {
     hooks.on("filter:composer.submit", function (payload) {
       if (
@@ -168,6 +182,8 @@ $(document).ready(function () {
     pendingAutoCreateHref = intent.href;
     launchWikiCreate(intent);
   });
+
+  document.addEventListener("click", handleWikiCreateLinkClick, true);
 
   markRedLinks();
   maybeOpenCreateFromLocation();
