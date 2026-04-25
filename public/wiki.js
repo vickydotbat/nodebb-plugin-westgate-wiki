@@ -59,7 +59,8 @@ $(document).ready(function () {
 
     app.newTopic({
       cid: intent.cid,
-      title: intent.title || ""
+      title: intent.title || "",
+      _wikiCreate: true
     });
 
     return true;
@@ -121,13 +122,25 @@ $(document).ready(function () {
   }
 
   require(["hooks"], function (hooks) {
+    hooks.on("filter:composer.topic.push", function (payload) {
+      if (
+        payload &&
+        payload.data &&
+        payload.data._wikiCreate &&
+        payload.pushData
+      ) {
+        payload.pushData._wikiCreate = true;
+      }
+
+      return payload;
+    });
+
     hooks.on("filter:composer.submit", function (payload) {
       if (
-        pendingWikiCreate &&
         payload &&
         payload.action === "topics.post" &&
         payload.composerData &&
-        String(payload.composerData.cid) === String(pendingWikiCreate.cid)
+        (pendingWikiCreate || (payload.postData && payload.postData._wikiCreate))
       ) {
         payload.redirect = false;
         payload.composerData._wikiRedirect = true;

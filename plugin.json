@@ -30,6 +30,10 @@
     {
       "hook": "filter:admin.header.build",
       "method": "addAdminNavigation"
+    },
+    {
+      "hook": "action:topic.post",
+      "method": "clearWikiPostParseCache"
     }
   ]
 }

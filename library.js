@@ -1,6 +1,7 @@
 "use strict";
 
 const routeHelpers = require.main.require("./src/routes/helpers");
+const cacheService = require("./lib/cache-service");
 const config = require("./lib/config");
 const adminControllers = require("./lib/controllers/admin");
 const serializer = require("./lib/serializer");
@@ -36,7 +37,9 @@ plugin.addAdminNavigation = async function (header) {
 };
 
 plugin.transformWikiPostContent = wikiLinks.transformWikiPostContent;
+plugin.clearWikiPostParseCache = cacheService.clearWikiPostParseCache;
 plugin.services = {
+  cacheService,
   config,
   serializer,
   topicService,
