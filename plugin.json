@@ -1,0 +1,32 @@
+{
+  "id": "nodebb-plugin-westgate-wiki",
+  "name": "Westgate Wiki",
+  "description": "Adds a custom /wiki page backed by NodeBB categories and topics.",
+  "settingsRoute": "/admin/plugins/westgate-wiki",
+  "library": "./library.js",
+  "scripts": [
+    "public/wiki.js"
+  ],
+  "modules": {
+    "../admin/plugins/westgate-wiki.js": "./public/admin.js"
+  },
+  "templates": "templates",
+  "staticDirs": {
+    "public": "public"
+  },
+  "hooks": [
+    {
+      "hook": "static:app.load",
+      "method": "init"
+    },
+    {
+      "hook": "filter:parse.post",
+      "method": "transformWikiPostContent",
+      "priority": 3
+    },
+    {
+      "hook": "filter:admin.header.build",
+      "method": "addAdminNavigation"
+    }
+  ]
+}

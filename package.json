@@ -1,0 +1,13 @@
+{
+  "name": "nodebb-plugin-westgate-wiki",
+  "version": "0.1.0",
+  "description": "Westgate wiki pages for NodeBB",
+  "main": "library.js",
+  "scripts": {
+    "test": "node --check library.js && node --check routes/wiki.js && node --check lib/config.js && node --check lib/serializer.js && node --check lib/topic-service.js && node --check lib/wiki-service.js && node --check lib/wiki-links.js && node --check lib/controllers/admin.js && node --check public/wiki.js"
+  },
+  "license": "MIT",
+  "nbbpm": {
+    "compatibility": "^4.0.0"
+  }
+}

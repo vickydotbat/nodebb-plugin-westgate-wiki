@@ -1,0 +1,291 @@
+.westgate-wiki {
+  max-width: 1200px;
+}
+
+.wiki-hero {
+  border: 1px solid rgba(202, 164, 106, 0.25);
+  background: linear-gradient(180deg, #211323, #100911);
+  border-radius: 1rem;
+  padding: 2rem;
+}
+
+.wiki-page-hero {
+  border: 1px solid rgba(202, 164, 106, 0.25);
+  background: linear-gradient(180deg, #211323, #100911);
+  border-radius: 1rem;
+  padding: 2rem;
+}
+
+.wiki-hero h1 {
+  color: #e1c27a;
+}
+
+.wiki-page-hero h1 {
+  color: #e1c27a;
+  margin-bottom: 0.75rem;
+}
+
+.wiki-page-kicker {
+  font-size: 0.875rem;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+}
+
+.wiki-page-kicker a {
+  color: rgba(225, 194, 122, 0.85);
+}
+
+.wiki-namespace-path {
+  color: rgba(255, 248, 237, 0.68);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.85rem;
+}
+
+.wiki-namespace-path a {
+  color: #d7b26e;
+  text-decoration: none;
+}
+
+.wiki-hero p,
+.wiki-page-hero p,
+.wiki-card-description,
+.wiki-section-description {
+  color: rgba(255, 248, 237, 0.78);
+}
+
+.wiki-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.wiki-status-card {
+  background: rgba(24, 15, 29, 0.94);
+  border: 1px solid rgba(202, 164, 106, 0.2);
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+}
+
+.wiki-status-card-warning {
+  border-color: rgba(202, 164, 106, 0.45);
+}
+
+.wiki-section-heading {
+  margin-bottom: 1rem;
+}
+
+.wiki-section-heading h2,
+.wiki-subsection-card h3 {
+  color: #e1c27a;
+  margin-bottom: 0.25rem;
+}
+
+.wiki-section-heading p {
+  color: rgba(255, 248, 237, 0.68);
+  margin: 0;
+}
+
+.wiki-card {
+  background: rgba(24, 15, 29, 0.94);
+  border: 1px solid rgba(202, 164, 106, 0.2);
+  border-radius: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+}
+
+.wiki-card-header {
+  align-items: baseline;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.wiki-topic-count {
+  color: rgba(225, 194, 122, 0.75);
+  font-size: 0.875rem;
+}
+
+.wiki-card-description {
+  margin-bottom: 0.75rem;
+}
+
+.wiki-topic-list {
+  margin: 0;
+  margin-top: auto;
+  padding-left: 1.25rem;
+}
+
+.wiki-card h2 a,
+.wiki-topic-list a {
+  color: #caa46a;
+}
+
+.wiki-card-link {
+  align-self: flex-start;
+  color: #f3d8a0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.wiki-card-link-secondary {
+  color: rgba(255, 248, 237, 0.78);
+}
+
+.wiki-card-link:hover,
+.wiki-card-link:focus {
+  color: #fff0c9;
+}
+
+.wiki-page-meta {
+  color: rgba(255, 255, 255, 0.72);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+}
+
+.wiki-page-meta a {
+  color: #caa46a;
+}
+
+.wiki-page-body {
+  display: grid;
+  gap: 1rem;
+}
+
+.wiki-content-layout {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
+}
+
+.wiki-sidebar {
+  display: grid;
+  gap: 1rem;
+}
+
+.wiki-sidebar-card {
+  background: rgba(24, 15, 29, 0.94);
+  border: 1px solid rgba(202, 164, 106, 0.2);
+  border-radius: 0.75rem;
+  padding: 1rem;
+}
+
+.wiki-sidebar-card h2 {
+  color: #e1c27a;
+  font-size: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.wiki-sidebar-root {
+  color: #f3d8a0;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.wiki-sidebar-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.wiki-sidebar-list li + li {
+  margin-top: 0.5rem;
+}
+
+.wiki-sidebar-list a {
+  color: rgba(255, 248, 237, 0.82);
+  text-decoration: none;
+}
+
+.wiki-sidebar-list .is-active a {
+  color: #f3d8a0;
+  font-weight: 600;
+}
+
+.wiki-page-content {
+  background: rgba(24, 15, 29, 0.94);
+  border: 1px solid rgba(202, 164, 106, 0.2);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+}
+
+.wiki-section-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.wiki-topic-card {
+  background: rgba(24, 15, 29, 0.94);
+  border: 1px solid rgba(202, 164, 106, 0.2);
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+}
+
+.wiki-topic-card h2 {
+  margin-bottom: 0.5rem;
+}
+
+.wiki-topic-card h2,
+.wiki-subsection-card h3 {
+  font-size: 1.4rem;
+}
+
+.wiki-topic-card h2 a {
+  color: #e1c27a;
+}
+
+.wiki-topic-card-meta {
+  color: rgba(255, 255, 255, 0.72);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+}
+
+.wiki-topic-card-meta a {
+  color: #caa46a;
+}
+
+.westgate-wiki a.wiki-redlink,
+.westgate-wiki .wiki-page-content a.wiki-redlink,
+.westgate-wiki .wiki-section-description a.wiki-redlink,
+.westgate-wiki .wiki-card-description a.wiki-redlink,
+.westgate-wiki .wiki-status-card a.wiki-redlink {
+  color: #d77979 !important;
+  text-decoration: underline dotted;
+  text-underline-offset: 0.16em;
+}
+
+.wiki-status-card-redlink {
+  border-color: rgba(215, 121, 121, 0.45);
+}
+
+.wiki-redlink-action {
+  color: #f0a8a8;
+}
+
+@media (max-width: 767px) {
+  .wiki-content-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .wiki-hero,
+  .wiki-page-hero,
+  .wiki-page-content,
+  .wiki-status-card,
+  .wiki-card,
+  .wiki-topic-card,
+  .wiki-sidebar-card {
+    padding: 1.25rem;
+  }
+
+  .wiki-card-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
