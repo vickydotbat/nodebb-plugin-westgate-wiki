@@ -33,7 +33,7 @@ This plugin is distributed under **GPL-3.0-or-later** so it can ship a **CKEdito
   - `[[Root Namespace/Child Namespace/Page Title]]`
   - `[[Target|Custom Label]]`
 - Treats unresolved internal links as wiki redlinks that open prefilled page creation in the target namespace
-- **Create child namespace** from the wiki (see below), backed by **`POST /api/v3/plugins/westgate-wiki/namespace`** (new categories are always created under an existing wiki namespace, not as forum root categories)
+- **Create child namespace** from the wiki (see below), backed by **`POST /api/v3/plugins/westgate-wiki/namespace`** (new categories are always created under an existing wiki namespace, not as forum root categories). **Wiki article pages** show a fixed **floating icon dock** (Font Awesome + native `title` tooltips) for **Edit**, **Discuss**, and **Remove** when permitted—no layout column, and no “new page” / “new namespace” there. **Namespace listing pages** use the same floating pattern for **new page** and **new namespace** when permitted.
 
 ## How To Use It
 
@@ -46,7 +46,7 @@ This plugin is distributed under **GPL-3.0-or-later** so it can ship a **CKEdito
 
 ### Creating child namespaces from the wiki
 
-- On a namespace page or wiki article, use **Create child namespace** (or open `/wiki/namespace/create/:parentCid`). The new NodeBB category is created **under** the current wiki category, and **category privileges are copied from that parent** (`cloneFromCid`) so group-based locks on the parent apply to the child.
+- On a **namespace** page (`/wiki/category/...`), use the **folder** icon in the floating dock (same as opening `/wiki/namespace/create/:parentCid`). The new NodeBB category is created **under** the current wiki category, and **category privileges are copied from that parent** (`cloneFromCid`) so group-based locks on the parent apply to the child.
 - Additional **root** wiki namespaces (top-level forum categories) are not created from the wiki on purpose: configure one (or more) top-level wiki categories in the ACP and nest everything else beneath them.
 - If **Automatically include descendant categories** is **off**, each new child is also appended to the configured category list so it stays visible in the wiki.
 

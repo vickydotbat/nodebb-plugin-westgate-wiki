@@ -21,6 +21,14 @@ function appendQueryString(path, req) {
   return queryString ? `${path}?${queryString}` : path;
 }
 
+function computeShowWikiFabDock(pageData) {
+  return !!(
+    pageData.canEditWikiPage ||
+    pageData.canDeleteWikiPage ||
+    pageData.showWikiDiscussionLink
+  );
+}
+
 function buildWikiPageRenderData(wikiPage, { isWikiHome }) {
   const pageBreadcrumbs = [
     {
@@ -143,10 +151,12 @@ function register(params) {
 
       if (wikiPage.status === "ok") {
         const canCreateWikiNamespaces = await wikiNamespaceCreators.getCanCreateWikiNamespaces(req.uid);
-        return res.render("wiki-page", {
+        const homePageData = {
           ...buildWikiPageRenderData(wikiPage, { isWikiHome: true }),
           canCreateWikiNamespaces
-        });
+        };
+        homePageData.showWikiFabDock = computeShowWikiFabDock(homePageData);
+        return res.render("wiki-page", homePageData);
       }
 
       const status = wikiPage.status;
@@ -202,17 +212,19 @@ function register(params) {
 
     const canCreateWikiNamespaces = await wikiNamespaceCreators.getCanCreateWikiNamespaces(req.uid);
 
+    const canCreatePage = wikiSection.section.privileges.canCreatePage;
     res.render("wiki-section", {
       title: `${wikiSection.section.name} | Westgate Wiki`,
       breadcrumbs: sectionBreadcrumbs,
       section: wikiSection.section,
       hasChildSections: wikiSection.section.childSections.length > 0,
       hasTopics: wikiSection.section.topics.length > 0,
-      canCreatePage: wikiSection.section.privileges.canCreatePage,
+      canCreatePage,
       topicsPerCategory: wikiSection.settings.topicsPerCategory,
       hasCreateIntent,
       createIntentTitle,
-      canCreateWikiNamespaces
+      canCreateWikiNamespaces,
+      showWikiSectionFab: !!(canCreatePage || canCreateWikiNamespaces)
     });
   });
 
@@ -241,11 +253,13 @@ function register(params) {
     }
 
     const canCreateWikiNamespaces = await wikiNamespaceCreators.getCanCreateWikiNamespaces(req.uid);
-
-    res.render("wiki-page", {
+    const pageData = {
       ...buildWikiPageRenderData(wikiPage, { isWikiHome: false }),
       canCreateWikiNamespaces
-    });
+    };
+    pageData.showWikiFabDock = computeShowWikiFabDock(pageData);
+
+    res.render("wiki-page", pageData);
   });
 }
 

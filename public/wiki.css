@@ -15,6 +15,7 @@
 
 /* Optional: unified chrome tokens for nested wiki cards */
 .westgate-wiki .card.wiki-page-hero,
+.westgate-wiki .card.wiki-section-hero,
 .westgate-wiki .card.wiki-hero,
 .westgate-wiki .card.wiki-page-content,
 .westgate-wiki .card.wiki-sidebar-card,
@@ -33,6 +34,7 @@
 }
 
 .westgate-wiki .card.wiki-page-hero,
+.westgate-wiki .card.wiki-section-hero,
 .westgate-wiki .card.wiki-hero {
   background: var(
     --wiki-chrome-hero-bg,
@@ -182,34 +184,30 @@
   color: var(--wiki-chrome-link-hover-color, var(--bs-link-hover-color, var(--bs-link-color, inherit)));
 }
 
-.wiki-page-meta {
+.wiki-page-byline,
+.wiki-section-stats {
   color: var(--wiki-chrome-muted-color, var(--bs-secondary-color, inherit));
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem 1rem;
+  gap: 0.5rem 0.75rem;
+  font-size: 0.9rem;
+  margin-bottom: 0;
+  margin-top: 0.25rem;
 }
 
-.wiki-page-meta a {
-  color: var(--wiki-chrome-link-color, var(--bs-link-color, inherit));
+.wiki-page-byline-author + .wiki-page-byline-time::before {
+  content: "·";
+  margin-right: 0.5rem;
 }
 
-.wiki-page-meta a:hover,
-.wiki-page-meta a:focus {
-  color: var(--wiki-chrome-link-hover-color, var(--bs-link-hover-color, var(--bs-link-color, inherit)));
-}
-
-.wiki-page-meta .wiki-delete-page {
-  background: none;
-  border: 0;
+.wiki-fab-btn.wiki-delete-page {
   cursor: pointer;
-  color: var(--wiki-chrome-danger, var(--bs-danger, #dc3545));
-  font: inherit;
-  padding: 0;
-  text-decoration: underline;
 }
 
-.wiki-page-meta .wiki-delete-page:hover,
-.wiki-page-meta .wiki-delete-page:focus {
+.wiki-fab-btn--danger:hover,
+.wiki-fab-btn--danger:focus,
+.wiki-fab-btn.wiki-delete-page:hover,
+.wiki-fab-btn.wiki-delete-page:focus {
   color: var(--wiki-chrome-danger-hover, var(--bs-danger-text-emphasis, var(--bs-danger, #b02a37)));
 }
 
@@ -218,10 +216,96 @@
   gap: 1rem;
 }
 
-.wiki-content-layout {
+.wiki-page-main-column {
+  min-width: 0;
+}
+
+.wiki-with-fab {
+  position: relative;
+}
+
+.wiki-with-fab .wiki-content-layout {
   display: grid;
   gap: 1rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.wiki-with-fab .wiki-content-layout--sidebar {
   grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
+}
+
+/* Fixed dock: does not consume layout width; icon-only + native title tooltips */
+.wiki-fab-dock--floating {
+  bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+  left: auto;
+  margin: 0;
+  position: fixed;
+  right: max(4rem, env(safe-area-inset-right, 0px));
+  top: auto;
+  transform: none;
+  z-index: 1035;
+}
+
+.wiki-fab-dock--floating .wiki-fab-dock-inner {
+  align-items: center;
+  background-color: var(
+    --wiki-fab-bg,
+    color-mix(in srgb, var(--wiki-chrome-surface-bg, var(--bs-card-bg, #fff)) 92%, transparent)
+  );
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--wiki-fab-border-color, var(--wiki-chrome-surface-border, var(--bs-border-color, #dee2e6)));
+  border-radius: var(--wiki-chrome-radius, var(--bs-border-radius-lg, 0.5rem));
+  box-shadow: var(--wiki-fab-shadow, 0 2px 12px rgba(0, 0, 0, 0.12));
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.45rem;
+}
+
+.wiki-fab-btn {
+  align-items: center;
+  background: var(
+    --wiki-fab-btn-bg,
+    color-mix(in srgb, var(--wiki-chrome-link-color, var(--bs-link-color, #0d6efd)) 8%, transparent)
+  );
+  border: 1px solid var(--wiki-fab-btn-border, var(--wiki-chrome-surface-border, var(--bs-border-color, #dee2e6)));
+  border-radius: var(--wiki-chrome-radius, var(--bs-border-radius-lg, 0.5rem));
+  color: var(--wiki-chrome-link-color, var(--bs-link-color, inherit));
+  display: inline-flex;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  justify-content: center;
+  line-height: 1;
+  padding: 0.45rem 0.65rem;
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.wiki-fab-btn--icon {
+  font-size: 1rem;
+  height: 2.5rem;
+  min-width: 2.5rem;
+  padding: 0;
+  width: 2.5rem;
+}
+
+.wiki-fab-btn--icon .fa {
+  line-height: 1;
+}
+
+.wiki-fab-btn:hover,
+.wiki-fab-btn:focus {
+  color: var(--wiki-chrome-link-hover-color, var(--bs-link-hover-color, var(--bs-link-color, inherit)));
+}
+
+.wiki-fab-btn--danger {
+  background: var(
+    --wiki-fab-danger-bg,
+    color-mix(in srgb, var(--wiki-chrome-danger, var(--bs-danger, #dc3545)) 12%, transparent)
+  );
+  border-color: var(--wiki-chrome-danger, var(--bs-danger, #dc3545));
+  color: var(--wiki-chrome-danger, var(--bs-danger, #dc3545));
 }
 
 .wiki-sidebar {
@@ -365,7 +449,7 @@ a[href*="/wiki/category/"][href*="redlink=1"] {
 /* CKEditor editable sizing / chrome: see wiki-article-body.css (loads after CKEditor on compose) */
 
 @media (max-width: 767px) {
-  .wiki-content-layout {
+  .wiki-with-fab .wiki-content-layout--sidebar {
     grid-template-columns: 1fr;
   }
 
