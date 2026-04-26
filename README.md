@@ -75,7 +75,16 @@ The plugin is intentionally split by responsibility:
 - [lib/serializer.js](/home/vicky/Projects/nodebb-dev/nodebb-plugin-westgate-wiki/lib/serializer.js): wiki path and view-model shaping
 - [templates/](/home/vicky/Projects/nodebb-dev/nodebb-plugin-westgate-wiki/templates): wiki-facing templates
 - [public/wiki.js](/home/vicky/Projects/nodebb-dev/nodebb-plugin-westgate-wiki/public/wiki.js): client-side create-page and redlink behavior
-- [public/wiki.css](/home/vicky/Projects/nodebb-dev/nodebb-plugin-westgate-wiki/public/wiki.css): wiki-scoped styling
+- [public/wiki.css](/home/vicky/Projects/nodebb-dev/nodebb-plugin-westgate-wiki/public/wiki.css): wiki shell layout + optional `--wiki-chrome-*` hooks (Bootstrap defaults when unset)
+
+### Styling and theme hooks
+
+The plugin ships **layout** and **Bootstrap-aligned defaults** only. The active NodeBB theme supplies brand colors, typography, and panel chrome by setting CSS custom properties on `:root` or `#content` (child themes: import SCSS after your design tokens).
+
+- **`public/wiki.css`** (from `plugin.json` `css`): scopes to `.westgate-wiki`, handles grid/sidebar structure, and documents **shell** variables in the header comment. Read views use Bootstrap **`card` / `card-body`** so surfaces inherit normal forum card styling when variables are not set.
+- **`public/wiki-article-body.css`** (served at **`/westgate-wiki/compose/article-body.css`** on article and compose routes): **article prose** (`--wiki-prose-*`), **compose editable** (`--wiki-compose-editable-*`), and **CKEditor UI** (`--wiki-ck-*`). The full contract is listed in that file’s header comment.
+
+**Shell (wiki chrome):** `--wiki-chrome-surface-bg`, `--wiki-chrome-surface-border`, `--wiki-chrome-radius`, `--wiki-chrome-heading-color`, `--wiki-chrome-page-title-font-family`, `--wiki-chrome-muted-color`, `--wiki-chrome-link-color`, `--wiki-chrome-link-hover-color`, `--wiki-chrome-hero-bg`, `--wiki-chrome-accent-color`, `--wiki-chrome-warning-border`, `--wiki-chrome-danger`, `--wiki-chrome-danger-hover`, `--wiki-redlink-color`, `--wiki-redlink-decoration`, `--wiki-redlink-underline-offset`, `--wiki-redlink-border-color`, `--wiki-redlink-action-color`. **Legacy article panel:** `--wiki-panel-bg` and `--wiki-panel-border-color` are checked first for the article card and otherwise fall back through `--wiki-chrome-*` to Bootstrap card tokens.
 
 ### Exposed Service Surface
 
@@ -150,6 +159,6 @@ Check these flows after meaningful changes:
   Rebuild NodeBB assets, then restart the process if the change is server-side or initialization-related.
 - Wiki compose: CKEditor scripts/CSS fail with **MIME type “text/plain”** or **NS_ERROR_CORRUPTED_CONTENT** in Firefox:
   Usually the static files are missing from the install (`public/vendor/ckeditor5/` under the plugin) or the URL is wrong. From the plugin repo run **`npm run build:ckeditor`**, confirm those files exist next to `wiki-compose-page.js`, then reinstall/relink the plugin into NodeBB and run **`./nodebb build`**. In templates, do not prefix **`v=`** before `{config.cache-buster}`—that value already includes the `v=` segment when set.
-- Wiki compose or article page still looks like **plain CKEditor** (white canvas, default fonts):
-  Article typography is **`/westgate-wiki/compose/article-body.css`** (served by the plugin router, same namespace as `vendor.css`). Confirm that URL returns **200** in the browser network tab after **`./nodebb build`** and a process restart. The editable also gets class **`wiki-article-prose`** from JS (`getEditableElement`) plus the **`#wiki-compose-editor`** wrapper in the template.
+- Wiki compose or article page still looks like **plain CKEditor** (white canvas, default fonts), or wiki pages look like unstyled Bootstrap:
+  Article typography and CKEditor theming live in **`/westgate-wiki/compose/article-body.css`**. Wiki landing/section/article **chrome** uses **`public/wiki.css`** plus Bootstrap cards. Confirm **`article-body.css`** returns **200** in the network tab after **`./nodebb build`** and a process restart. The editable gets class **`wiki-article-prose`** from JS (`getEditableElement`) plus the **`#wiki-compose-editor`** wrapper in the template. Child themes should set **`--wiki-prose-*`**, **`--wiki-ck-*`**, and **`--wiki-chrome-*`** (see README section **Styling and theme hooks**) for full parity.
 - **127.0.0.1 vs localhost**: open the forum using the same host as **`url` in `config.json`**. Mixing them breaks websockets, CORP on some plugin assets, and CSRF/session expectations.

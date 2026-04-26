@@ -1,4 +1,4 @@
-<div id="westgate-wiki-compose" class="westgate-wiki westgate-wiki-compose container-lg py-4">
+<div id="westgate-wiki-compose" class="westgate-wiki westgate-wiki-compose py-4">
   <p class="wiki-page-kicker">
     <a href="{config.relative_path}/wiki">Westgate Wiki</a>
     <!-- BEGIN breadcrumbs -->
@@ -13,6 +13,12 @@
 
   <h1>{pageHeading}</h1>
   <p class="text-muted">Namespace: <strong>{section.name}</strong></p>
+  <!-- IF showSetHomeBanner -->
+  <div class="alert alert-info mb-3" role="status">
+    This page will be published and set as the public wiki homepage at <code class="px-1">/wiki</code> (you can change
+    that later in <strong>Admin &rarr; Plugins &rarr; Westgate Wiki</strong>).
+  </div>
+  <!-- ENDIF showSetHomeBanner -->
 
   <div id="westgate-wiki-compose-data" class="d-none" data-payload-b64="{composePayloadB64}"></div>
 

@@ -1,27 +1,52 @@
+/**
+ * Wiki shell layout + theme hooks (public/wiki.css).
+ *
+ * Surfaces use Bootstrap .card where templates provide it; colors chain through
+ * optional --wiki-chrome-* variables (documented in wiki-article-body.css) to --bs-*.
+ * Themes override --wiki-chrome-* / --wiki-prose-* on :root or #content for brand parity.
+ *
+ * Width: no max-width here — wiki lives inside Harmony `#content.container-lg` (or equivalent).
+ * Optional reading cap: max-width: var(--wiki-root-max-width, none);
+ */
+
 .westgate-wiki {
-  max-width: 1200px;
+  width: 100%;
 }
 
-.wiki-hero {
-  border: 1px solid rgba(202, 164, 106, 0.25);
-  background: linear-gradient(180deg, #211323, #100911);
-  border-radius: 1rem;
-  padding: 2rem;
+/* Optional: unified chrome tokens for nested wiki cards */
+.westgate-wiki .card.wiki-page-hero,
+.westgate-wiki .card.wiki-hero,
+.westgate-wiki .card.wiki-page-content,
+.westgate-wiki .card.wiki-sidebar-card,
+.westgate-wiki .card.wiki-status-card,
+.westgate-wiki .card.wiki-card,
+.westgate-wiki .card.wiki-topic-card {
+  background-color: var(
+    --wiki-chrome-surface-bg,
+    var(--bs-card-bg, var(--bs-body-bg, #fff))
+  );
+  border-color: var(
+    --wiki-chrome-surface-border,
+    var(--bs-card-border-color, var(--bs-border-color, #dee2e6))
+  );
+  border-radius: var(--wiki-chrome-radius, var(--bs-card-border-radius, var(--bs-border-radius-lg, 0.5rem)));
 }
 
-.wiki-page-hero {
-  border: 1px solid rgba(202, 164, 106, 0.25);
-  background: linear-gradient(180deg, #211323, #100911);
-  border-radius: 1rem;
-  padding: 2rem;
+.westgate-wiki .card.wiki-page-hero,
+.westgate-wiki .card.wiki-hero {
+  background: var(
+    --wiki-chrome-hero-bg,
+    var(--wiki-chrome-surface-bg, var(--bs-card-bg, var(--bs-body-bg, #fff)))
+  );
 }
 
+.wiki-page-hero h1,
 .wiki-hero h1 {
-  color: #e1c27a;
-}
-
-.wiki-page-hero h1 {
-  color: #e1c27a;
+  color: var(--wiki-chrome-heading-color, var(--bs-heading-color, var(--bs-emphasis-color, inherit)));
+  font-family: var(
+    --wiki-chrome-page-title-font-family,
+    var(--bs-heading-font-family, inherit)
+  );
   margin-bottom: 0.75rem;
 }
 
@@ -33,40 +58,42 @@
 }
 
 .wiki-page-kicker a {
-  color: rgba(225, 194, 122, 0.85);
-}
-
-.wiki-namespace-path {
-  color: rgba(255, 248, 237, 0.68);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-bottom: 0.85rem;
-}
-
-.wiki-namespace-path a {
-  color: #d7b26e;
+  color: var(--wiki-chrome-link-color, var(--bs-link-color, inherit));
   text-decoration: none;
 }
 
+.wiki-page-kicker a:hover,
+.wiki-page-kicker a:focus {
+  color: var(--wiki-chrome-link-hover-color, var(--bs-link-hover-color, var(--bs-link-color, inherit)));
+}
+
+.wiki-namespace-path,
 .wiki-page-path {
-  color: rgba(255, 248, 237, 0.68);
+  color: var(--wiki-chrome-muted-color, var(--bs-secondary-color, inherit));
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
   margin-bottom: 0.85rem;
 }
 
+.wiki-namespace-path a,
 .wiki-page-path a {
-  color: #d7b26e;
+  color: var(--wiki-chrome-link-color, var(--bs-link-color, inherit));
   text-decoration: none;
+}
+
+.wiki-namespace-path a:hover,
+.wiki-namespace-path a:focus,
+.wiki-page-path a:hover,
+.wiki-page-path a:focus {
+  color: var(--wiki-chrome-link-hover-color, var(--bs-link-hover-color, var(--bs-link-color, inherit)));
 }
 
 .wiki-hero p,
 .wiki-page-hero p,
 .wiki-card-description,
 .wiki-section-description {
-  color: rgba(255, 248, 237, 0.78);
+  color: var(--wiki-chrome-muted-color, var(--bs-secondary-color, inherit));
 }
 
 .wiki-grid {
@@ -75,15 +102,11 @@
   gap: 1rem;
 }
 
-.wiki-status-card {
-  background: rgba(24, 15, 29, 0.94);
-  border: 1px solid rgba(202, 164, 106, 0.2);
-  border-radius: 0.75rem;
-  padding: 1.25rem;
-}
-
 .wiki-status-card-warning {
-  border-color: rgba(202, 164, 106, 0.45);
+  border-color: var(
+    --wiki-chrome-warning-border,
+    var(--bs-warning-border-subtle, var(--bs-warning, var(--bs-border-color, #dee2e6)))
+  );
 }
 
 .wiki-section-heading {
@@ -92,23 +115,19 @@
 
 .wiki-section-heading h2,
 .wiki-subsection-card h3 {
-  color: #e1c27a;
+  color: var(--wiki-chrome-heading-color, var(--bs-heading-color, var(--bs-emphasis-color, inherit)));
   margin-bottom: 0.25rem;
 }
 
 .wiki-section-heading p {
-  color: rgba(255, 248, 237, 0.68);
+  color: var(--wiki-chrome-muted-color, var(--bs-secondary-color, inherit));
   margin: 0;
 }
 
 .wiki-card {
-  background: rgba(24, 15, 29, 0.94);
-  border: 1px solid rgba(202, 164, 106, 0.2);
-  border-radius: 0.75rem;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  padding: 1rem;
 }
 
 .wiki-card-header {
@@ -119,7 +138,7 @@
 }
 
 .wiki-topic-count {
-  color: rgba(225, 194, 122, 0.75);
+  color: var(--wiki-chrome-accent-color, var(--wiki-chrome-muted-color, var(--bs-secondary-color, inherit)));
   font-size: 0.875rem;
 }
 
@@ -135,50 +154,63 @@
 
 .wiki-card h2 a,
 .wiki-topic-list a {
-  color: #caa46a;
+  color: var(--wiki-chrome-link-color, var(--bs-link-color, inherit));
+}
+
+.wiki-card h2 a:hover,
+.wiki-card h2 a:focus,
+.wiki-topic-list a:hover,
+.wiki-topic-list a:focus {
+  color: var(--wiki-chrome-link-hover-color, var(--bs-link-hover-color, var(--bs-link-color, inherit)));
 }
 
 .wiki-card-link {
   align-self: flex-start;
-  color: #f3d8a0;
+  color: var(--wiki-chrome-link-color, var(--bs-link-color, inherit));
   font-size: 0.95rem;
   font-weight: 600;
   text-decoration: none;
 }
 
 .wiki-card-link-secondary {
-  color: rgba(255, 248, 237, 0.78);
+  color: var(--wiki-chrome-muted-color, var(--bs-secondary-color, inherit));
+  font-weight: 500;
 }
 
 .wiki-card-link:hover,
 .wiki-card-link:focus {
-  color: #fff0c9;
+  color: var(--wiki-chrome-link-hover-color, var(--bs-link-hover-color, var(--bs-link-color, inherit)));
 }
 
 .wiki-page-meta {
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--wiki-chrome-muted-color, var(--bs-secondary-color, inherit));
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem 1rem;
 }
 
 .wiki-page-meta a {
-  color: #caa46a;
+  color: var(--wiki-chrome-link-color, var(--bs-link-color, inherit));
+}
+
+.wiki-page-meta a:hover,
+.wiki-page-meta a:focus {
+  color: var(--wiki-chrome-link-hover-color, var(--bs-link-hover-color, var(--bs-link-color, inherit)));
 }
 
 .wiki-page-meta .wiki-delete-page {
   background: none;
   border: 0;
-  padding: 0;
-  font: inherit;
   cursor: pointer;
-  color: rgba(204, 110, 110, 0.95);
+  color: var(--wiki-chrome-danger, var(--bs-danger, #dc3545));
+  font: inherit;
+  padding: 0;
   text-decoration: underline;
 }
 
 .wiki-page-meta .wiki-delete-page:hover,
 .wiki-page-meta .wiki-delete-page:focus {
-  color: #e8a0a0;
+  color: var(--wiki-chrome-danger-hover, var(--bs-danger-text-emphasis, var(--bs-danger, #b02a37)));
 }
 
 .wiki-page-body {
@@ -197,23 +229,21 @@
   gap: 1rem;
 }
 
-.wiki-sidebar-card {
-  background: rgba(24, 15, 29, 0.94);
-  border: 1px solid rgba(202, 164, 106, 0.2);
-  border-radius: 0.75rem;
-  padding: 1rem;
-}
-
 .wiki-sidebar-card h2 {
-  color: #e1c27a;
+  color: var(--wiki-chrome-heading-color, var(--bs-heading-color, var(--bs-emphasis-color, inherit)));
   font-size: 1rem;
   margin-bottom: 0.75rem;
 }
 
 .wiki-sidebar-root {
-  color: #f3d8a0;
+  color: var(--wiki-chrome-link-color, var(--bs-link-color, inherit));
   font-weight: 600;
   text-decoration: none;
+}
+
+.wiki-sidebar-root:hover,
+.wiki-sidebar-root:focus {
+  color: var(--wiki-chrome-link-hover-color, var(--bs-link-hover-color, var(--bs-link-color, inherit)));
 }
 
 .wiki-sidebar-list {
@@ -227,18 +257,24 @@
 }
 
 .wiki-sidebar-list a {
-  color: rgba(255, 248, 237, 0.82);
+  color: var(--wiki-chrome-muted-color, var(--bs-secondary-color, inherit));
   display: inline-flex;
   flex-direction: column;
   gap: 0.1rem;
   text-decoration: none;
 }
 
+.wiki-sidebar-list a:hover,
+.wiki-sidebar-list a:focus {
+  color: var(--wiki-chrome-link-hover-color, var(--bs-link-hover-color, var(--bs-link-color, inherit)));
+}
+
 .wiki-sidebar-parent-path,
 .wiki-topic-parent-path {
-  color: rgba(255, 248, 237, 0.56);
+  color: var(--wiki-chrome-muted-color, var(--bs-secondary-color, inherit));
   display: block;
   font-size: 0.78rem;
+  opacity: 0.92;
 }
 
 .wiki-sidebar-page-title,
@@ -247,29 +283,25 @@
 }
 
 .wiki-sidebar-list .is-active a {
-  color: #f3d8a0;
+  color: var(--wiki-chrome-link-color, var(--bs-link-color, inherit));
   font-weight: 600;
 }
 
-.wiki-page-content {
-  background: var(--wiki-panel-bg, rgba(24, 15, 29, 0.94));
-  border: 1px solid var(--wiki-panel-border-color, rgba(202, 164, 106, 0.2));
-  border-radius: 0.75rem;
-  padding: 1.5rem;
+/* Article shell: legacy --wiki-panel-* aliases chrome / Bootstrap */
+.wiki-page-content.card {
+  background-color: var(
+    --wiki-panel-bg,
+    var(--wiki-chrome-surface-bg, var(--bs-card-bg, var(--bs-body-bg, #fff)))
+  );
+  border-color: var(
+    --wiki-panel-border-color,
+    var(--wiki-chrome-surface-border, var(--bs-card-border-color, var(--bs-border-color, #dee2e6)))
+  );
 }
-
-/* Article figure layout + floats: see wiki-article-body.css (.wiki-article-prose) */
 
 .wiki-section-list {
   display: grid;
   gap: 1rem;
-}
-
-.wiki-topic-card {
-  background: rgba(24, 15, 29, 0.94);
-  border: 1px solid rgba(202, 164, 106, 0.2);
-  border-radius: 0.75rem;
-  padding: 1.25rem;
 }
 
 .wiki-topic-card h2 {
@@ -282,18 +314,28 @@
 }
 
 .wiki-topic-card h2 a {
-  color: #e1c27a;
+  color: var(--wiki-chrome-heading-color, var(--bs-heading-color, var(--bs-emphasis-color, inherit)));
+}
+
+.wiki-topic-card h2 a:hover,
+.wiki-topic-card h2 a:focus {
+  color: var(--wiki-chrome-link-hover-color, var(--bs-link-hover-color, var(--bs-link-color, inherit)));
 }
 
 .wiki-topic-card-meta {
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--wiki-chrome-muted-color, var(--bs-secondary-color, inherit));
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem 1rem;
 }
 
 .wiki-topic-card-meta a {
-  color: #caa46a;
+  color: var(--wiki-chrome-link-color, var(--bs-link-color, inherit));
+}
+
+.wiki-topic-card-meta a:hover,
+.wiki-topic-card-meta a:focus {
+  color: var(--wiki-chrome-link-hover-color, var(--bs-link-hover-color, var(--bs-link-color, inherit)));
 }
 
 .westgate-wiki a.wiki-redlink,
@@ -303,17 +345,17 @@
 .westgate-wiki .wiki-card-description a.wiki-redlink,
 .westgate-wiki .wiki-status-card a.wiki-redlink,
 a[href*="/wiki/category/"][href*="redlink=1"] {
-  color: #d77979 !important;
-  text-decoration: underline dotted;
-  text-underline-offset: 0.16em;
+  color: var(--wiki-redlink-color, var(--bs-danger, #dc3545));
+  text-decoration: var(--wiki-redlink-decoration, underline dotted);
+  text-underline-offset: var(--wiki-redlink-underline-offset, 0.16em);
 }
 
 .wiki-status-card-redlink {
-  border-color: rgba(215, 121, 121, 0.45);
+  border-color: var(--wiki-redlink-border-color, rgba(220, 53, 69, 0.42));
 }
 
 .wiki-redlink-action {
-  color: #f0a8a8;
+  color: var(--wiki-redlink-action-color, var(--bs-danger-text-emphasis, var(--bs-danger, #dc3545)));
 }
 
 .westgate-wiki-compose .wiki-compose-editor {
@@ -325,16 +367,6 @@ a[href*="/wiki/category/"][href*="redlink=1"] {
 @media (max-width: 767px) {
   .wiki-content-layout {
     grid-template-columns: 1fr;
-  }
-
-  .wiki-hero,
-  .wiki-page-hero,
-  .wiki-page-content,
-  .wiki-status-card,
-  .wiki-card,
-  .wiki-topic-card,
-  .wiki-sidebar-card {
-    padding: 1.25rem;
   }
 
   .wiki-card-header {

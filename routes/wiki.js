@@ -5,6 +5,7 @@ const middleware = require.main.require("./src/middleware");
 const routeHelpers = require.main.require("./src/routes/helpers");
 const composeAssets = require("../lib/compose-assets");
 const composeController = require("../lib/controllers/compose");
+const config = require("../lib/config");
 const serializer = require("../lib/serializer");
 const wikiService = require("../lib/wiki-service");
 const topicService = require("../lib/topic-service");
@@ -18,6 +19,65 @@ function appendQueryString(path, req) {
   return queryString ? `${path}?${queryString}` : path;
 }
 
+function buildWikiPageRenderData(wikiPage, { isWikiHome }) {
+  const pageBreadcrumbs = [
+    {
+      text: "Westgate Wiki",
+      url: "/wiki"
+    },
+    ...wikiPage.ancestorSections.map((ancestor) => ({
+      text: ancestor.name,
+      url: ancestor.wikiPath
+    })),
+    {
+      text: wikiPage.category.name,
+      url: serializer.buildWikiSectionPath(wikiPage.category)
+    },
+    ...wikiPage.parentPages.map((page) => ({
+      text: page.text,
+      url: page.url || undefined
+    })),
+    {
+      text: wikiPage.pageTitlePath.length ? wikiPage.pageTitlePath[wikiPage.pageTitlePath.length - 1] : wikiPage.topic.title
+    }
+  ];
+
+  return {
+    title: wikiPage.topic.title,
+    breadcrumbs: pageBreadcrumbs,
+    topic: wikiPage.topic,
+    isWikiHome: !!isWikiHome,
+    showWikiDiscussionLink: !isWikiHome,
+    pageTitle: wikiPage.pageTitlePath.length ? wikiPage.pageTitlePath[wikiPage.pageTitlePath.length - 1] : wikiPage.topic.title,
+    pageTitlePath: wikiPage.pageTitlePath,
+    hasPageParents: wikiPage.parentPages.length > 0,
+    parentPages: wikiPage.parentPages,
+    category: wikiPage.category,
+    canCreateSiblingPage: !!wikiPage.categoryPrivileges["topics:create"],
+    canEditWikiPage: !!wikiPage.canEditWikiPage,
+    canDeleteWikiPage: !!wikiPage.canDeleteWikiPage,
+    sectionNavigation: wikiPage.sectionNavigation,
+    hasSectionNavigation: !!wikiPage.sectionNavigation,
+    hasSectionChildNamespaces: !!(wikiPage.sectionNavigation && wikiPage.sectionNavigation.childSections.length),
+    hasSectionPages: !!(wikiPage.sectionNavigation && wikiPage.sectionNavigation.topics.length),
+    mainPost: wikiPage.mainPost
+  };
+}
+
+async function getWikiFallbackContext(uid) {
+  const wikiData = await wikiService.getSections(uid);
+  return {
+    sections: wikiData.sections,
+    hasSections: wikiData.sections.length > 0,
+    configuredCategoryCount: wikiData.settings.categoryIds.length,
+    effectiveCategoryCount: wikiData.settings.effectiveCategoryIds.length,
+    topicsPerCategory: wikiData.settings.topicsPerCategory,
+    includeChildCategories: wikiData.settings.includeChildCategories,
+    hasInvalidCategoryIds: wikiData.invalidCategoryIds.length > 0,
+    invalidCategoryIdsText: wikiData.invalidCategoryIds.join(", ")
+  };
+}
+
 function register(params) {
   const { router } = params;
 
@@ -25,25 +85,73 @@ function register(params) {
 
   routeHelpers.setupPageRoute(router, "/wiki", async (req, res, next) => {
     try {
-      const wikiData = await wikiService.getSections(req.uid);
+      const settings = await config.getSettings();
+      const baseBreadcrumbs = [
+        {
+          text: "Westgate Wiki",
+          url: "/wiki"
+        }
+      ];
 
-      res.render("wiki", {
-        title: "Westgate Wiki",
-        breadcrumbs: [
-          {
-            text: "Westgate Wiki",
-            url: "/wiki"
+      if (!settings.isConfigured) {
+        const ctx = await getWikiFallbackContext(req.uid);
+        return res.render("wiki", {
+          title: "Westgate Wiki",
+          breadcrumbs: baseBreadcrumbs,
+          setupRequired: true,
+          homePageSetupRequired: false,
+          homePageLoadError: false,
+          homePageErrorForbidden: false,
+          homePageErrorNotFound: false,
+          showNamespaceIndex: false,
+          ...ctx
+        });
+      }
+
+      if (!settings.homeTopicId) {
+        const ctx = await getWikiFallbackContext(req.uid);
+        let bootstrapHomeCid = null;
+        for (const s of ctx.sections) {
+          if (s.privileges && s.privileges.canCreatePage) {
+            bootstrapHomeCid = s.cid;
+            break;
           }
-        ],
-        sections: wikiData.sections,
-        hasSections: wikiData.sections.length > 0,
-        setupRequired: !wikiData.settings.isConfigured,
-        configuredCategoryCount: wikiData.settings.categoryIds.length,
-        effectiveCategoryCount: wikiData.settings.effectiveCategoryIds.length,
-        topicsPerCategory: wikiData.settings.topicsPerCategory,
-        includeChildCategories: wikiData.settings.includeChildCategories,
-        hasInvalidCategoryIds: wikiData.invalidCategoryIds.length > 0,
-        invalidCategoryIdsText: wikiData.invalidCategoryIds.join(", ")
+        }
+        const canBootstrapHome = Number.isInteger(parseInt(bootstrapHomeCid, 10)) && parseInt(bootstrapHomeCid, 10) > 0;
+        return res.render("wiki", {
+          title: "Westgate Wiki",
+          breadcrumbs: baseBreadcrumbs,
+          setupRequired: false,
+          homePageSetupRequired: true,
+          homePageLoadError: false,
+          homePageErrorForbidden: false,
+          homePageErrorNotFound: false,
+          showNamespaceIndex: false,
+          canBootstrapHome,
+          bootstrapHomeCid: canBootstrapHome ? String(bootstrapHomeCid) : "",
+          ...ctx
+        });
+      }
+
+      const wikiPage = await topicService.getWikiPage(String(settings.homeTopicId), req.uid);
+
+      if (wikiPage.status === "ok") {
+        return res.render("wiki-page", buildWikiPageRenderData(wikiPage, { isWikiHome: true }));
+      }
+
+      const status = wikiPage.status;
+      const ctx = await getWikiFallbackContext(req.uid);
+      return res.render("wiki", {
+        title: "Westgate Wiki",
+        breadcrumbs: baseBreadcrumbs,
+        setupRequired: false,
+        homePageSetupRequired: false,
+        homePageLoadError: true,
+        homePageErrorForbidden: status === "forbidden",
+        homePageErrorNotFound: status === "not-found",
+        homePageErrorStatus: String(status),
+        showNamespaceIndex: false,
+        ...ctx
       });
     } catch (err) {
       next(err);
@@ -114,49 +222,16 @@ function register(params) {
       return helpers.redirect(res, appendQueryString(`/wiki/${wikiPage.topic.slug}`, req), true);
     }
 
-    const pageBreadcrumbs = [
-      {
-        text: "Westgate Wiki",
-        url: "/wiki"
-      },
-      ...wikiPage.ancestorSections.map((ancestor) => ({
-        text: ancestor.name,
-        url: ancestor.wikiPath
-      })),
-      {
-        text: wikiPage.category.name,
-        url: serializer.buildWikiSectionPath(wikiPage.category)
-      },
-      ...wikiPage.parentPages.map((page) => ({
-        text: page.text,
-        url: page.url || undefined
-      })),
-      {
-        text: wikiPage.pageTitlePath.length ? wikiPage.pageTitlePath[wikiPage.pageTitlePath.length - 1] : wikiPage.topic.title
-      }
-    ];
+    const settings = await config.getSettings();
+    if (settings.homeTopicId && parseInt(wikiPage.topic.tid, 10) === settings.homeTopicId && !res.locals.isAPI) {
+      return helpers.redirect(res, appendQueryString("/wiki", req), true);
+    }
 
-    res.render("wiki-page", {
-      title: wikiPage.topic.title,
-      breadcrumbs: pageBreadcrumbs,
-      topic: wikiPage.topic,
-      pageTitle: wikiPage.pageTitlePath.length ? wikiPage.pageTitlePath[wikiPage.pageTitlePath.length - 1] : wikiPage.topic.title,
-      pageTitlePath: wikiPage.pageTitlePath,
-      hasPageParents: wikiPage.parentPages.length > 0,
-      parentPages: wikiPage.parentPages,
-      category: wikiPage.category,
-      canCreateSiblingPage: !!wikiPage.categoryPrivileges["topics:create"],
-      canEditWikiPage: !!wikiPage.canEditWikiPage,
-      canDeleteWikiPage: !!wikiPage.canDeleteWikiPage,
-      sectionNavigation: wikiPage.sectionNavigation,
-      hasSectionNavigation: !!wikiPage.sectionNavigation,
-      hasSectionChildNamespaces: !!(wikiPage.sectionNavigation && wikiPage.sectionNavigation.childSections.length),
-      hasSectionPages: !!(wikiPage.sectionNavigation && wikiPage.sectionNavigation.topics.length),
-      mainPost: wikiPage.mainPost
-    });
+    res.render("wiki-page", buildWikiPageRenderData(wikiPage, { isWikiHome: false }));
   });
 }
 
 module.exports = {
-  register
+  register,
+  buildWikiPageRenderData
 };

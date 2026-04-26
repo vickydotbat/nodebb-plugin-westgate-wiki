@@ -28,14 +28,22 @@ plugin.init = async function (params) {
   wikiRoutes.register(params);
 };
 
-plugin.registerApiRoutes = async function ({ router }) {
+plugin.registerApiRoutes = async function ({ router, middleware }) {
   const wikiNamespaceSearch = require("./lib/wiki-namespace-search");
+  const wikiHomepage = require("./lib/wiki-homepage");
   routeHelpers.setupApiRoute(
     router,
     "get",
     "/westgate-wiki/namespace/:cid/search",
     [],
     wikiNamespaceSearch.searchNamespaceTopics
+  );
+  routeHelpers.setupApiRoute(
+    router,
+    "put",
+    "/westgate-wiki/homepage",
+    [middleware.ensureLoggedIn, middleware.checkRequired.bind(null, ["tid"])],
+    wikiHomepage.putWikiHomepage
   );
 };
 
@@ -54,6 +62,28 @@ plugin.wikiMarkdownBeforeParse = wikiHtmlParse.markdownBeforeParse;
 plugin.clearWikiPostParseCache = cacheService.clearWikiPostParseCache;
 plugin.clearWikiPostEditCache = cacheService.clearWikiPostEditCache;
 plugin.onWikiTopicDelete = wikiTopicPurge.onTopicDelete;
+plugin.wikiFilterTopicDelete = async function (data) {
+  if (!data || !data.topicData) {
+    return data;
+  }
+  const settings = await config.getSettings();
+  if (settings.homeTopicId && parseInt(data.topicData.tid, 10) === settings.homeTopicId) {
+    data.canDelete = false;
+  }
+  return data;
+};
+plugin.wikiFilterPrivilegesTopicsGet = async function (data) {
+  if (!data || data.tid === undefined || data.tid === null) {
+    return data;
+  }
+  const settings = await config.getSettings();
+  if (settings.homeTopicId && parseInt(data.tid, 10) === settings.homeTopicId) {
+    data["topics:delete"] = false;
+    data.purge = false;
+    data.deletable = false;
+  }
+  return data;
+};
 plugin.services = {
   cacheService,
   config,

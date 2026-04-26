@@ -51,6 +51,14 @@
     {
       "hook": "action:topic.delete",
       "method": "onWikiTopicDelete"
+    },
+    {
+      "hook": "filter:topic.delete",
+      "method": "wikiFilterTopicDelete"
+    },
+    {
+      "hook": "filter:privileges.topics.get",
+      "method": "wikiFilterPrivilegesTopicsGet"
     }
   ]
 }

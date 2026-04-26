@@ -57,6 +57,25 @@
         </div>
 
         <div class="mb-4">
+          <label class="form-label" for="homeTopicId">Wiki homepage (topic id)</label>
+          <input
+            id="homeTopicId"
+            type="text"
+            class="form-control"
+            name="homeTopicId"
+            inputmode="numeric"
+            pattern="[0-9]*"
+            placeholder="e.g. 42 (leave empty to clear)"
+            value="{homeTopicId}"
+          />
+          <p class="form-text">
+            The <code>/wiki</code> route shows this topic as the wiki home (same layout as other wiki pages). Create a topic
+            in any configured wiki namespace, then enter its numeric topic id here. This page cannot be removed from the wiki
+            &quot;Remove page&quot; action.
+          </p>
+        </div>
+
+        <div class="mb-4">
           <label class="form-label" for="topicsPerCategory">Topics Per Category</label>
           <input
             id="topicsPerCategory"

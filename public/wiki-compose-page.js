@@ -206,6 +206,46 @@ function initWikiComposePage() {
             wikiSlug = responsePayload.slug;
           }
 
+          let homepageSetOk = false;
+          if (!isEdit && payload.setAsWikiHome && payload.wikiHomepageApiUrl) {
+            const tidVal = responsePayload && (responsePayload.tid || (responsePayload.topic && responsePayload.topic.tid));
+            if (tidVal) {
+              const putRes = await fetch(payload.wikiHomepageApiUrl, {
+                method: "PUT",
+                credentials: "same-origin",
+                headers: {
+                  "Content-Type": "application/json",
+                  "x-csrf-token": payload.csrfToken
+                },
+                body: JSON.stringify({ tid: parseInt(tidVal, 10) })
+              });
+              if (putRes.ok) {
+                homepageSetOk = true;
+              } else {
+                let putJson = null;
+                try {
+                  putJson = await putRes.json();
+                } catch (e) {
+                  putJson = null;
+                }
+                const putMsg = (putJson && putJson.status && putJson.status.message) || putRes.statusText;
+                setStatus(
+                  statusEl,
+                  "Page published, but /wiki was not set as the homepage: " + putMsg + " You can set the topic id in the ACP."
+                );
+              }
+            }
+          }
+
+          if (homepageSetOk) {
+            if (typeof ajaxify !== "undefined" && ajaxify.go) {
+              ajaxify.go("wiki");
+            } else {
+              window.location.href = (payload.relativePath || "") + "/wiki";
+            }
+            return;
+          }
+
           if (wikiSlug && typeof ajaxify !== "undefined" && ajaxify.go) {
             ajaxify.go(`wiki/${wikiSlug}`);
           } else if (wikiSlug) {

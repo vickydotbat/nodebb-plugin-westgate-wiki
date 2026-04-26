@@ -34,6 +34,23 @@
  *   --wiki-ck-input-background, --wiki-ck-input-border, --wiki-ck-input-text
  *   --wiki-ck-list-background, --wiki-ck-panel-background, --wiki-ck-panel-border
  *   --wiki-ck-tooltip-background, --wiki-ck-tooltip-text
+ *
+ *   Wiki shell (landing / section / page chrome; see public/wiki.css):
+ *   --wiki-chrome-surface-bg, --wiki-chrome-surface-border, --wiki-chrome-radius
+ *   --wiki-chrome-heading-color, --wiki-chrome-page-title-font-family (optional)
+ *   --wiki-chrome-muted-color
+ *   --wiki-chrome-link-color, --wiki-chrome-link-hover-color
+ *   --wiki-chrome-hero-bg (optional; falls back to --wiki-chrome-surface-bg)
+ *   --wiki-chrome-accent-color (optional; topic counts, secondary emphasis)
+ *   --wiki-chrome-warning-border (optional; status card warning state)
+ *   --wiki-chrome-danger, --wiki-chrome-danger-hover (delete action)
+ *   --wiki-redlink-color, --wiki-redlink-decoration, --wiki-redlink-underline-offset
+ *   --wiki-redlink-border-color (status card redlink border)
+ *   --wiki-redlink-action-color
+ *
+ *   Legacy article panel (alias of chrome surface; themes may set either):
+ *   --wiki-panel-bg → falls back to --wiki-chrome-surface-bg then Bootstrap card/body
+ *   --wiki-panel-border-color → falls back to --wiki-chrome-surface-border
  */
 
 /* --- CKEditor UI: map to theme / Bootstrap / optional --wiki-ck-* --- */
