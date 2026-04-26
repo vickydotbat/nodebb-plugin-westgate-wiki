@@ -266,6 +266,17 @@ export async function createWikiEditor(element, options) {
 
   const editor = await ClassicEditor.create(element, {
     licenseKey: "GPL",
+    /*
+     * GPL: the "Powered by" affordance is required. Keep it in the official layout
+     * (inside the editing surface) so it is not a stray body-level strip after ajaxify.
+     * @see https://ckeditor.com/docs/ckeditor5/latest/getting-started/licensing/managing-ckeditor-logo.html
+     */
+    ui: {
+      poweredBy: {
+        position: "inside",
+        side: "right"
+      }
+    },
     plugins: [...editorPlugins, UploadPlugin],
     toolbar: {
       items: toolbarItems,
@@ -322,7 +333,31 @@ export async function createWikiEditor(element, options) {
     editableEl.classList.add("wiki-article-prose");
   }
 
+  reparentCKEditorBodyWrapper(editor);
+
   return editor;
+}
+
+/**
+ * BodyCollection.attachToDom() appends a shared div.ck-body-wrapper to document.body. That is correct for
+ * standalone pages but breaks NodeBB layout (full-width / flex / theme rules on body children). Move the
+ * wrapper into the compose root so CKEditor UI layers stay in the wiki compose subtree.
+ * @param {*} editor
+ */
+function reparentCKEditorBodyWrapper(editor) {
+  const sink = document.getElementById("westgate-wiki-ck-body-sink");
+  const bodyView = editor.ui && editor.ui.view && editor.ui.view.body;
+  const collectionRoot = bodyView && bodyView.bodyCollectionContainer;
+  if (!sink || !collectionRoot) {
+    return;
+  }
+  const wrap = collectionRoot.parentElement;
+  if (!wrap || !wrap.classList || !wrap.classList.contains("ck-body-wrapper")) {
+    return;
+  }
+  if (wrap.parentNode !== sink) {
+    sink.appendChild(wrap);
+  }
 }
 
 export function htmlToMarkdown(html) {

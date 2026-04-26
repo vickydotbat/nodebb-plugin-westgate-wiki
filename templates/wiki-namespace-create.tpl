@@ -1,18 +1,13 @@
 <div class="westgate-wiki westgate-wiki-namespace-create py-4">
-  <p class="wiki-page-kicker">
-    <a href="{config.relative_path}/wiki">Westgate Wiki</a>
-    <!-- BEGIN breadcrumbs -->
-    <span> / </span>
-    <!-- IF breadcrumbs.url -->
-    <a href="{config.relative_path}{breadcrumbs.url}">{breadcrumbs.text}</a>
-    <!-- ELSE -->
-    <span>{breadcrumbs.text}</span>
-    <!-- ENDIF breadcrumbs.url -->
-    <!-- END breadcrumbs -->
-  </p>
-
-  <h1>Create child namespace</h1>
-  <p class="text-muted">New namespace under <strong>{parentName}</strong>. Access rules are copied from this parent.</p>
+  <header class="wiki-page-header mb-3">
+    <!-- IMPORT partials/wiki/breadcrumb-trail.tpl -->
+    <div class="wiki-page-heading">
+      <h1 class="wiki-page-heading__title">Create child namespace</h1>
+    </div>
+    <p class="wiki-namespace-create-lead text-muted mb-0 mt-2 small">
+      New namespace under <strong>{parentName}</strong>. Access rules are copied from this parent.
+    </p>
+  </header>
 
   <div
     id="wiki-namespace-create-config"

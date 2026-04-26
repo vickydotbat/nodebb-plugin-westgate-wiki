@@ -1,12 +1,13 @@
 <div class="westgate-wiki py-4">
-  <section class="wiki-hero card mb-4">
-    <div class="card-body">
-      <h1>Westgate Wiki</h1>
-      <p>
-        Lore, factions, locations, rules, and player guidance for Shadows Over Westgate.
-      </p>
+  <header class="wiki-page-header mb-4">
+    <!-- IMPORT partials/wiki/breadcrumb-trail.tpl -->
+    <div class="wiki-page-heading">
+      <h1 class="wiki-page-heading__title">Westgate Wiki</h1>
     </div>
-  </section>
+    <p class="wiki-hub-tagline mb-0 mt-2">
+      Lore, factions, locations, rules, and player guidance for Shadows Over Westgate.
+    </p>
+  </header>
 
   <!-- IF setupRequired -->
   <section class="wiki-status-card card mb-4">

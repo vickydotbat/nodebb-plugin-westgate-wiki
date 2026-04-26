@@ -1,30 +1,15 @@
 <div class="westgate-wiki py-4">
-  <section class="wiki-page-hero card mb-4">
-    <div class="card-body">
-      <p class="wiki-page-kicker">
-        <a href="{config.relative_path}/wiki">Westgate Wiki</a>
-      </p>
-      <h1>{section.name}</h1>
-
-      <!-- IF section.ancestorSections.length -->
-      <div class="wiki-namespace-path">
-        <!-- BEGIN section.ancestorSections -->
-        <a href="{config.relative_path}{section.ancestorSections.wikiPath}">
-          {section.ancestorSections.name}
-        </a>
-        <span>/</span>
-        <!-- END section.ancestorSections -->
-        <span>{section.name}</span>
-      </div>
-      <!-- ENDIF section.ancestorSections.length -->
-
-      <!-- IF section.description -->
-      <div class="wiki-section-description wiki-article-prose">
-        {section.description}
-      </div>
-      <!-- ENDIF section.description -->
+  <header class="wiki-page-header mb-4">
+    <!-- IMPORT partials/wiki/breadcrumb-trail.tpl -->
+    <div class="wiki-page-heading">
+      <h1 class="wiki-page-heading__title">{section.name}</h1>
     </div>
-  </section>
+    <!-- IF section.description -->
+    <div class="wiki-section-description wiki-article-prose mt-2 mb-0">
+      {section.description}
+    </div>
+    <!-- ENDIF section.description -->
+  </header>
 
   <div class="wiki-with-fab wiki-with-fab--section">
     <div class="wiki-content-layout">
@@ -128,7 +113,6 @@
       </div>
     </div>
 
-    <!-- IF showWikiSectionFab -->
     <nav class="wiki-fab-dock wiki-fab-dock--floating" aria-label="Namespace tools">
       <div class="wiki-fab-dock-inner">
         <!-- IF canCreatePage -->
@@ -141,9 +125,11 @@
           <i class="fa fa-fw fa-folder-open" aria-hidden="true"></i>
         </a>
         <!-- ENDIF canCreateWikiNamespaces -->
+        <button type="button" class="wiki-fab-btn wiki-fab-btn--icon" data-wiki-scroll-top="1" title="Scroll to top" aria-label="Scroll to top">
+          <i class="fa fa-fw fa-chevron-up" aria-hidden="true"></i>
+        </button>
       </div>
     </nav>
-    <!-- ENDIF showWikiSectionFab -->
   </div>
 </div>
 

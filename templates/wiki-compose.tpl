@@ -1,17 +1,10 @@
 <div id="westgate-wiki-compose" class="westgate-wiki westgate-wiki-compose py-4">
-  <p class="wiki-page-kicker">
-    <!-- BEGIN breadcrumbs -->
-    <!-- IF breadcrumbs.url -->
-    <a href="{config.relative_path}{breadcrumbs.url}">{breadcrumbs.text}</a>
-    <span> / </span>
-    <!-- ELSE -->
-    <span>{breadcrumbs.text}</span>
-    <!-- ENDIF breadcrumbs.url -->
-    <!-- END breadcrumbs -->
-  </p>
-
-  <h1>{pageHeading}</h1>
-  <p class="text-muted">Namespace: <strong>{section.name}</strong></p>
+  <header class="wiki-page-header mb-3">
+    <!-- IMPORT partials/wiki/breadcrumb-trail.tpl -->
+    <div class="wiki-page-heading">
+      <h1 class="wiki-page-heading__title">{pageHeading}</h1>
+    </div>
+  </header>
   <!-- IF showSetHomeBanner -->
   <div class="alert alert-info mb-3" role="status">
     This page will be published and set as the public wiki homepage at <code class="px-1">/wiki</code> (you can change
@@ -29,7 +22,7 @@
 
     <div class="mb-2">
       <label class="form-label">Article body</label>
-      <p class="small text-muted mb-1">The editor saves HTML for the wiki topic. Wiki links like <code>[[Page]]</code> are turned into normal links when the page is viewed. You can still import Markdown below and load it into the editor.</p>
+      <p class="small text-muted mb-1">The editor saves HTML for the wiki topic. Wiki links like <code>[[Page]]</code>, <code>[[Page|Custom label]]</code>, <code>[[ns:Root/Child]]</code> (namespace index), and namespaced articles <code>[[Namespace/Page]]</code> are turned into links when the page is viewed. You can still import Markdown below and load it into the editor.</p>
       <div id="wiki-compose-editor" class="wiki-compose-editor wiki-article-prose"></div>
     </div>
 
