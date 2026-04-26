@@ -113,7 +113,6 @@
       </div>
     </div>
 
-    <!-- IF showWikiSectionFab -->
     <nav class="wiki-fab-dock wiki-fab-dock--floating" aria-label="Namespace tools">
       <div class="wiki-fab-dock-inner">
         <!-- IF canCreatePage -->
@@ -126,9 +125,11 @@
           <i class="fa fa-fw fa-folder-open" aria-hidden="true"></i>
         </a>
         <!-- ENDIF canCreateWikiNamespaces -->
+        <button type="button" class="wiki-fab-btn wiki-fab-btn--icon" data-wiki-scroll-top="1" title="Scroll to top" aria-label="Scroll to top">
+          <i class="fa fa-fw fa-chevron-up" aria-hidden="true"></i>
+        </button>
       </div>
     </nav>
-    <!-- ENDIF showWikiSectionFab -->
   </div>
 </div>
 

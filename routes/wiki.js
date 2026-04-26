@@ -22,14 +22,6 @@ function appendQueryString(path, req) {
   return queryString ? `${path}?${queryString}` : path;
 }
 
-function computeShowWikiFabDock(pageData) {
-  return !!(
-    pageData.canEditWikiPage ||
-    pageData.canDeleteWikiPage ||
-    pageData.showWikiDiscussionLink
-  );
-}
-
 /**
  * Flat rows for article sidebar: each configured ancestor namespace, then the
  * current namespace, then pages in that namespace only (no pages from parents).
@@ -190,7 +182,6 @@ function register(params) {
           ...buildWikiPageRenderData(wikiPage, { isWikiHome: true }),
           canCreateWikiNamespaces
         };
-        homePageData.showWikiFabDock = computeShowWikiFabDock(homePageData);
         return res.render("wiki-page", homePageData);
       }
 
@@ -258,8 +249,7 @@ function register(params) {
       canCreatePage,
       hasCreateIntent,
       createIntentTitle,
-      canCreateWikiNamespaces,
-      showWikiSectionFab: !!(canCreatePage || canCreateWikiNamespaces)
+      canCreateWikiNamespaces
     });
   });
 
@@ -292,8 +282,6 @@ function register(params) {
       ...buildWikiPageRenderData(wikiPage, { isWikiHome: false }),
       canCreateWikiNamespaces
     };
-    pageData.showWikiFabDock = computeShowWikiFabDock(pageData);
-
     res.render("wiki-page", pageData);
   });
 }

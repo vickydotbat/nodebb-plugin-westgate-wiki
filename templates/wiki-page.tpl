@@ -4,13 +4,14 @@
     <div class="wiki-page-heading">
       <h1 class="wiki-page-heading__title">{pageTitle}</h1>
       <!-- IF mainPost -->
-      <div class="wiki-page-heading__meta wiki-page-byline">
-        <!-- IF mainPost.user -->
-        <span class="wiki-page-byline-author">By {mainPost.user.displayname}</span>
-        <!-- ENDIF mainPost.user -->
-        <!-- IF mainPost.timestampISO -->
-        <span title="{mainPost.timestampISO}" class="wiki-page-byline-time timeago"></span>
-        <!-- ENDIF mainPost.timestampISO -->
+      <div class="wiki-page-heading__meta wiki-page-byline wiki-page-byline--attribution">
+        <!-- IF mainPost.wikiLastRevisionUser -->
+        <span>Last edited by
+          <!-- IF mainPost.wikiLastRevisionUser.userslug --><a class="wiki-page-byline__userlink" href="{config.relative_path}/user/{mainPost.wikiLastRevisionUser.userslug}">{mainPost.wikiLastRevisionUser.displayname}</a><!-- ELSE -->{mainPost.wikiLastRevisionUser.displayname}<!-- ENDIF mainPost.wikiLastRevisionUser.userslug -->
+        </span><!-- IF mainPost.wikiLastRevisionTimeISO --> <span title="{mainPost.wikiLastRevisionTimeISO}" class="wiki-page-byline-time timeago"></span><!-- ENDIF mainPost.wikiLastRevisionTimeISO --><!-- IF mainPost.wikiCreatedByUser --><span>, created by
+          <!-- IF mainPost.wikiCreatedByUser.userslug --><a class="wiki-page-byline__userlink" href="{config.relative_path}/user/{mainPost.wikiCreatedByUser.userslug}">{mainPost.wikiCreatedByUser.displayname}</a><!-- ELSE -->{mainPost.wikiCreatedByUser.displayname}<!-- ENDIF mainPost.wikiCreatedByUser.userslug -->
+        </span><!-- ENDIF mainPost.wikiCreatedByUser -->
+        <!-- ENDIF mainPost.wikiLastRevisionUser -->
       </div>
       <!-- ENDIF mainPost -->
     </div>
@@ -102,7 +103,6 @@
       </div>
     </div>
 
-    <!-- IF showWikiFabDock -->
     <nav class="wiki-fab-dock wiki-fab-dock--floating" aria-label="Page tools">
       <div class="wiki-fab-dock-inner">
         <!-- IF canEditWikiPage -->
@@ -120,9 +120,11 @@
           <i class="fa fa-fw fa-trash-o" aria-hidden="true"></i>
         </button>
         <!-- ENDIF canDeleteWikiPage -->
+        <button type="button" class="wiki-fab-btn wiki-fab-btn--icon" data-wiki-scroll-top="1" title="Scroll to top" aria-label="Scroll to top">
+          <i class="fa fa-fw fa-chevron-up" aria-hidden="true"></i>
+        </button>
       </div>
     </nav>
-    <!-- ENDIF showWikiFabDock -->
   </div>
 </div>
 

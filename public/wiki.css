@@ -247,15 +247,31 @@
   margin: 0;
 }
 
+/* Single-line attribution: “Last edited by …, created by …” (no flex gaps between words) */
+.wiki-page-byline--attribution {
+  display: block;
+  gap: 0;
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+
+.wiki-page-byline__userlink {
+  color: var(--wiki-chrome-link-color, var(--bs-link-color, inherit));
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+  text-underline-offset: 0.15em;
+}
+
+.wiki-page-byline__userlink:hover,
+.wiki-page-byline__userlink:focus {
+  color: var(--wiki-chrome-link-hover-color, var(--bs-link-hover-color, var(--bs-link-color, inherit)));
+  text-decoration-color: currentcolor;
+}
+
 @media (max-width: 576px) {
   .wiki-page-heading__meta .wiki-page-byline {
     justify-content: flex-start;
   }
-}
-
-.wiki-page-byline-author + .wiki-page-byline-time::before {
-  content: "·";
-  margin-right: 0.5rem;
 }
 
 .wiki-fab-btn.wiki-delete-page {

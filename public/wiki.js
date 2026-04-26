@@ -185,6 +185,15 @@ $(document).ready(function () {
     }
   );
 
+  $(document).on("click", "[data-wiki-scroll-top]", function (event) {
+    event.preventDefault();
+    try {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (err) {
+      window.scrollTo(0, 0);
+    }
+  });
+
   $(document).on("click", "[data-wiki-create-page]", function (event) {
     const cid = parseInt($(this).attr("data-cid"), 10);
     const title = ($(this).attr("data-title") || "").trim();
