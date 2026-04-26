@@ -109,6 +109,38 @@
   );
 }
 
+/*
+ * After init, we move div.ck-body-wrapper from document.body into #westgate-wiki-ck-body-sink
+ * (see wiki-editor-bundle.js) so the BodyCollection host is not a direct child of <body> and
+ * does not pick up full-page / flex layout from the theme.
+ */
+#westgate-wiki-ck-body-sink {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 20;
+  width: 100%;
+  max-width: 100%;
+  min-height: 0;
+  overflow: visible;
+  /* Let clicks pass through; floating UI re-enables (see CKEditor balloon/dialog below). */
+  pointer-events: none;
+}
+
+#westgate-wiki-ck-body-sink .ck-body-wrapper,
+#westgate-wiki-ck-body-sink .ck.ck-body {
+  max-width: 100%;
+  pointer-events: auto;
+}
+
+#westgate-wiki-ck-body-sink .ck-balloon-panel,
+#westgate-wiki-ck-body-sink .ck-dialog,
+#westgate-wiki-ck-body-sink .ck-tooltip {
+  pointer-events: auto;
+}
+
 .westgate-wiki-compose .ck.ck-toolbar {
   border-radius: var(--bs-border-radius, 0.5rem) var(--bs-border-radius, 0.5rem) 0 0;
 }
@@ -146,6 +178,28 @@ body:has(#westgate-wiki-compose) .ck.ck-balloon-panel:not(.ck-powered-by-balloon
   --ck-color-tooltip-background: var(--wiki-ck-tooltip-background, var(--bs-tertiary-bg, #2b3035));
   --ck-color-tooltip-text: var(--wiki-ck-tooltip-text, var(--wiki-ck-ui-text, var(--bs-body-color, #f8f9fa)));
   color: var(--ck-color-text);
+}
+
+/*
+ * "Powered by CKEditor" (GPL). Placement is set in wiki-editor-bundle.js (ui.poweredBy.position: inside).
+ * CKEditor documents these variables for theming only — do not use display:none or size clamps that look
+ * like hiding the mark; that can conflict with licensing expectations.
+ * @see https://ckeditor.com/docs/ckeditor5/latest/getting-started/licensing/managing-ckeditor-logo.html
+ */
+.westgate-wiki-compose .ck.ck-balloon-panel.ck-powered-by-balloon {
+  --ck-powered-by-line-height: 1.2;
+  --ck-powered-by-padding-vertical: 4px;
+  --ck-powered-by-padding-horizontal: 8px;
+  --ck-powered-by-text-color: var(--bs-secondary-color, #6c757d);
+  --ck-powered-by-background: var(--wiki-ck-base-background, var(--bs-body-bg, #fff));
+  --ck-powered-by-border-color: var(--bs-border-color, #dee2e6);
+  --ck-powered-by-border-radius: var(--bs-border-radius, 0.5rem);
+}
+
+.westgate-wiki-compose .ck.ck-balloon-panel.ck-powered-by-balloon .ck.ck-powered-by .ck-powered-by__label {
+  text-transform: none;
+  font-size: 0.7rem;
+  letter-spacing: 0.01em;
 }
 
 body:has(#westgate-wiki-compose) .ck.ck-balloon-panel:not(.ck-powered-by-balloon) .ck.ck-list__item .ck-button,
