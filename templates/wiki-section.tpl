@@ -83,13 +83,13 @@
               <section class="wiki-index-pages-block" aria-labelledby="wiki-index-pages-heading">
                 <h3 class="wiki-index-subsection-title" id="wiki-index-pages-heading">Articles</h3>
 
-                <!-- IF (wikiIndexPageLetterGroupCount > 1) -->
+                <!-- IF hasMultipleWikiIndexLetterGroups -->
                 <nav class="wiki-index-jump" aria-label="Jump to wiki page letter">
                   <!-- BEGIN wikiIndexPageLetters -->
                   <a class="wiki-index-jump-link" href="#wiki-page-letter-{wikiIndexPageLetters.letterAnchor}">{wikiIndexPageLetters.letterLabel}</a>
                   <!-- END wikiIndexPageLetters -->
                 </nav>
-                <!-- ENDIF (wikiIndexPageLetterGroupCount > 1) -->
+                <!-- ENDIF hasMultipleWikiIndexLetterGroups -->
 
                 <div class="wiki-index-body">
                   <!-- BEGIN wikiIndexPageLetters -->
@@ -98,18 +98,18 @@
                       <span class="wiki-index-letter-label">{wikiIndexPageLetters.letterLabel}</span>
                     </h4>
                     <ul class="wiki-index-list">
-                      <!-- BEGIN wikiIndexPageLetters.entries -->
+                      {{{ each ./entries }}}
                       <li class="wiki-index-entry">
                         <div class="wiki-index-entry-main">
-                          <a class="wiki-index-entry-title" href="{config.relative_path}{wikiIndexPageLetters.entries.wikiPath}">
-                            <!-- IF wikiIndexPageLetters.entries.hasParentPath -->
-                            <span class="wiki-topic-parent-path">{wikiIndexPageLetters.entries.parentTitlePathText}</span>
-                            <!-- ENDIF wikiIndexPageLetters.entries.hasParentPath -->
-                            <span class="wiki-topic-title-leaf">{wikiIndexPageLetters.entries.titleLeaf}</span>
+                          <a class="wiki-index-entry-title" href="{config.relative_path}{../wikiPath}">
+                            {{{ if ../hasParentPath }}}
+                            <span class="wiki-topic-parent-path">{../parentTitlePathText}</span>
+                            {{{ end }}}
+                            <span class="wiki-topic-title-leaf">{../titleLeaf}</span>
                           </a>
                         </div>
                       </li>
-                      <!-- END wikiIndexPageLetters.entries -->
+                      {{{ end }}}
                     </ul>
                   </section>
                   <!-- END wikiIndexPageLetters -->

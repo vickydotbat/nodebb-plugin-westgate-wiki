@@ -289,7 +289,7 @@ function register(params) {
       hasWikiIndexNamespaces: sectionContentsIndex.namespaces.length > 0,
       hasWikiIndexPageLetters: sectionContentsIndex.pageLetterGroups.length > 0,
       hasNamespaceIndexContent: namespaceIndexEntryCount > 0,
-      wikiIndexPageLetterGroupCount: sectionContentsIndex.pageLetterGroups.length,
+      hasMultipleWikiIndexLetterGroups: sectionContentsIndex.pageLetterGroups.length > 1,
       canCreatePage,
       hasCreateIntent,
       createIntentTitle,
