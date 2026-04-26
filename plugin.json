@@ -60,6 +60,10 @@
     {
       "hook": "filter:privileges.topics.get",
       "method": "wikiFilterPrivilegesTopicsGet"
+    },
+    {
+      "hook": "filter:categories.build",
+      "method": "filterCategoriesBuild"
     }
   ]
 }

@@ -11,6 +11,7 @@ const wikiHtmlParse = require("./lib/wiki-html-parse");
 const wikiService = require("./lib/wiki-service");
 const wikiTopicPurge = require("./lib/wiki-topic-purge");
 const wikiRoutes = require("./routes/wiki");
+const filterCategoriesForum = require("./lib/filter-categories-forum");
 
 const plugin = module.exports;
 
@@ -80,6 +81,7 @@ plugin.wikiFilterTopicDelete = async function (data) {
   }
   return data;
 };
+plugin.filterCategoriesBuild = filterCategoriesForum.filterCategoriesBuild;
 plugin.wikiFilterPrivilegesTopicsGet = async function (data) {
   if (!data || data.tid === undefined || data.tid === null) {
     return data;
