@@ -30,6 +30,58 @@ function computeShowWikiFabDock(pageData) {
   );
 }
 
+/**
+ * Flat rows for article sidebar: each configured ancestor namespace, then the
+ * current namespace, then pages in that namespace only (no pages from parents).
+ */
+function buildWikiArticleSidebarNavRows(sectionNavigation, topic) {
+  if (!sectionNavigation) {
+    return [];
+  }
+  const rows = [];
+  const ancestors = Array.isArray(sectionNavigation.ancestorSections)
+    ? sectionNavigation.ancestorSections
+    : [];
+  const currentTid = String(topic && topic.tid != null ? topic.tid : "");
+
+  ancestors.forEach((ancestor, index) => {
+    rows.push({
+      depth: index,
+      isNamespace: true,
+      isPage: false,
+      name: ancestor.name,
+      wikiPath: ancestor.wikiPath
+    });
+  });
+
+  const nsDepth = ancestors.length;
+  rows.push({
+    depth: nsDepth,
+    isNamespace: true,
+    isPage: false,
+    isCurrentNamespace: true,
+    name: sectionNavigation.name,
+    wikiPath: sectionNavigation.wikiPath
+  });
+
+  const topics = Array.isArray(sectionNavigation.topics) ? sectionNavigation.topics : [];
+  topics.forEach((t) => {
+    rows.push({
+      depth: nsDepth + 1,
+      isNamespace: false,
+      isPage: true,
+      tid: t.tid,
+      titleLeaf: t.titleLeaf,
+      hasParentPath: t.hasParentPath,
+      parentTitlePathText: t.parentTitlePathText,
+      wikiPath: t.wikiPath,
+      isActive: String(t.tid) === currentTid
+    });
+  });
+
+  return rows;
+}
+
 function buildWikiPageRenderData(wikiPage, { isWikiHome }) {
   const pageBreadcrumbs = [
     {
@@ -53,6 +105,11 @@ function buildWikiPageRenderData(wikiPage, { isWikiHome }) {
     }
   ];
 
+  const wikiSidebarNavRows = buildWikiArticleSidebarNavRows(
+    wikiPage.sectionNavigation,
+    wikiPage.topic
+  );
+
   return {
     title: wikiPage.topic.title,
     breadcrumbs: pageBreadcrumbs,
@@ -71,6 +128,7 @@ function buildWikiPageRenderData(wikiPage, { isWikiHome }) {
     hasSectionNavigation: !!wikiPage.sectionNavigation,
     hasSectionChildNamespaces: !!(wikiPage.sectionNavigation && wikiPage.sectionNavigation.childSections.length),
     hasSectionPages: !!(wikiPage.sectionNavigation && wikiPage.sectionNavigation.topics.length),
+    wikiSidebarNavRows,
     mainPost: wikiPage.mainPost
   };
 }
