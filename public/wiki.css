@@ -994,6 +994,16 @@
   color: var(--wiki-chrome-link-hover-color, var(--bs-link-hover-color, var(--bs-link-color, inherit)));
 }
 
+/* [[wiki]] links parsed from forum posts (not wiki article bodies): book glyph */
+a.wiki-link-from-forum .wiki-forum-link-icon {
+  margin-right: 0.28em;
+  opacity: 0.88;
+}
+
+a.wiki-link-from-forum .wiki-forum-link-text {
+  text-decoration: inherit;
+}
+
 .westgate-wiki a.wiki-redlink,
 .westgate-wiki .wiki-article-prose a.wiki-redlink,
 .westgate-wiki .wiki-page-content a.wiki-redlink,
