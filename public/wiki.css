@@ -246,6 +246,17 @@
   z-index: 1035;
 }
 
+@media (max-width: 991px) {
+  .wiki-fab-dock--floating {
+    bottom: max(4rem, env(safe-area-inset-bottom, 0px));
+    right: max(0.75rem, env(safe-area-inset-right, 0px));
+  }
+
+  .wiki-fab-dock--floating .wiki-fab-dock-inner {
+    flex-direction: row !important; 
+  }
+}
+
 .wiki-fab-dock--floating .wiki-fab-dock-inner {
   align-items: center;
   background-color: var(
