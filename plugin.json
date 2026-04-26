@@ -64,6 +64,10 @@
     {
       "hook": "filter:categories.build",
       "method": "filterCategoriesBuild"
+    },
+    {
+      "hook": "filter:category.build",
+      "method": "filterCategoryBuild"
     }
   ]
 }

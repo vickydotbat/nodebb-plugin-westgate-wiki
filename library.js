@@ -82,6 +82,7 @@ plugin.wikiFilterTopicDelete = async function (data) {
   return data;
 };
 plugin.filterCategoriesBuild = filterCategoriesForum.filterCategoriesBuild;
+plugin.filterCategoryBuild = filterCategoriesForum.filterCategoryBuild;
 plugin.wikiFilterPrivilegesTopicsGet = async function (data) {
   if (!data || data.tid === undefined || data.tid === null) {
     return data;
