@@ -5,7 +5,8 @@
   "settingsRoute": "/admin/plugins/westgate-wiki",
   "library": "./library.js",
   "scripts": [
-    "public/wiki.js"
+    "public/wiki.js",
+    "public/wiki-namespace-create.js"
   ],
   "css": [
     "public/wiki.css"
@@ -23,6 +24,15 @@
       "method": "init"
     },
     {
+      "hook": "static:api.routes",
+      "method": "registerApiRoutes"
+    },
+    {
+      "hook": "filter:markdown.beforeParse",
+      "method": "wikiMarkdownBeforeParse",
+      "priority": 4
+    },
+    {
       "hook": "filter:parse.post",
       "method": "transformWikiPostContent",
       "priority": 6
@@ -34,6 +44,26 @@
     {
       "hook": "action:topic.post",
       "method": "clearWikiPostParseCache"
+    },
+    {
+      "hook": "action:post.edit",
+      "method": "clearWikiPostEditCache"
+    },
+    {
+      "hook": "action:topic.delete",
+      "method": "onWikiTopicDelete"
+    },
+    {
+      "hook": "filter:topic.delete",
+      "method": "wikiFilterTopicDelete"
+    },
+    {
+      "hook": "filter:privileges.topics.get",
+      "method": "wikiFilterPrivilegesTopicsGet"
+    },
+    {
+      "hook": "filter:categories.build",
+      "method": "filterCategoriesBuild"
     }
   ]
 }

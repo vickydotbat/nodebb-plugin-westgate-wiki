@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This repository is a NodeBB plugin that adds a Westgate-specific wiki surface on top of forum content.
+This repository is a NodeBB plugin that adds a Westgate-specific wiki surface on top of forum content. The package is **GPL-3.0-or-later** (CKEditor 5 GPL bundle). Wiki page creation uses **`/wiki/compose/:cid`** with a vendored CKEditor build under `public/vendor/ckeditor5/` (rebuild with `npm run build:ckeditor`).
 
 Current design baseline:
 
