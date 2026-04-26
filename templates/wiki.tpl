@@ -1,6 +1,7 @@
 <div class="westgate-wiki py-4">
   <section class="wiki-hero card mb-4">
     <div class="card-body">
+      <!-- IMPORT partials/wiki/breadcrumb-trail.tpl -->
       <h1>Westgate Wiki</h1>
       <p>
         Lore, factions, locations, rules, and player guidance for Shadows Over Westgate.

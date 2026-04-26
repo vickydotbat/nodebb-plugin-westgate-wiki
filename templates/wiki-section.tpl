@@ -1,22 +1,8 @@
 <div class="westgate-wiki py-4">
   <section class="wiki-page-hero card mb-4">
     <div class="card-body">
-      <p class="wiki-page-kicker">
-        <a href="{config.relative_path}/wiki">Westgate Wiki</a>
-      </p>
+      <!-- IMPORT partials/wiki/breadcrumb-trail.tpl -->
       <h1>{section.name}</h1>
-
-      <!-- IF section.ancestorSections.length -->
-      <div class="wiki-namespace-path">
-        <!-- BEGIN section.ancestorSections -->
-        <a href="{config.relative_path}{section.ancestorSections.wikiPath}">
-          {section.ancestorSections.name}
-        </a>
-        <span>/</span>
-        <!-- END section.ancestorSections -->
-        <span>{section.name}</span>
-      </div>
-      <!-- ENDIF section.ancestorSections.length -->
 
       <!-- IF section.description -->
       <div class="wiki-section-description wiki-article-prose">

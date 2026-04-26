@@ -1,15 +1,5 @@
 <div id="westgate-wiki-compose" class="westgate-wiki westgate-wiki-compose py-4">
-  <p class="wiki-page-kicker">
-    <!-- BEGIN breadcrumbs -->
-    <!-- IF breadcrumbs.url -->
-    <a href="{config.relative_path}{breadcrumbs.url}">{breadcrumbs.text}</a>
-    <span> / </span>
-    <!-- ELSE -->
-    <span>{breadcrumbs.text}</span>
-    <!-- ENDIF breadcrumbs.url -->
-    <!-- END breadcrumbs -->
-  </p>
-
+  <!-- IMPORT partials/wiki/breadcrumb-trail.tpl -->
   <h1>{pageHeading}</h1>
   <p class="text-muted">Namespace: <strong>{section.name}</strong></p>
   <!-- IF showSetHomeBanner -->

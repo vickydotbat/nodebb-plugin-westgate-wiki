@@ -1,38 +1,8 @@
 <div class="westgate-wiki py-4">
   <section class="wiki-page-hero card mb-4">
     <div class="card-body">
-      <p class="wiki-page-kicker">
-        <a href="{config.relative_path}/wiki/category/{category.slug}">{category.name}</a>
-      </p>
+      <!-- IMPORT partials/wiki/breadcrumb-trail.tpl -->
       <h1>{pageTitle}</h1>
-
-      <!-- IF ancestorSections.length -->
-      <div class="wiki-namespace-path">
-        <!-- BEGIN ancestorSections -->
-        <a href="{config.relative_path}{ancestorSections.wikiPath}">
-          {ancestorSections.name}
-        </a>
-        <span>/</span>
-        <!-- END ancestorSections -->
-        <a href="{config.relative_path}/wiki/category/{category.slug}">{category.name}</a>
-      </div>
-      <!-- ENDIF ancestorSections.length -->
-
-      <!-- IF hasPageParents -->
-      <div class="wiki-page-path">
-        <a href="{config.relative_path}/wiki/category/{category.slug}">{category.name}</a>
-        <span>/</span>
-        <!-- BEGIN parentPages -->
-        <!-- IF parentPages.url -->
-        <a href="{config.relative_path}{parentPages.url}">{parentPages.text}</a>
-        <!-- ELSE -->
-        <span>{parentPages.text}</span>
-        <!-- ENDIF parentPages.url -->
-        <span>/</span>
-        <!-- END parentPages -->
-        <span>{pageTitle}</span>
-      </div>
-      <!-- ENDIF hasPageParents -->
 
       <!-- IF mainPost -->
       <p class="wiki-page-byline">

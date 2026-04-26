@@ -54,43 +54,75 @@
   margin-bottom: 0.75rem;
 }
 
-.wiki-page-kicker {
-  font-size: 0.875rem;
-  letter-spacing: 0.08em;
-  margin-bottom: 0.5rem;
-  text-transform: uppercase;
-}
-
-.wiki-page-kicker a {
-  color: var(--wiki-chrome-link-color, var(--bs-link-color, inherit));
-  text-decoration: none;
-}
-
-.wiki-page-kicker a:hover,
-.wiki-page-kicker a:focus {
-  color: var(--wiki-chrome-link-hover-color, var(--bs-link-hover-color, var(--bs-link-color, inherit)));
-}
-
-.wiki-namespace-path,
-.wiki-page-path {
+/* Standard wiki location trail (+ optional action: Edit, Create page, …) */
+.wiki-breadcrumb-trail {
+  align-items: baseline;
   color: var(--wiki-chrome-muted-color, var(--bs-secondary-color, inherit));
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-bottom: 0.85rem;
+  font-size: 0.875rem;
+  gap: 0.35rem 0.5rem;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.75rem;
+  text-transform: uppercase;
 }
 
-.wiki-namespace-path a,
-.wiki-page-path a {
+.wiki-breadcrumb-trail__list {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.wiki-breadcrumb-trail__item {
+  align-items: baseline;
+  display: inline-flex;
+  gap: 0.35rem;
+}
+
+.wiki-breadcrumb-trail__item:not(:last-child)::after {
+  color: var(--wiki-chrome-muted-color, var(--bs-secondary-color, inherit));
+  content: "/";
+  font-weight: normal;
+  opacity: 0.55;
+  speak: never;
+}
+
+.wiki-breadcrumb-trail__link {
   color: var(--wiki-chrome-link-color, var(--bs-link-color, inherit));
   text-decoration: none;
 }
 
-.wiki-namespace-path a:hover,
-.wiki-namespace-path a:focus,
-.wiki-page-path a:hover,
-.wiki-page-path a:focus {
+.wiki-breadcrumb-trail__link:hover,
+.wiki-breadcrumb-trail__link:focus {
   color: var(--wiki-chrome-link-hover-color, var(--bs-link-hover-color, var(--bs-link-color, inherit)));
+}
+
+.wiki-breadcrumb-trail__text {
+  color: inherit;
+}
+
+.wiki-breadcrumb-trail__text--current {
+  color: var(--wiki-chrome-heading-color, var(--bs-heading-color, var(--bs-emphasis-color, inherit)));
+  font-weight: 600;
+}
+
+.wiki-breadcrumb-trail__action {
+  color: var(--wiki-chrome-heading-color, var(--bs-heading-color, var(--bs-emphasis-color, inherit)));
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.wiki-breadcrumb-trail__action::before {
+  color: var(--wiki-chrome-muted-color, var(--bs-secondary-color, inherit));
+  content: "·";
+  font-weight: normal;
+  margin-right: 0.4rem;
+  opacity: 0.75;
 }
 
 .wiki-hero p,

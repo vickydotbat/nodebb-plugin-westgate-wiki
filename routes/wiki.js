@@ -7,11 +7,11 @@ const composeAssets = require("../lib/compose-assets");
 const composeController = require("../lib/controllers/compose");
 const wikiNamespaceCreateController = require("../lib/controllers/wiki-namespace-create");
 const config = require("../lib/config");
-const serializer = require("../lib/serializer");
 const wikiNamespaceCreators = require("../lib/wiki-namespace-creators");
 const wikiAlphabeticalIndex = require("../lib/wiki-alphabetical-index");
 const wikiService = require("../lib/wiki-service");
 const topicService = require("../lib/topic-service");
+const wikiBreadcrumbTrail = require("../lib/wiki-breadcrumb-trail");
 
 function getCreateIntentTitle(req) {
   return String((req.query && req.query.create) || "").trim();
@@ -83,27 +83,7 @@ function buildWikiArticleSidebarNavRows(sectionNavigation, topic) {
 }
 
 function buildWikiPageRenderData(wikiPage, { isWikiHome }) {
-  const pageBreadcrumbs = [
-    {
-      text: "Westgate Wiki",
-      url: "/wiki"
-    },
-    ...wikiPage.ancestorSections.map((ancestor) => ({
-      text: ancestor.name,
-      url: ancestor.wikiPath
-    })),
-    {
-      text: wikiPage.category.name,
-      url: serializer.buildWikiSectionPath(wikiPage.category)
-    },
-    ...wikiPage.parentPages.map((page) => ({
-      text: page.text,
-      url: page.url || undefined
-    })),
-    {
-      text: wikiPage.pageTitlePath.length ? wikiPage.pageTitlePath[wikiPage.pageTitlePath.length - 1] : wikiPage.topic.title
-    }
-  ];
+  const trail = wikiBreadcrumbTrail.forArticleView(wikiPage);
 
   const wikiSidebarNavRows = buildWikiArticleSidebarNavRows(
     wikiPage.sectionNavigation,
@@ -112,7 +92,7 @@ function buildWikiPageRenderData(wikiPage, { isWikiHome }) {
 
   return {
     title: wikiPage.topic.title,
-    breadcrumbs: pageBreadcrumbs,
+    ...trail,
     topic: wikiPage.topic,
     isWikiHome: !!isWikiHome,
     showWikiDiscussionLink: !isWikiHome,
@@ -160,18 +140,13 @@ function register(params) {
   routeHelpers.setupPageRoute(router, "/wiki", async (req, res, next) => {
     try {
       const settings = await config.getSettings();
-      const baseBreadcrumbs = [
-        {
-          text: "Westgate Wiki",
-          url: "/wiki"
-        }
-      ];
+      const hubTrail = wikiBreadcrumbTrail.forWikiHub();
 
       if (!settings.isConfigured) {
         const ctx = await getWikiFallbackContext(req.uid);
         return res.render("wiki", {
           title: "Westgate Wiki",
-          breadcrumbs: baseBreadcrumbs,
+          ...hubTrail,
           setupRequired: true,
           homePageSetupRequired: false,
           homePageLoadError: false,
@@ -194,7 +169,7 @@ function register(params) {
         const canBootstrapHome = Number.isInteger(parseInt(bootstrapHomeCid, 10)) && parseInt(bootstrapHomeCid, 10) > 0;
         return res.render("wiki", {
           title: "Westgate Wiki",
-          breadcrumbs: baseBreadcrumbs,
+          ...hubTrail,
           setupRequired: false,
           homePageSetupRequired: true,
           homePageLoadError: false,
@@ -223,7 +198,7 @@ function register(params) {
       const ctx = await getWikiFallbackContext(req.uid);
       return res.render("wiki", {
         title: "Westgate Wiki",
-        breadcrumbs: baseBreadcrumbs,
+        ...hubTrail,
         setupRequired: false,
         homePageSetupRequired: false,
         homePageLoadError: true,
@@ -256,19 +231,7 @@ function register(params) {
     const createIntentTitle = getCreateIntentTitle(req);
     const hasCreateIntent = !!(createIntentTitle && wikiSection.section.privileges.canCreatePage);
 
-    const sectionBreadcrumbs = [
-      {
-        text: "Westgate Wiki",
-        url: "/wiki"
-      },
-      ...wikiSection.section.ancestorSections.map((ancestor) => ({
-        text: ancestor.name,
-        url: ancestor.wikiPath
-      })),
-      {
-        text: wikiSection.section.name
-      }
-    ];
+    const sectionTrail = wikiBreadcrumbTrail.forSectionView(wikiSection.section);
 
     const canCreateWikiNamespaces = await wikiNamespaceCreators.getCanCreateWikiNamespaces(req.uid);
 
@@ -282,7 +245,7 @@ function register(params) {
 
     res.render("wiki-section", {
       title: `${wikiSection.section.name} | Westgate Wiki`,
-      breadcrumbs: sectionBreadcrumbs,
+      ...sectionTrail,
       section: wikiSection.section,
       hasChildSections: wikiSection.section.childSections.length > 0,
       hasTopics: wikiSection.section.topics.length > 0,
