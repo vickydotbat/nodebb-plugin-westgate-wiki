@@ -1,16 +1,15 @@
 <div class="westgate-wiki py-4">
-  <section class="wiki-page-hero card mb-4">
-    <div class="card-body">
-      <!-- IMPORT partials/wiki/breadcrumb-trail.tpl -->
-      <h1>{section.name}</h1>
-
-      <!-- IF section.description -->
-      <div class="wiki-section-description wiki-article-prose">
-        {section.description}
-      </div>
-      <!-- ENDIF section.description -->
+  <header class="wiki-page-header mb-4">
+    <!-- IMPORT partials/wiki/breadcrumb-trail.tpl -->
+    <div class="wiki-page-heading">
+      <h1 class="wiki-page-heading__title">{section.name}</h1>
     </div>
-  </section>
+    <!-- IF section.description -->
+    <div class="wiki-section-description wiki-article-prose mt-2 mb-0">
+      {section.description}
+    </div>
+    <!-- ENDIF section.description -->
+  </header>
 
   <div class="wiki-with-fab wiki-with-fab--section">
     <div class="wiki-content-layout">

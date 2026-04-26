@@ -1,21 +1,20 @@
 <div class="westgate-wiki py-4">
-  <section class="wiki-page-hero card mb-4">
-    <div class="card-body">
-      <!-- IMPORT partials/wiki/breadcrumb-trail.tpl -->
-      <h1>{pageTitle}</h1>
-
+  <header class="wiki-page-header mb-4">
+    <!-- IMPORT partials/wiki/breadcrumb-trail.tpl -->
+    <div class="wiki-page-heading">
+      <h1 class="wiki-page-heading__title">{pageTitle}</h1>
       <!-- IF mainPost -->
-      <p class="wiki-page-byline">
+      <div class="wiki-page-heading__meta wiki-page-byline">
         <!-- IF mainPost.user -->
         <span class="wiki-page-byline-author">By {mainPost.user.displayname}</span>
         <!-- ENDIF mainPost.user -->
         <!-- IF mainPost.timestampISO -->
         <span title="{mainPost.timestampISO}" class="wiki-page-byline-time timeago"></span>
         <!-- ENDIF mainPost.timestampISO -->
-      </p>
+      </div>
       <!-- ENDIF mainPost -->
     </div>
-  </section>
+  </header>
 
   <div class="wiki-with-fab">
     <div class="wiki-content-layout<!-- IF hasSectionNavigation --> wiki-content-layout--sidebar<!-- ENDIF hasSectionNavigation -->">

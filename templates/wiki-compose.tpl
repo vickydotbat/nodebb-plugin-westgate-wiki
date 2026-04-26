@@ -1,7 +1,10 @@
 <div id="westgate-wiki-compose" class="westgate-wiki westgate-wiki-compose py-4">
-  <!-- IMPORT partials/wiki/breadcrumb-trail.tpl -->
-  <h1>{pageHeading}</h1>
-  <p class="text-muted">Namespace: <strong>{section.name}</strong></p>
+  <header class="wiki-page-header mb-3">
+    <!-- IMPORT partials/wiki/breadcrumb-trail.tpl -->
+    <div class="wiki-page-heading">
+      <h1 class="wiki-page-heading__title">{pageHeading}</h1>
+    </div>
+  </header>
   <!-- IF showSetHomeBanner -->
   <div class="alert alert-info mb-3" role="status">
     This page will be published and set as the public wiki homepage at <code class="px-1">/wiki</code> (you can change

@@ -1,7 +1,13 @@
 <div class="westgate-wiki westgate-wiki-namespace-create py-4">
-  <!-- IMPORT partials/wiki/breadcrumb-trail.tpl -->
-  <h1>Create child namespace</h1>
-  <p class="text-muted">New namespace under <strong>{parentName}</strong>. Access rules are copied from this parent.</p>
+  <header class="wiki-page-header mb-3">
+    <!-- IMPORT partials/wiki/breadcrumb-trail.tpl -->
+    <div class="wiki-page-heading">
+      <h1 class="wiki-page-heading__title">Create child namespace</h1>
+    </div>
+    <p class="wiki-namespace-create-lead text-muted mb-0 mt-2 small">
+      New namespace under <strong>{parentName}</strong>. Access rules are copied from this parent.
+    </p>
+  </header>
 
   <div
     id="wiki-namespace-create-config"
