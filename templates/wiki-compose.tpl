@@ -1,6 +1,5 @@
 <div id="westgate-wiki-compose" class="westgate-wiki westgate-wiki-compose py-4">
   <p class="wiki-page-kicker">
-    <a href="{config.relative_path}/wiki">Westgate Wiki</a>
     <!-- BEGIN breadcrumbs -->
     <span> / </span>
     <!-- IF breadcrumbs.url -->
