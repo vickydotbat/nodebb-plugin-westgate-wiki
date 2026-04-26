@@ -31,6 +31,7 @@ plugin.init = async function (params) {
 plugin.registerApiRoutes = async function ({ router, middleware }) {
   const wikiNamespaceSearch = require("./lib/wiki-namespace-search");
   const wikiHomepage = require("./lib/wiki-homepage");
+  const wikiNamespaceCreateController = require("./lib/controllers/wiki-namespace-create");
   routeHelpers.setupApiRoute(
     router,
     "get",
@@ -44,6 +45,13 @@ plugin.registerApiRoutes = async function ({ router, middleware }) {
     "/westgate-wiki/homepage",
     [middleware.ensureLoggedIn, middleware.checkRequired.bind(null, ["tid"])],
     wikiHomepage.putWikiHomepage
+  );
+  routeHelpers.setupApiRoute(
+    router,
+    "post",
+    "/westgate-wiki/namespace",
+    [middleware.ensureLoggedIn],
+    wikiNamespaceCreateController.postNamespace
   );
 };
 

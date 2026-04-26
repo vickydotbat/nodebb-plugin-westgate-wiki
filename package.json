@@ -5,7 +5,7 @@
   "main": "library.js",
   "scripts": {
     "build:ckeditor": "vite build --config ckeditor/vite.config.mjs",
-    "test": "node --check library.js && node --check routes/wiki.js && node --check lib/cache-service.js && node --check lib/compose-assets.js && node --check lib/config.js && node --check lib/serializer.js && node --check lib/topic-service.js && node --check lib/wiki-service.js && node --check lib/wiki-topic-purge.js && node --check lib/wiki-links.js && node --check lib/wiki-html-parse.js && node --check lib/wiki-homepage.js && node --check lib/controllers/admin.js && node --check lib/controllers/compose.js && node --check lib/wiki-namespace-search.js && node --check public/wiki.js && node --check public/wiki-compose-page.js"
+    "test": "node --check library.js && node --check routes/wiki.js && node --check lib/cache-service.js && node --check lib/compose-assets.js && node --check lib/config.js && node --check lib/serializer.js && node --check lib/topic-service.js && node --check lib/wiki-service.js && node --check lib/wiki-topic-purge.js && node --check lib/wiki-links.js && node --check lib/wiki-html-parse.js && node --check lib/wiki-homepage.js && node --check lib/wiki-namespace-creators.js && node --check lib/controllers/admin.js && node --check lib/controllers/compose.js && node --check lib/controllers/wiki-namespace-create.js && node --check lib/wiki-namespace-search.js && node --check public/wiki.js && node --check public/wiki-compose-page.js && node --check public/wiki-namespace-create.js"
   },
   "license": "GPL-3.0-or-later",
   "nbbpm": {

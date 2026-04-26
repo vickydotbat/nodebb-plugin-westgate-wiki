@@ -33,6 +33,7 @@ This plugin is distributed under **GPL-3.0-or-later** so it can ship a **CKEdito
   - `[[Root Namespace/Child Namespace/Page Title]]`
   - `[[Target|Custom Label]]`
 - Treats unresolved internal links as wiki redlinks that open prefilled page creation in the target namespace
+- **Create child namespace** from the wiki (see below), backed by **`POST /api/v3/plugins/westgate-wiki/namespace`** (new categories are always created under an existing wiki namespace, not as forum root categories)
 
 ## How To Use It
 
@@ -40,7 +41,21 @@ This plugin is distributed under **GPL-3.0-or-later** so it can ship a **CKEdito
 2. Open `ACP > Plugins > Westgate Wiki`.
 3. Select the categories that should behave as wiki namespaces.
 4. Decide whether descendant categories should automatically count as wiki namespaces.
-5. Visit `/wiki`.
+5. (Optional) Under **Groups allowed to create wiki namespaces**, choose which NodeBB groups may create **child** namespaces from the wiki. **Administrators** always may; if no groups are selected, only administrators can use **Create child namespace**.
+6. Visit `/wiki`.
+
+### Creating child namespaces from the wiki
+
+- On a namespace page or wiki article, use **Create child namespace** (or open `/wiki/namespace/create/:parentCid`). The new NodeBB category is created **under** the current wiki category, and **category privileges are copied from that parent** (`cloneFromCid`) so group-based locks on the parent apply to the child.
+- Additional **root** wiki namespaces (top-level forum categories) are not created from the wiki on purpose: configure one (or more) top-level wiki categories in the ACP and nest everything else beneath them.
+- If **Automatically include descendant categories** is **off**, each new child is also appended to the configured category list so it stays visible in the wiki.
+
+Delegated namespace creators (non-administrators in the ACP allowlist) can create real NodeBB categories through these flows only after the plugin’s gate passes; treat the allowlist as a sensitive capability.
+
+### Troubleshooting
+
+- **Create namespace on the wiki, then hard-refresh if needed:** The create form binds to `submit` on the document so it works under ajaxify. If you still see a stale script after upgrading the plugin, run `./nodebb build` and hard-refresh the browser.
+- **Admin “Create a Category” vs wiki namespaces:** The ACP modal’s parent picker loads categories from NodeBB’s category search (by default it does **not** treat outbound **link** categories like normal parents). If your “Wiki” row is a **link-only** category (it jumps to `/wiki` instead of listing topics), it may **not appear** as a parent there. That does not block the wiki plugin: use **Create child namespace** on the wiki while viewing a real wiki-backed category, or create the child under a normal parent category in ACP and then enable it in **Plugins → Westgate Wiki** if needed.
 
 Practical structure:
 

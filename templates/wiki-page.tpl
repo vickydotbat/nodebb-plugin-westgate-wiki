@@ -44,6 +44,9 @@
         <!-- IF canCreateSiblingPage -->
         <a href="#" data-wiki-create-page="1" data-cid="{category.cid}">Create Sibling Page</a>
         <!-- ENDIF canCreateSiblingPage -->
+        <!-- IF canCreateWikiNamespaces -->
+        <a href="{config.relative_path}/wiki/namespace/create/{category.cid}">Create child namespace</a>
+        <!-- ENDIF canCreateWikiNamespaces -->
         <!-- IF canEditWikiPage -->
         <a href="{config.relative_path}/wiki/edit/{topic.tid}">Edit page</a>
         <!-- ENDIF canEditWikiPage -->

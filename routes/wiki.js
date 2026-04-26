@@ -5,8 +5,10 @@ const middleware = require.main.require("./src/middleware");
 const routeHelpers = require.main.require("./src/routes/helpers");
 const composeAssets = require("../lib/compose-assets");
 const composeController = require("../lib/controllers/compose");
+const wikiNamespaceCreateController = require("../lib/controllers/wiki-namespace-create");
 const config = require("../lib/config");
 const serializer = require("../lib/serializer");
+const wikiNamespaceCreators = require("../lib/wiki-namespace-creators");
 const wikiService = require("../lib/wiki-service");
 const topicService = require("../lib/topic-service");
 
@@ -66,6 +68,7 @@ function buildWikiPageRenderData(wikiPage, { isWikiHome }) {
 
 async function getWikiFallbackContext(uid) {
   const wikiData = await wikiService.getSections(uid);
+  const canCreateWikiNamespaces = await wikiNamespaceCreators.getCanCreateWikiNamespaces(uid);
   return {
     sections: wikiData.sections,
     hasSections: wikiData.sections.length > 0,
@@ -74,14 +77,17 @@ async function getWikiFallbackContext(uid) {
     topicsPerCategory: wikiData.settings.topicsPerCategory,
     includeChildCategories: wikiData.settings.includeChildCategories,
     hasInvalidCategoryIds: wikiData.invalidCategoryIds.length > 0,
-    invalidCategoryIdsText: wikiData.invalidCategoryIds.join(", ")
+    invalidCategoryIdsText: wikiData.invalidCategoryIds.join(", "),
+    canCreateWikiNamespaces
   };
 }
 
 function register(params) {
-  const { router } = params;
+  const { router, middleware } = params;
 
   composeAssets.register(router);
+
+  routeHelpers.setupPageRoute(router, "/wiki/namespace/create/:parent_cid", [middleware.ensureLoggedIn], wikiNamespaceCreateController.renderChild);
 
   routeHelpers.setupPageRoute(router, "/wiki", async (req, res, next) => {
     try {
@@ -103,7 +109,7 @@ function register(params) {
           homePageLoadError: false,
           homePageErrorForbidden: false,
           homePageErrorNotFound: false,
-          showNamespaceIndex: false,
+          showNamespaceIndex: ctx.hasSections,
           ...ctx
         });
       }
@@ -126,7 +132,7 @@ function register(params) {
           homePageLoadError: false,
           homePageErrorForbidden: false,
           homePageErrorNotFound: false,
-          showNamespaceIndex: false,
+          showNamespaceIndex: ctx.hasSections,
           canBootstrapHome,
           bootstrapHomeCid: canBootstrapHome ? String(bootstrapHomeCid) : "",
           ...ctx
@@ -136,7 +142,11 @@ function register(params) {
       const wikiPage = await topicService.getWikiPage(String(settings.homeTopicId), req.uid);
 
       if (wikiPage.status === "ok") {
-        return res.render("wiki-page", buildWikiPageRenderData(wikiPage, { isWikiHome: true }));
+        const canCreateWikiNamespaces = await wikiNamespaceCreators.getCanCreateWikiNamespaces(req.uid);
+        return res.render("wiki-page", {
+          ...buildWikiPageRenderData(wikiPage, { isWikiHome: true }),
+          canCreateWikiNamespaces
+        });
       }
 
       const status = wikiPage.status;
@@ -150,7 +160,7 @@ function register(params) {
         homePageErrorForbidden: status === "forbidden",
         homePageErrorNotFound: status === "not-found",
         homePageErrorStatus: String(status),
-        showNamespaceIndex: false,
+        showNamespaceIndex: ctx.hasSections,
         ...ctx
       });
     } catch (err) {
@@ -190,6 +200,8 @@ function register(params) {
       }
     ];
 
+    const canCreateWikiNamespaces = await wikiNamespaceCreators.getCanCreateWikiNamespaces(req.uid);
+
     res.render("wiki-section", {
       title: `${wikiSection.section.name} | Westgate Wiki`,
       breadcrumbs: sectionBreadcrumbs,
@@ -199,7 +211,8 @@ function register(params) {
       canCreatePage: wikiSection.section.privileges.canCreatePage,
       topicsPerCategory: wikiSection.settings.topicsPerCategory,
       hasCreateIntent,
-      createIntentTitle
+      createIntentTitle,
+      canCreateWikiNamespaces
     });
   });
 
@@ -227,7 +240,12 @@ function register(params) {
       return helpers.redirect(res, appendQueryString("/wiki", req), true);
     }
 
-    res.render("wiki-page", buildWikiPageRenderData(wikiPage, { isWikiHome: false }));
+    const canCreateWikiNamespaces = await wikiNamespaceCreators.getCanCreateWikiNamespaces(req.uid);
+
+    res.render("wiki-page", {
+      ...buildWikiPageRenderData(wikiPage, { isWikiHome: false }),
+      canCreateWikiNamespaces
+    });
   });
 }
 

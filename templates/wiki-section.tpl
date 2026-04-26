@@ -27,11 +27,12 @@
       <div class="wiki-page-meta">
         <span>{section.topicCount} visible pages</span>
         <span>{section.childSections.length} child namespaces</span>
-        <span>Showing up to {topicsPerCategory} recent topics</span>
         <!-- IF canCreatePage -->
         <a href="#" data-wiki-create-page="1" data-cid="{section.cid}">Create Page In This Namespace</a>
         <!-- ENDIF canCreatePage -->
-        <a href="{config.relative_path}{section.categoryPath}">Open Forum Category</a>
+        <!-- IF canCreateWikiNamespaces -->
+        <a href="{config.relative_path}/wiki/namespace/create/{section.cid}">Create child namespace</a>
+        <!-- ENDIF canCreateWikiNamespaces -->
       </div>
     </div>
   </section>

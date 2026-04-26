@@ -5,7 +5,8 @@
   "settingsRoute": "/admin/plugins/westgate-wiki",
   "library": "./library.js",
   "scripts": [
-    "public/wiki.js"
+    "public/wiki.js",
+    "public/wiki-namespace-create.js"
   ],
   "css": [
     "public/wiki.css"

@@ -124,6 +124,11 @@
           Create Page
         </a>
         <!-- ENDIF sections.privileges.canCreatePage -->
+        <!-- IF canCreateWikiNamespaces -->
+        <a class="wiki-card-link wiki-card-link-secondary" href="{config.relative_path}/wiki/namespace/create/{sections.cid}">
+          Create child namespace
+        </a>
+        <!-- ENDIF canCreateWikiNamespaces -->
       </div>
     </article>
     <!-- END sections -->

@@ -107,6 +107,45 @@
           </p>
         </div>
 
+        <div class="mb-4">
+          <label class="form-label mb-2" for="wikiNamespaceCreateGroups">Groups allowed to create wiki namespaces</label>
+          <p class="form-text">
+            <strong>Administrators</strong> can always create child namespaces from the wiki. Members of the groups selected below
+            may also use <strong>Create child namespace</strong>. Leave all unchecked for administrators only.
+          </p>
+          <div class="list-group mb-2" style="max-height: 16rem; overflow: auto;">
+            <!-- BEGIN groupOptions -->
+            <label class="list-group-item">
+              <div class="form-check mb-0">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  value="{groupOptions.name}"
+                  data-wiki-namespace-creator-group="1"
+                  <!-- IF groupOptions.isSelected -->checked<!-- ENDIF groupOptions.isSelected -->
+                />
+                <span class="form-check-label">
+                  <strong>{groupOptions.displayName}</strong>
+                  <span class="text-muted small ms-2">{groupOptions.name}</span>
+                </span>
+              </div>
+            </label>
+            <!-- END groupOptions -->
+          </div>
+          <label class="form-label" for="wikiNamespaceCreateGroups">Stored group names</label>
+          <textarea
+            id="wikiNamespaceCreateGroups"
+            class="form-control font-monospace"
+            name="wikiNamespaceCreateGroups"
+            rows="2"
+            placeholder="Global Moderators, wiki-editors"
+          >{wikiNamespaceCreateGroups}</textarea>
+          <p class="form-text mb-0">
+            Synced from the checkboxes above when you save. You may edit this list manually (comma or newline separated)
+            if needed.
+          </p>
+        </div>
+
         <div class="alert alert-info">
           Wiki namespace enablement is plugin-specific, but read/post/edit access still comes from the
           underlying NodeBB category permissions.
