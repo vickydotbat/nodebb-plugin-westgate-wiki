@@ -166,6 +166,21 @@
   color: #caa46a;
 }
 
+.wiki-page-meta .wiki-delete-page {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  color: rgba(204, 110, 110, 0.95);
+  text-decoration: underline;
+}
+
+.wiki-page-meta .wiki-delete-page:hover,
+.wiki-page-meta .wiki-delete-page:focus {
+  color: #e8a0a0;
+}
+
 .wiki-page-body {
   display: grid;
   gap: 1rem;
@@ -237,11 +252,13 @@
 }
 
 .wiki-page-content {
-  background: rgba(24, 15, 29, 0.94);
-  border: 1px solid rgba(202, 164, 106, 0.2);
+  background: var(--wiki-panel-bg, rgba(24, 15, 29, 0.94));
+  border: 1px solid var(--wiki-panel-border-color, rgba(202, 164, 106, 0.2));
   border-radius: 0.75rem;
   padding: 1.5rem;
 }
+
+/* Article figure layout + floats: see wiki-article-body.css (.wiki-article-prose) */
 
 .wiki-section-list {
   display: grid;
@@ -280,6 +297,7 @@
 }
 
 .westgate-wiki a.wiki-redlink,
+.westgate-wiki .wiki-article-prose a.wiki-redlink,
 .westgate-wiki .wiki-page-content a.wiki-redlink,
 .westgate-wiki .wiki-section-description a.wiki-redlink,
 .westgate-wiki .wiki-card-description a.wiki-redlink,
@@ -297,6 +315,12 @@ a[href*="/wiki/category/"][href*="redlink=1"] {
 .wiki-redlink-action {
   color: #f0a8a8;
 }
+
+.westgate-wiki-compose .wiki-compose-editor {
+  min-height: 28rem;
+}
+
+/* CKEditor editable sizing / chrome: see wiki-article-body.css (loads after CKEditor on compose) */
 
 @media (max-width: 767px) {
   .wiki-content-layout {

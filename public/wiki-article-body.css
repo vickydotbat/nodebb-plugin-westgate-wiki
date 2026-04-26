@@ -1,0 +1,399 @@
+/**
+ * Wiki article typography + CKEditor compose chrome.
+ *
+ * Contract:
+ * - Rendered HTML and the CKEditor root both use class `wiki-article-prose`.
+ * - This file uses Bootstrap 5 variables (`--bs-*`) when present, plus optional
+ *   theme/plugin hooks. Child themes may set any of these on :root (or body):
+ *
+ *   Prose (read + editor content):
+ *   --wiki-prose-font-family, --wiki-prose-heading-font-family
+ *   --wiki-prose-font-size, --wiki-prose-line-height
+ *   --wiki-prose-color, --wiki-prose-heading-color
+ *   --wiki-prose-heading-font-weight, --wiki-prose-heading-text-shadow
+ *   --wiki-prose-link-color, --wiki-prose-link-hover-color
+ *   --wiki-prose-blockquote-bg, --wiki-prose-blockquote-border, --wiki-prose-blockquote-color
+ *   --wiki-prose-code-font-family, --wiki-prose-code-bg, --wiki-prose-code-border, --wiki-prose-code-color
+ *   --wiki-prose-pre-bg, --wiki-prose-pre-border, --wiki-prose-pre-color
+ *   --wiki-prose-hr-color
+ *   --wiki-prose-table-border, --wiki-prose-table-head-color, --wiki-prose-table-hover-bg, --wiki-prose-table-hover-color
+ *   --wiki-prose-caption-bg, --wiki-prose-caption-color, --wiki-prose-caption-font-family
+ *   --wiki-prose-caption-font-size, --wiki-prose-caption-padding
+ *   --wiki-prose-table-caption-bg, --wiki-prose-table-caption-color (CKEditor table captions)
+ *   --wiki-prose-media-iframe-border
+ *   --wiki-prose-raw-embed-bg, --wiki-prose-raw-embed-border, --wiki-prose-raw-embed-color
+ *
+ *   Compose only (editable surface + CKEditor UI):
+ *   --wiki-compose-editable-bg, --wiki-compose-editable-border-color
+ *   --wiki-ck-base-background, --wiki-ck-base-foreground, --wiki-ck-base-border, --wiki-ck-base-text
+ *   --wiki-ck-ui-text (maps to --ck-color-text; required for toolbar icons via currentColor)
+ *   --wiki-ck-toolbar-icon-color (toolbar + dropdown trigger buttons)
+ *   --wiki-ck-focus-border, --wiki-ck-focus-outer-shadow
+ *   --wiki-ck-toolbar-background, --wiki-ck-toolbar-border
+ *   --wiki-ck-button-on-color, --wiki-ck-dropdown-background, --wiki-ck-dropdown-border
+ *   --wiki-ck-input-background, --wiki-ck-input-border, --wiki-ck-input-text
+ *   --wiki-ck-list-background, --wiki-ck-panel-background, --wiki-ck-panel-border
+ *   --wiki-ck-tooltip-background, --wiki-ck-tooltip-text
+ */
+
+/* --- CKEditor UI: map to theme / Bootstrap / optional --wiki-ck-* --- */
+.westgate-wiki-compose .ck.ck-editor {
+  --ck-border-radius: var(--bs-border-radius, 0.5rem);
+  --ck-color-base-background: var(--wiki-ck-base-background, var(--bs-tertiary-bg, var(--bs-body-bg, #fff)));
+  --ck-color-base-foreground: var(--wiki-ck-base-foreground, var(--bs-body-bg, #fff));
+  --ck-color-base-border: var(--wiki-ck-base-border, var(--bs-border-color, #dee2e6));
+  --ck-color-base-text: var(--wiki-ck-base-text, var(--bs-body-color, #212529));
+  /* Must override --ck-color-text itself: .ck-reset_all uses color:var(--ck-color-text) and only reads :root otherwise */
+  --ck-color-text: var(--wiki-ck-ui-text, var(--wiki-ck-base-text, var(--bs-body-color, #212529)));
+  --ck-color-focus-border: var(--wiki-ck-focus-border, var(--bs-focus-ring-color, rgba(13, 110, 253, 0.5)));
+  --ck-color-focus-outer-shadow: var(--wiki-ck-focus-outer-shadow, rgba(13, 110, 253, 0.15));
+  --ck-color-shadow-drop: var(--wiki-ck-shadow-drop, rgba(0, 0, 0, 0.15));
+  --ck-color-shadow-inner: var(--wiki-ck-shadow-inner, rgba(0, 0, 0, 0.08));
+  --ck-color-toolbar-background: var(--wiki-ck-toolbar-background, var(--bs-tertiary-bg, var(--bs-body-bg, #f8f9fa)));
+  --ck-color-toolbar-border: var(--wiki-ck-toolbar-border, var(--bs-border-color, #dee2e6));
+  --ck-color-button-default-background: transparent;
+  --ck-color-button-default-hover-background: var(--wiki-ck-button-hover-bg, var(--bs-secondary-bg, rgba(0, 0, 0, 0.05)));
+  --ck-color-button-default-active-background: var(--wiki-ck-button-active-bg, var(--bs-secondary-bg, rgba(0, 0, 0, 0.08)));
+  --ck-color-button-on-background: var(--wiki-ck-button-on-bg, var(--bs-primary-bg-subtle, rgba(13, 110, 253, 0.1)));
+  --ck-color-button-on-hover-background: var(--wiki-ck-button-on-hover-bg, var(--bs-primary-bg-subtle, rgba(13, 110, 253, 0.15)));
+  --ck-color-button-on-active-background: var(--wiki-ck-button-on-active-bg, var(--bs-primary-bg-subtle, rgba(13, 110, 253, 0.2)));
+  --ck-color-button-on-color: var(--wiki-ck-button-on-color, var(--bs-primary, #0d6efd));
+  --ck-color-dropdown-panel-background: var(--wiki-ck-dropdown-background, var(--bs-body-bg, #fff));
+  --ck-color-dropdown-panel-border: var(--wiki-ck-dropdown-border, var(--bs-border-color, #dee2e6));
+  --ck-color-input-background: var(--wiki-ck-input-background, var(--bs-body-bg, #fff));
+  --ck-color-input-border: var(--wiki-ck-input-border, var(--bs-border-color, #ced4da));
+  --ck-color-input-text: var(--wiki-ck-input-text, var(--bs-body-color, #212529));
+  --ck-color-list-background: var(--wiki-ck-list-background, var(--bs-body-bg, #fff));
+  --ck-color-list-button-hover-background: var(--wiki-ck-list-hover-bg, var(--bs-secondary-bg, rgba(0, 0, 0, 0.05)));
+  --ck-color-list-button-on-background: var(--wiki-ck-list-on-bg, var(--bs-primary-bg-subtle, rgba(13, 110, 253, 0.12)));
+  --ck-color-list-button-on-text: var(--wiki-ck-list-on-text, var(--bs-primary, #0d6efd));
+  --ck-color-panel-background: var(--wiki-ck-panel-background, var(--bs-body-bg, #fff));
+  --ck-color-panel-border: var(--wiki-ck-panel-border, var(--bs-border-color, #dee2e6));
+  --ck-color-switch-button-off-background: var(--wiki-ck-switch-off-bg, var(--bs-secondary-bg, #e9ecef));
+  --ck-color-labeled-field-label-background: var(--wiki-ck-label-bg, var(--bs-tertiary-bg, #f8f9fa));
+  --ck-color-tooltip-background: var(--wiki-ck-tooltip-background, var(--bs-tertiary-bg, #2b3035));
+  --ck-color-tooltip-text: var(--wiki-ck-tooltip-text, var(--wiki-ck-ui-text, var(--bs-body-color, #f8f9fa)));
+  /* CKEditor `.ck-content` on the editable (defaults to Helvetica / #000) */
+  --ck-content-font-family: var(--wiki-prose-font-family, var(--bs-body-font-family, inherit));
+  /* Use rem like `.wiki-article-prose` so heading `em`/`rem` match the saved view */
+  --ck-content-font-size: var(--wiki-prose-font-size, 1rem);
+  --ck-content-font-color: var(--wiki-prose-color, var(--bs-body-color, #212529));
+  --ck-content-line-height: var(--wiki-prose-line-height, 1.68);
+  /* CKEditor `.ck-content .image>figcaption` defaults (#f7f7f7 / #333); must match wiki output */
+  --ck-content-color-image-caption-background: var(--wiki-prose-caption-bg, var(--bs-secondary-bg, rgba(0, 0, 0, 0.04)));
+  --ck-content-color-image-caption-text: var(--wiki-prose-caption-color, var(--bs-secondary-color, inherit));
+  --ck-content-color-table-caption-background: var(
+    --wiki-prose-table-caption-bg,
+    var(--wiki-prose-caption-bg, var(--bs-secondary-bg, rgba(0, 0, 0, 0.04)))
+  );
+  --ck-content-color-table-caption-text: var(
+    --wiki-prose-table-caption-color,
+    var(--wiki-prose-caption-color, var(--bs-secondary-color, inherit))
+  );
+}
+
+.westgate-wiki-compose .ck.ck-toolbar {
+  border-radius: var(--bs-border-radius, 0.5rem) var(--bs-border-radius, 0.5rem) 0 0;
+}
+
+/* Toolbar / split-button labels: icons use currentColor from the button */
+.westgate-wiki-compose .ck.ck-toolbar .ck.ck-button:not(.ck-disabled):not(.ck-switchbutton):not(.ck-color-selector__remove-color),
+.westgate-wiki-compose .ck.ck-toolbar a.ck.ck-button:not(.ck-disabled):not(.ck-switchbutton),
+.westgate-wiki-compose .ck.ck-toolbar .ck.ck-dropdown__button:not(.ck-disabled) {
+  color: var(--wiki-ck-toolbar-icon-color, var(--wiki-ck-ui-text, var(--ck-color-text)));
+}
+
+.westgate-wiki-compose .ck.ck-toolbar .ck.ck-splitbutton > .ck.ck-button:not(:last-of-type):not(.ck-disabled) {
+  color: var(--wiki-ck-toolbar-icon-color, var(--wiki-ck-ui-text, var(--ck-color-text)));
+}
+
+/*
+ * Dropdowns, context menus, and dialogs are often mounted under <body>.
+ * Scope with :has(#westgate-wiki-compose) so other pages are unaffected.
+ */
+body:has(#westgate-wiki-compose) .ck.ck-dropdown__panel,
+body:has(#westgate-wiki-compose) .ck.ck-balloon-panel:not(.ck-powered-by-balloon) {
+  --ck-color-base-text: var(--wiki-ck-base-text, var(--bs-body-color, #212529));
+  --ck-color-text: var(--wiki-ck-ui-text, var(--wiki-ck-base-text, var(--bs-body-color, #212529)));
+  --ck-color-dropdown-panel-background: var(--wiki-ck-dropdown-background, var(--bs-body-bg, #fff));
+  --ck-color-dropdown-panel-border: var(--wiki-ck-dropdown-border, var(--bs-border-color, #dee2e6));
+  --ck-color-list-background: var(--wiki-ck-list-background, var(--bs-body-bg, #fff));
+  --ck-color-list-button-hover-background: var(--wiki-ck-list-hover-bg, var(--bs-secondary-bg, rgba(0, 0, 0, 0.06)));
+  --ck-color-list-button-on-background: var(--wiki-ck-list-on-bg, var(--bs-primary-bg-subtle, rgba(13, 110, 253, 0.12)));
+  --ck-color-list-button-on-text: var(--wiki-ck-list-on-text, var(--bs-primary, #0d6efd));
+  --ck-color-panel-background: var(--wiki-ck-panel-background, var(--bs-body-bg, #fff));
+  --ck-color-panel-border: var(--wiki-ck-panel-border, var(--bs-border-color, #dee2e6));
+  --ck-color-input-background: var(--wiki-ck-input-background, var(--bs-body-bg, #fff));
+  --ck-color-input-border: var(--wiki-ck-input-border, var(--bs-border-color, #ced4da));
+  --ck-color-input-text: var(--wiki-ck-input-text, var(--bs-body-color, #212529));
+  --ck-color-tooltip-background: var(--wiki-ck-tooltip-background, var(--bs-tertiary-bg, #2b3035));
+  --ck-color-tooltip-text: var(--wiki-ck-tooltip-text, var(--wiki-ck-ui-text, var(--bs-body-color, #f8f9fa)));
+  color: var(--ck-color-text);
+}
+
+body:has(#westgate-wiki-compose) .ck.ck-balloon-panel:not(.ck-powered-by-balloon) .ck.ck-list__item .ck-button,
+body:has(#westgate-wiki-compose) .ck.ck-dropdown__panel .ck.ck-list__item .ck-button {
+  color: var(--ck-color-text);
+}
+
+.westgate-wiki-compose .ck.ck-editor__main > .ck.ck-editor__editable {
+  border-radius: 0 0 var(--bs-border-radius, 0.5rem) var(--bs-border-radius, 0.5rem);
+}
+
+/* --- Shared prose (article + CKEditor when .wiki-article-prose is on the root) --- */
+.wiki-article-prose {
+  font-family: var(--wiki-prose-font-family, var(--bs-body-font-family, inherit));
+  font-size: var(--wiki-prose-font-size, 1rem);
+  color: var(--wiki-prose-color, var(--bs-body-color, inherit));
+  line-height: var(--wiki-prose-line-height, 1.68);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.wiki-article-prose :where(p, li, td, th) {
+  font-family: var(--wiki-prose-font-family, var(--bs-body-font-family, inherit));
+  color: var(--wiki-prose-color, var(--bs-body-color, inherit));
+}
+
+.wiki-article-prose :where(h1, h2, h3, h4, h5, h6) {
+  color: var(--wiki-prose-heading-color, var(--bs-heading-color, var(--bs-emphasis-color, inherit)));
+  font-family: var(--wiki-prose-heading-font-family, var(--bs-heading-font-family, inherit));
+  font-weight: var(--wiki-prose-heading-font-weight, 600);
+  letter-spacing: 0;
+  line-height: 1.25;
+  margin-top: 0.85em;
+  margin-bottom: 0.4em;
+  text-shadow: var(--wiki-prose-heading-text-shadow, none);
+}
+
+/* !important: Harmony/Bootstrap may set `#content h1` etc. with higher specificity than two classes */
+.wiki-article-prose h1 {
+  font-size: var(--wiki-prose-h1-size, 1.85rem) !important;
+}
+
+.wiki-article-prose h2 {
+  font-size: var(--wiki-prose-h2-size, 1.55rem) !important;
+}
+
+.wiki-article-prose h3 {
+  font-size: var(--wiki-prose-h3-size, 1.3rem) !important;
+}
+
+.wiki-article-prose h4 {
+  font-size: var(--wiki-prose-h4-size, 1.15rem) !important;
+}
+
+.wiki-article-prose a {
+  color: var(--wiki-prose-link-color, var(--bs-link-color, inherit));
+  text-decoration: var(--wiki-prose-link-decoration, none);
+}
+
+.wiki-article-prose a:hover,
+.wiki-article-prose a:focus {
+  color: var(--wiki-prose-link-hover-color, var(--bs-link-hover-color, var(--bs-link-color, inherit)));
+  text-decoration: var(--wiki-prose-link-hover-decoration, underline);
+}
+
+.wiki-article-prose blockquote {
+  background: var(--wiki-prose-blockquote-bg, var(--bs-secondary-bg, rgba(0, 0, 0, 0.04)));
+  border-left: 3px solid var(--wiki-prose-blockquote-border, var(--bs-border-color, #dee2e6));
+  color: var(--wiki-prose-blockquote-color, var(--bs-secondary-color, inherit));
+  margin: 1rem 0;
+  padding: 0.75rem 1rem;
+}
+
+.wiki-article-prose :where(code:not(pre code)) {
+  font-family: var(--wiki-prose-code-font-family, var(--bs-font-monospace-family, ui-monospace, monospace)) !important;
+  font-size: 0.92em;
+  background: var(--wiki-prose-code-bg, var(--bs-tertiary-bg, rgba(0, 0, 0, 0.06)));
+  border: 1px solid var(--wiki-prose-code-border, var(--bs-border-color-translucent, var(--bs-border-color, #dee2e6)));
+  border-radius: var(--bs-border-radius-sm, 0.25rem);
+  padding: 0.12em 0.35em;
+  color: var(--wiki-prose-code-color, var(--bs-emphasis-color, inherit));
+}
+
+.wiki-article-prose pre {
+  font-family: var(--wiki-prose-code-font-family, var(--bs-font-monospace-family, ui-monospace, monospace)) !important;
+  background: var(--wiki-prose-pre-bg, var(--bs-tertiary-bg, rgba(0, 0, 0, 0.06)));
+  border: 1px solid var(--wiki-prose-pre-border, var(--bs-border-color, #dee2e6));
+  border-radius: var(--bs-border-radius, 0.375rem);
+  color: var(--wiki-prose-pre-color, var(--bs-body-color, inherit));
+  margin: 1rem 0;
+  padding: 1rem;
+  overflow-x: auto;
+  tab-size: 2;
+}
+
+.wiki-article-prose pre code {
+  background: transparent !important;
+  border: 0 !important;
+  padding: 0 !important;
+  font-size: inherit !important;
+  color: inherit;
+}
+
+.wiki-article-prose hr {
+  border: 0;
+  border-top: 1px solid var(--wiki-prose-hr-color, var(--bs-border-color, #dee2e6));
+  margin: 1.5rem 0;
+}
+
+.wiki-article-prose :where(ul, ol) {
+  padding-left: 1.35rem;
+}
+
+.wiki-article-prose table {
+  --bs-table-bg: transparent;
+  --bs-table-color: var(--wiki-prose-color, var(--bs-body-color, inherit));
+  --bs-table-border-color: var(--wiki-prose-table-border, var(--bs-border-color-translucent, var(--bs-border-color, #dee2e6)));
+  --bs-table-hover-bg: var(--wiki-prose-table-hover-bg, var(--bs-secondary-bg, rgba(0, 0, 0, 0.04)));
+  --bs-table-hover-color: var(--wiki-prose-table-hover-color, var(--bs-emphasis-color, inherit));
+  width: 100%;
+  margin: 1rem 0;
+  color: var(--wiki-prose-color, var(--bs-body-color, inherit));
+  border-collapse: collapse;
+}
+
+.wiki-article-prose :where(th, td) {
+  border: 1px solid var(--wiki-prose-table-border, var(--bs-border-color-translucent, var(--bs-border-color, #dee2e6)));
+  padding: 0.5rem 0.65rem;
+}
+
+.wiki-article-prose thead th {
+  color: var(--wiki-prose-table-head-color, var(--bs-secondary-color, inherit));
+  font-family: var(--wiki-prose-table-head-font-family, var(--bs-body-font-family, inherit));
+  font-size: 0.88rem;
+}
+
+.wiki-article-prose figure.table figcaption {
+  background: var(--wiki-prose-table-caption-bg, var(--wiki-prose-caption-bg, var(--bs-secondary-bg, rgba(0, 0, 0, 0.04))));
+  color: var(--wiki-prose-table-caption-color, var(--wiki-prose-caption-color, var(--bs-secondary-color, inherit)));
+  caption-side: top;
+  font-size: var(--wiki-prose-caption-font-size, 0.875rem);
+  padding: 0.35rem 0.5rem;
+}
+
+.wiki-article-prose figure.image > figcaption {
+  background: var(--wiki-prose-caption-bg, var(--bs-secondary-bg, rgba(0, 0, 0, 0.04)));
+  border: 1px solid var(--wiki-prose-table-border, var(--bs-border-color-translucent, var(--bs-border-color, #dee2e6)));
+  border-top: 0;
+  color: var(--wiki-prose-caption-color, var(--bs-secondary-color, inherit));
+  font-family: var(--wiki-prose-caption-font-family, var(--bs-body-font-family, inherit));
+  font-size: var(--wiki-prose-caption-font-size, 0.875rem);
+  padding: var(--wiki-prose-caption-padding, 0.5rem 0.75rem);
+  text-align: center;
+}
+
+.wiki-article-prose .media {
+  margin: 1rem 0;
+}
+
+.wiki-article-prose .media iframe {
+  border-radius: var(--bs-border-radius, 0.375rem);
+  border: 1px solid var(--wiki-prose-media-iframe-border, var(--bs-border-color-translucent, var(--bs-border-color, #dee2e6)));
+}
+
+.westgate-wiki-compose .wiki-article-prose .ck.ck-editor__editable_inline .raw-html-embed,
+.westgate-wiki-compose .ck.ck-editor__editable_inline.wiki-article-prose .raw-html-embed {
+  background: var(--wiki-prose-raw-embed-bg, var(--bs-secondary-bg, rgba(0, 0, 0, 0.04)));
+  border: 1px dashed var(--wiki-prose-raw-embed-border, var(--bs-border-color, #dee2e6));
+  border-radius: var(--bs-border-radius, 0.375rem);
+  color: var(--wiki-prose-raw-embed-color, var(--bs-secondary-color, inherit));
+}
+
+/* CKEditor image side layouts (same classes as saved HTML) */
+.wiki-article-prose figure.image.image-style-side {
+  float: right;
+  max-width: min(50%, 26rem);
+  margin: 0.35em 0 0.75em 1.25em;
+}
+
+.wiki-article-prose figure.image.image-style-align-left {
+  float: left;
+  margin: 0.35em 1.25em 0.75em 0;
+}
+
+.wiki-article-prose figure.image.image-style-align-right {
+  float: right;
+  margin: 0.35em 0 0.75em 1.25em;
+}
+
+.wiki-article-prose figure.image.image-style-block {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.wiki-article-prose figure.image {
+  margin: 0.5rem 0;
+  max-width: 100%;
+}
+
+.wiki-article-prose figure.image img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--bs-border-radius-sm, 0.25rem);
+}
+
+.wiki-article-prose::after {
+  content: "";
+  display: table;
+  clear: both;
+}
+
+/* Compose: editable surface (prose class on #wiki-compose-editor and/or on the editable from JS) */
+.westgate-wiki-compose .wiki-article-prose .ck.ck-editor__editable_inline,
+.westgate-wiki-compose .ck.ck-editor__editable_inline.wiki-article-prose {
+  background: var(--wiki-compose-editable-bg, var(--bs-body-bg, #fff)) !important;
+  border: 1px solid var(--wiki-compose-editable-border-color, var(--bs-border-color, #dee2e6)) !important;
+  border-top: 0;
+  padding: 1.25rem 1.5rem !important;
+  min-height: 22rem;
+}
+
+.westgate-wiki-compose .wiki-article-prose .ck.ck-editor__editable_inline.ck-focused,
+.westgate-wiki-compose .ck.ck-editor__editable_inline.wiki-article-prose.ck-focused {
+  box-shadow: none !important;
+}
+
+/*
+ * CKEditor ships `.ck-content .image>figcaption` (and heading UA scale) after this file in the
+ * bundle; beat it with compose-only specificity + !important so the canvas matches saved HTML.
+ */
+.westgate-wiki-compose .wiki-article-prose .ck.ck-editor__editable_inline.ck-content figure.image > figcaption,
+.westgate-wiki-compose .ck.ck-editor__editable_inline.wiki-article-prose.ck-content figure.image > figcaption {
+  background-color: var(--wiki-prose-caption-bg, var(--bs-secondary-bg, rgba(0, 0, 0, 0.04))) !important;
+  border: 1px solid var(--wiki-prose-table-border, var(--bs-border-color-translucent, var(--bs-border-color, #dee2e6))) !important;
+  border-top: 0 !important;
+  color: var(--wiki-prose-caption-color, var(--bs-secondary-color, inherit)) !important;
+  font-family: var(--wiki-prose-caption-font-family, var(--bs-body-font-family, inherit)) !important;
+  font-size: var(--wiki-prose-caption-font-size, 0.875rem) !important;
+  padding: var(--wiki-prose-caption-padding, 0.5rem 0.75rem) !important;
+  text-align: center;
+}
+
+.westgate-wiki-compose .wiki-article-prose .ck.ck-editor__editable_inline.ck-content figure.table > figcaption,
+.westgate-wiki-compose .ck.ck-editor__editable_inline.wiki-article-prose.ck-content figure.table > figcaption {
+  background: var(--wiki-prose-table-caption-bg, var(--wiki-prose-caption-bg, var(--bs-secondary-bg, rgba(0, 0, 0, 0.04)))) !important;
+  color: var(--wiki-prose-table-caption-color, var(--wiki-prose-caption-color, var(--bs-secondary-color, inherit))) !important;
+  font-size: var(--wiki-prose-caption-font-size, 0.875rem) !important;
+}
+
+.westgate-wiki-compose .wiki-article-prose .ck.ck-editor__editable_inline.ck-content h1,
+.westgate-wiki-compose .ck.ck-editor__editable_inline.wiki-article-prose.ck-content h1 {
+  font-size: var(--wiki-prose-h1-size, 1.85rem) !important;
+}
+
+.westgate-wiki-compose .wiki-article-prose .ck.ck-editor__editable_inline.ck-content h2,
+.westgate-wiki-compose .ck.ck-editor__editable_inline.wiki-article-prose.ck-content h2 {
+  font-size: var(--wiki-prose-h2-size, 1.55rem) !important;
+}
+
+.westgate-wiki-compose .wiki-article-prose .ck.ck-editor__editable_inline.ck-content h3,
+.westgate-wiki-compose .ck.ck-editor__editable_inline.wiki-article-prose.ck-content h3 {
+  font-size: var(--wiki-prose-h3-size, 1.3rem) !important;
+}
+
+.westgate-wiki-compose .wiki-article-prose .ck.ck-editor__editable_inline.ck-content h4,
+.westgate-wiki-compose .ck.ck-editor__editable_inline.wiki-article-prose.ck-content h4 {
+  font-size: var(--wiki-prose-h4-size, 1.15rem) !important;
+}

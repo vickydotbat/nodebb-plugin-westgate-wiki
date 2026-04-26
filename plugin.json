@@ -23,6 +23,15 @@
       "method": "init"
     },
     {
+      "hook": "static:api.routes",
+      "method": "registerApiRoutes"
+    },
+    {
+      "hook": "filter:markdown.beforeParse",
+      "method": "wikiMarkdownBeforeParse",
+      "priority": 4
+    },
+    {
       "hook": "filter:parse.post",
       "method": "transformWikiPostContent",
       "priority": 6
@@ -34,6 +43,14 @@
     {
       "hook": "action:topic.post",
       "method": "clearWikiPostParseCache"
+    },
+    {
+      "hook": "action:post.edit",
+      "method": "clearWikiPostEditCache"
+    },
+    {
+      "hook": "action:topic.delete",
+      "method": "onWikiTopicDelete"
     }
   ]
 }

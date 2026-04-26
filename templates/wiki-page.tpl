@@ -44,6 +44,12 @@
       <!-- IF canCreateSiblingPage -->
       <a href="#" data-wiki-create-page="1" data-cid="{category.cid}">Create Sibling Page</a>
       <!-- ENDIF canCreateSiblingPage -->
+      <!-- IF canEditWikiPage -->
+      <a href="{config.relative_path}/wiki/edit/{topic.tid}">Edit page</a>
+      <!-- ENDIF canEditWikiPage -->
+      <!-- IF canDeleteWikiPage -->
+      <button type="button" class="wiki-delete-page" data-wiki-delete-topic="1" data-tid="{topic.tid}" data-redirect-href="{config.relative_path}/wiki/category/{category.slug}">Remove page</button>
+      <!-- ENDIF canDeleteWikiPage -->
       <a href="{config.relative_path}/wiki/category/{category.slug}">More In {category.name}</a>
       <a href="{config.relative_path}/topic/{topic.slug}">Discussion Thread</a>
     </div>
@@ -96,7 +102,7 @@
 
     <section class="wiki-page-body">
       <!-- IF mainPost -->
-      <article class="wiki-page-content">
+      <article class="wiki-page-content wiki-article-prose">
         {mainPost.content}
       </article>
       <!-- ELSE -->
@@ -108,3 +114,9 @@
     </section>
   </div>
 </div>
+
+<!-- IF config.cache-buster -->
+<link rel="stylesheet" href="{config.relative_path}/westgate-wiki/compose/article-body.css?{config.cache-buster}" />
+<!-- ELSE -->
+<link rel="stylesheet" href="{config.relative_path}/westgate-wiki/compose/article-body.css" />
+<!-- ENDIF config.cache-buster -->

@@ -42,13 +42,7 @@ $(document).ready(function () {
   }
 
   function launchWikiCreate(intent) {
-    if (
-      !intent ||
-      !Number.isInteger(intent.cid) ||
-      intent.cid <= 0 ||
-      typeof app === "undefined" ||
-      typeof app.newTopic !== "function"
-    ) {
+    if (!intent || !Number.isInteger(intent.cid) || intent.cid <= 0) {
       return false;
     }
 
@@ -57,12 +51,19 @@ $(document).ready(function () {
       title: intent.title || ""
     };
 
-    app.newTopic({
-      cid: intent.cid,
-      title: intent.title || "",
-      _wikiCreate: true
-    });
+    let target = `wiki/compose/${intent.cid}`;
+    if (intent.title) {
+      target += `?title=${encodeURIComponent(intent.title)}`;
+    }
 
+    if (typeof ajaxify !== "undefined" && typeof ajaxify.go === "function") {
+      ajaxify.go(target);
+      return true;
+    }
+
+    const rel = (window.config && window.config.relative_path) || "";
+    const base = rel.endsWith("/") ? rel.slice(0, -1) : rel;
+    window.location.href = `${base}/${target}`;
     return true;
   }
 
@@ -201,4 +202,75 @@ $(document).ready(function () {
   markRedLinks();
   maybeOpenCreateFromLocation();
   maybeOpenCreateFromMarkup();
+
+  function getCsrfToken() {
+    if (window.config && window.config.csrf_token) {
+      return String(window.config.csrf_token);
+    }
+    return "";
+  }
+
+  $(document).on("click", "[data-wiki-delete-topic]", async function (event) {
+    const btn = event.currentTarget;
+    const tid = parseInt(btn.getAttribute("data-tid"), 10);
+    const redirectHref = btn.getAttribute("data-redirect-href") || "";
+
+    if (!Number.isInteger(tid) || tid <= 0) {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (!window.confirm("Remove this wiki page? The topic will be purged (hard delete) and CANNOT be restored.")) {
+      return;
+    }
+
+    const rel = (window.config && window.config.relative_path) || "";
+    const base = rel.endsWith("/") ? rel.slice(0, -1) : rel;
+    const url = `${base}/api/v3/topics/${tid}/state`;
+    const csrf = getCsrfToken();
+
+    btn.disabled = true;
+
+    try {
+      const res = await fetch(url, {
+        method: "DELETE",
+        credentials: "same-origin",
+        headers: {
+          "x-csrf-token": csrf
+        }
+      });
+      let body = null;
+      const ct = res.headers.get("content-type");
+      if (ct && ct.includes("application/json")) {
+        try {
+          body = await res.json();
+        } catch (parseErr) {
+          body = null;
+        }
+      }
+
+      if (!res.ok) {
+        const msg = (body && body.status && body.status.message) || res.statusText;
+        throw new Error(msg);
+      }
+
+      if (redirectHref) {
+        window.location.href = redirectHref;
+      } else {
+        window.location.href = `${base}/wiki`;
+      }
+    } catch (err) {
+      btn.disabled = false;
+      if (typeof app !== "undefined" && app.alert) {
+        app.alert({
+          type: "error",
+          title: "Could not remove page",
+          message: (err && err.message) || String(err)
+        });
+      } else {
+        window.alert((err && err.message) || String(err));
+      }
+    }
+  });
 });

@@ -1,7 +1,10 @@
 "use strict";
 
 const helpers = require.main.require("./src/controllers/helpers");
+const middleware = require.main.require("./src/middleware");
 const routeHelpers = require.main.require("./src/routes/helpers");
+const composeAssets = require("../lib/compose-assets");
+const composeController = require("../lib/controllers/compose");
 const serializer = require("../lib/serializer");
 const wikiService = require("../lib/wiki-service");
 const topicService = require("../lib/topic-service");
@@ -17,6 +20,8 @@ function appendQueryString(path, req) {
 
 function register(params) {
   const { router } = params;
+
+  composeAssets.register(router);
 
   routeHelpers.setupPageRoute(router, "/wiki", async (req, res, next) => {
     try {
@@ -90,6 +95,10 @@ function register(params) {
     });
   });
 
+  routeHelpers.setupPageRoute(router, "/wiki/compose/:cid", [middleware.ensureLoggedIn], composeController.renderCompose);
+
+  routeHelpers.setupPageRoute(router, "/wiki/edit/:tid", [middleware.ensureLoggedIn], composeController.renderEdit);
+
   routeHelpers.setupPageRoute(router, "/wiki/:topic_id/:slug?", async (req, res, next) => {
     const wikiPage = await topicService.getWikiPage(req.params.topic_id, req.uid);
 
@@ -137,6 +146,8 @@ function register(params) {
       parentPages: wikiPage.parentPages,
       category: wikiPage.category,
       canCreateSiblingPage: !!wikiPage.categoryPrivileges["topics:create"],
+      canEditWikiPage: !!wikiPage.canEditWikiPage,
+      canDeleteWikiPage: !!wikiPage.canDeleteWikiPage,
       sectionNavigation: wikiPage.sectionNavigation,
       hasSectionNavigation: !!wikiPage.sectionNavigation,
       hasSectionChildNamespaces: !!(wikiPage.sectionNavigation && wikiPage.sectionNavigation.childSections.length),
