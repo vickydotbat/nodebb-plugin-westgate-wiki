@@ -122,7 +122,9 @@ $(document).ready(function () {
     launchWikiCreate(intent);
   }
 
-  require(["hooks"], function (hooks) {
+  require(
+    ["hooks"],
+    function (hooks) {
     hooks.on("filter:composer.topic.push", function (payload) {
       if (
         payload &&
@@ -175,7 +177,13 @@ $(document).ready(function () {
       maybeOpenCreateFromLocation();
       maybeOpenCreateFromMarkup();
     });
-  });
+    },
+    function (err) {
+      if (window.console && console.error) {
+        console.error("westgate-wiki: could not load hooks", err);
+      }
+    }
+  );
 
   $(document).on("click", "[data-wiki-create-page]", function (event) {
     const cid = parseInt($(this).attr("data-cid"), 10);

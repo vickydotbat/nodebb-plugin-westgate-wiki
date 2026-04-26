@@ -126,6 +126,8 @@ function buildWikiPageRenderData(wikiPage, { isWikiHome }) {
     canDeleteWikiPage: !!wikiPage.canDeleteWikiPage,
     sectionNavigation: wikiPage.sectionNavigation,
     hasSectionNavigation: !!wikiPage.sectionNavigation,
+    /* Inline ToC mount: avoids Benchpress empty IF/ELSE in wiki-page.tpl */
+    showWikiTocInline: !wikiPage.sectionNavigation,
     hasSectionChildNamespaces: !!(wikiPage.sectionNavigation && wikiPage.sectionNavigation.childSections.length),
     hasSectionPages: !!(wikiPage.sectionNavigation && wikiPage.sectionNavigation.topics.length),
     wikiSidebarNavRows,

@@ -51,50 +51,69 @@
     <div class="wiki-content-layout<!-- IF hasSectionNavigation --> wiki-content-layout--sidebar<!-- ENDIF hasSectionNavigation -->">
       <!-- IF hasSectionNavigation -->
       <aside class="wiki-sidebar">
-        <section class="wiki-sidebar-card card wiki-sidebar-card--nav-merged">
-          <div class="card-body">
-            <nav class="wiki-sidebar-merged-nav" aria-label="Namespace and pages">
-              <ul class="wiki-sidebar-nav-rows">
-                <!-- BEGIN wikiSidebarNavRows -->
-                <li class="wiki-sidebar-nav-row<!-- IF wikiSidebarNavRows.isPage --> wiki-sidebar-nav-row--page<!-- ENDIF wikiSidebarNavRows.isPage --><!-- IF wikiSidebarNavRows.isNamespace --> wiki-sidebar-nav-row--namespace<!-- ENDIF wikiSidebarNavRows.isNamespace --><!-- IF wikiSidebarNavRows.isActive --> is-active<!-- ENDIF wikiSidebarNavRows.isActive -->"<!-- IF wikiSidebarNavRows.isCurrentNamespace --> data-wiki-current-namespace="1"<!-- ENDIF wikiSidebarNavRows.isCurrentNamespace --> style="--wiki-nav-depth: {wikiSidebarNavRows.depth};">
-                  <!-- IF wikiSidebarNavRows.isNamespace -->
-                  <a class="wiki-sidebar-nav-ns" href="{config.relative_path}{wikiSidebarNavRows.wikiPath}">{wikiSidebarNavRows.name}</a>
-                  <!-- ENDIF wikiSidebarNavRows.isNamespace -->
-                  <!-- IF wikiSidebarNavRows.isPage -->
-                  <a class="wiki-sidebar-nav-page" href="{config.relative_path}{wikiSidebarNavRows.wikiPath}">
-                    <!-- IF wikiSidebarNavRows.hasParentPath -->
-                    <span class="wiki-sidebar-parent-path">{wikiSidebarNavRows.parentTitlePathText}</span>
-                    <!-- ENDIF wikiSidebarNavRows.hasParentPath -->
-                    <span class="wiki-sidebar-page-title">{wikiSidebarNavRows.titleLeaf}</span>
-                  </a>
-                  <!-- ENDIF wikiSidebarNavRows.isPage -->
-                </li>
-                <!-- END wikiSidebarNavRows -->
-              </ul>
-            </nav>
+        <div class="wiki-sidebar-panels">
+          <div class="wiki-article-toc card wiki-article-toc--sidebar" data-wiki-article-toc-root hidden>
+            <details class="wiki-sidebar-disclosure" open>
+              <summary class="wiki-sidebar-disclosure__summary" id="wiki-article-toc-heading-sidebar">Table of Contents</summary>
+              <div class="wiki-sidebar-disclosure__body">
+                <nav class="wiki-article-toc__list-host wiki-sidebar-panel-scroll" data-wiki-article-toc aria-labelledby="wiki-article-toc-heading-sidebar"></nav>
+              </div>
+            </details>
           </div>
-        </section>
-
-        <!-- IF hasSectionChildNamespaces -->
-        <section class="wiki-sidebar-card card">
-          <div class="card-body">
-            <h2>Child Namespaces</h2>
-            <ul class="wiki-sidebar-list">
-              <!-- BEGIN sectionNavigation.childSections -->
-              <li>
-                <a href="{config.relative_path}{sectionNavigation.childSections.wikiPath}">
-                  {sectionNavigation.childSections.name}
-                </a>
-              </li>
-              <!-- END sectionNavigation.childSections -->
-            </ul>
+          <div class="wiki-sidebar-panel wiki-sidebar-panel--nav card" data-wiki-sidebar-nav-panel>
+            <details class="wiki-sidebar-disclosure wiki-sidebar-disclosure--nav" open>
+              <summary class="wiki-sidebar-disclosure__summary" id="wiki-article-wiki-nav-heading">Navigation</summary>
+              <div class="wiki-sidebar-disclosure__body wiki-sidebar-disclosure__body--nav wiki-sidebar-panel-scroll">
+                <nav class="wiki-sidebar-merged-nav" aria-label="Namespace, pages, and child namespaces">
+                  <ul class="wiki-sidebar-nav-rows">
+                    <!-- BEGIN wikiSidebarNavRows -->
+                    <li class="wiki-sidebar-nav-row<!-- IF wikiSidebarNavRows.isPage --> wiki-sidebar-nav-row--page<!-- ENDIF wikiSidebarNavRows.isPage --><!-- IF wikiSidebarNavRows.isNamespace --> wiki-sidebar-nav-row--namespace<!-- ENDIF wikiSidebarNavRows.isNamespace --><!-- IF wikiSidebarNavRows.isActive --> is-active<!-- ENDIF wikiSidebarNavRows.isActive -->"<!-- IF wikiSidebarNavRows.isCurrentNamespace --> data-wiki-current-namespace="1"<!-- ENDIF wikiSidebarNavRows.isCurrentNamespace --> style="--wiki-nav-depth: {wikiSidebarNavRows.depth};">
+                      <!-- IF wikiSidebarNavRows.isNamespace -->
+                      <a class="wiki-sidebar-nav-ns" href="{config.relative_path}{wikiSidebarNavRows.wikiPath}">{wikiSidebarNavRows.name}</a>
+                      <!-- ENDIF wikiSidebarNavRows.isNamespace -->
+                      <!-- IF wikiSidebarNavRows.isPage -->
+                      <a class="wiki-sidebar-nav-page" href="{config.relative_path}{wikiSidebarNavRows.wikiPath}">
+                        <!-- IF wikiSidebarNavRows.hasParentPath -->
+                        <span class="wiki-sidebar-parent-path">{wikiSidebarNavRows.parentTitlePathText}</span>
+                        <!-- ENDIF wikiSidebarNavRows.hasParentPath -->
+                        <span class="wiki-sidebar-page-title">{wikiSidebarNavRows.titleLeaf}</span>
+                      </a>
+                      <!-- ENDIF wikiSidebarNavRows.isPage -->
+                    </li>
+                    <!-- END wikiSidebarNavRows -->
+                  </ul>
+                  <!-- IF hasSectionChildNamespaces -->
+                  <hr class="wiki-sidebar-divider" />
+                  <h2 class="wiki-sidebar-child-ns-heading" id="wiki-sidebar-child-ns-heading">Child namespaces</h2>
+                  <ul class="wiki-sidebar-nav-rows" aria-labelledby="wiki-sidebar-child-ns-heading">
+                    <!-- BEGIN sectionNavigation.childSections -->
+                    <li class="wiki-sidebar-nav-row wiki-sidebar-nav-row--page">
+                      <a class="wiki-sidebar-nav-page" href="{config.relative_path}{sectionNavigation.childSections.wikiPath}">
+                        <span class="wiki-sidebar-page-title">{sectionNavigation.childSections.name}</span>
+                      </a>
+                    </li>
+                    <!-- END sectionNavigation.childSections -->
+                  </ul>
+                  <!-- ENDIF hasSectionChildNamespaces -->
+                </nav>
+              </div>
+            </details>
           </div>
-        </section>
-        <!-- ENDIF hasSectionChildNamespaces -->
+        </div>
       </aside>
       <!-- ENDIF hasSectionNavigation -->
 
       <div class="wiki-page-main-column">
+        <!-- IF showWikiTocInline -->
+        <div class="wiki-article-toc card mb-3 wiki-article-toc--inline" data-wiki-article-toc-root hidden>
+          <details class="wiki-sidebar-disclosure" open>
+            <summary class="wiki-sidebar-disclosure__summary" id="wiki-article-toc-heading-inline">Table of Contents</summary>
+            <div class="wiki-sidebar-disclosure__body">
+              <nav class="wiki-article-toc__list-host wiki-sidebar-panel-scroll" data-wiki-article-toc aria-labelledby="wiki-article-toc-heading-inline"></nav>
+            </div>
+          </details>
+        </div>
+        <!-- ENDIF showWikiTocInline -->
         <section class="wiki-page-body">
           <!-- IF mainPost -->
           <article class="wiki-page-content wiki-article-prose card">
