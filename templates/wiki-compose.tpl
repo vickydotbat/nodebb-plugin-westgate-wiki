@@ -1,9 +1,9 @@
 <div id="westgate-wiki-compose" class="westgate-wiki westgate-wiki-compose py-4">
   <p class="wiki-page-kicker">
     <!-- BEGIN breadcrumbs -->
-    <span> / </span>
     <!-- IF breadcrumbs.url -->
     <a href="{config.relative_path}{breadcrumbs.url}">{breadcrumbs.text}</a>
+    <span> / </span>
     <!-- ELSE -->
     <span>{breadcrumbs.text}</span>
     <!-- ENDIF breadcrumbs.url -->
