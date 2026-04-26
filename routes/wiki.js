@@ -9,6 +9,7 @@ const wikiNamespaceCreateController = require("../lib/controllers/wiki-namespace
 const config = require("../lib/config");
 const serializer = require("../lib/serializer");
 const wikiNamespaceCreators = require("../lib/wiki-namespace-creators");
+const wikiAlphabeticalIndex = require("../lib/wiki-alphabetical-index");
 const wikiService = require("../lib/wiki-service");
 const topicService = require("../lib/topic-service");
 
@@ -82,7 +83,6 @@ async function getWikiFallbackContext(uid) {
     hasSections: wikiData.sections.length > 0,
     configuredCategoryCount: wikiData.settings.categoryIds.length,
     effectiveCategoryCount: wikiData.settings.effectiveCategoryIds.length,
-    topicsPerCategory: wikiData.settings.topicsPerCategory,
     includeChildCategories: wikiData.settings.includeChildCategories,
     hasInvalidCategoryIds: wikiData.invalidCategoryIds.length > 0,
     invalidCategoryIdsText: wikiData.invalidCategoryIds.join(", "),
@@ -213,14 +213,26 @@ function register(params) {
     const canCreateWikiNamespaces = await wikiNamespaceCreators.getCanCreateWikiNamespaces(req.uid);
 
     const canCreatePage = wikiSection.section.privileges.canCreatePage;
+    const sectionContentsIndex = wikiAlphabeticalIndex.buildSectionContentsIndex(
+      wikiSection.section.childSections,
+      wikiSection.section.topics
+    );
+    const namespaceIndexEntryCount = wikiSection.section.childSections.length
+      + wikiSection.section.topics.length;
+
     res.render("wiki-section", {
       title: `${wikiSection.section.name} | Westgate Wiki`,
       breadcrumbs: sectionBreadcrumbs,
       section: wikiSection.section,
       hasChildSections: wikiSection.section.childSections.length > 0,
       hasTopics: wikiSection.section.topics.length > 0,
+      wikiIndexNamespaces: sectionContentsIndex.namespaces,
+      wikiIndexPageLetters: sectionContentsIndex.pageLetterGroups,
+      hasWikiIndexNamespaces: sectionContentsIndex.namespaces.length > 0,
+      hasWikiIndexPageLetters: sectionContentsIndex.pageLetterGroups.length > 0,
+      hasNamespaceIndexContent: namespaceIndexEntryCount > 0,
+      wikiIndexPageLetterGroupCount: sectionContentsIndex.pageLetterGroups.length,
       canCreatePage,
-      topicsPerCategory: wikiSection.settings.topicsPerCategory,
       hasCreateIntent,
       createIntentTitle,
       canCreateWikiNamespaces,

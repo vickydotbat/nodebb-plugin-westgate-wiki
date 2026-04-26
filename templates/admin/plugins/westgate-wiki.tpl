@@ -75,22 +75,6 @@
           </p>
         </div>
 
-        <div class="mb-4">
-          <label class="form-label" for="topicsPerCategory">Topics Per Category</label>
-          <input
-            id="topicsPerCategory"
-            type="number"
-            class="form-control"
-            name="topicsPerCategory"
-            min="1"
-            max="50"
-            value="{topicsPerCategory}"
-          />
-          <p class="form-text">
-            Controls how many recent topics are listed for each configured wiki category.
-          </p>
-        </div>
-
         <div class="mb-4 form-check">
           <input
             id="includeChildCategories"
