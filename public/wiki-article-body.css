@@ -19,6 +19,8 @@
  *   --wiki-prose-table-border, --wiki-prose-table-head-color, --wiki-prose-table-hover-bg, --wiki-prose-table-hover-color
  *   --wiki-prose-caption-bg, --wiki-prose-caption-color, --wiki-prose-caption-font-family
  *   --wiki-prose-caption-font-size, --wiki-prose-caption-padding
+ *   --wiki-prose-image-bg, --wiki-prose-image-border, --wiki-prose-image-padding
+ *   --wiki-prose-image-radius, --wiki-prose-image-shadow
  *   --wiki-prose-table-caption-bg, --wiki-prose-table-caption-color (CKEditor table captions)
  *   --wiki-prose-media-iframe-border
  *   --wiki-prose-raw-embed-bg, --wiki-prose-raw-embed-border, --wiki-prose-raw-embed-color
@@ -347,8 +349,6 @@ body:has(#westgate-wiki-compose) .ck.ck-dropdown__panel .ck.ck-list__item .ck-bu
 
 .wiki-article-prose figure.image > figcaption {
   background: var(--wiki-prose-caption-bg, var(--bs-secondary-bg, rgba(0, 0, 0, 0.04)));
-  border: 1px solid var(--wiki-prose-table-border, var(--bs-border-color-translucent, var(--bs-border-color, #dee2e6)));
-  border-top: 0;
   color: var(--wiki-prose-caption-color, var(--bs-secondary-color, inherit));
   font-family: var(--wiki-prose-caption-font-family, var(--bs-body-font-family, inherit));
   font-size: var(--wiki-prose-caption-font-size, 0.875rem);
@@ -396,14 +396,47 @@ body:has(#westgate-wiki-compose) .ck.ck-dropdown__panel .ck.ck-list__item .ck-bu
 }
 
 .wiki-article-prose figure.image {
-  margin: 0.5rem 0;
+  background: var(--wiki-prose-image-bg, transparent);
+  border: 1px solid var(--wiki-prose-image-border, transparent);
+  border-radius: var(--wiki-prose-image-radius, var(--bs-border-radius, 0.375rem));
+  box-shadow: var(--wiki-prose-image-shadow, none);
+  display: block;
+  margin: 1rem auto;
   max-width: 100%;
+  overflow: hidden;
+  padding: var(--wiki-prose-image-padding, 0);
+  width: fit-content;
 }
 
 .wiki-article-prose figure.image img {
+  display: block;
   max-width: 100%;
   height: auto;
-  border-radius: var(--bs-border-radius-sm, 0.25rem);
+  border-radius: var(--wiki-prose-image-radius, var(--bs-border-radius-sm, 0.25rem));
+}
+
+.wiki-article-prose figure.image > figcaption {
+  display: block;
+  max-width: 100%;
+}
+
+.wiki-article-prose figure.image.image-style-align-left,
+.wiki-article-prose figure.image.image-style-align-right,
+.wiki-article-prose figure.image.image-style-side {
+  width: fit-content;
+}
+
+/* Center simple imported image paragraphs without affecting images placed inside custom div/flex layouts. */
+.wiki-article-prose > p:has(> img:only-child),
+.wiki-article-prose > p:has(> a:only-child > img:only-child) {
+  text-align: center;
+}
+
+.wiki-article-prose > p > img:only-child,
+.wiki-article-prose > p > a:only-child > img:only-child {
+  display: inline-block;
+  max-width: 100%;
+  height: auto;
 }
 
 .wiki-article-prose::after {

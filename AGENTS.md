@@ -485,6 +485,25 @@ Mark items here as work lands in the repository.
     the generic dark popup button overrides so marker/font color swatches keep
     their actual colors while still using Westgate focus rings and labels.
   - [x] `./nodebb build` still succeeds after the color-grid pass.
+  - [x] Follow-up article media pass updated `public/wiki-article-body.css`
+    with neutral image figure hooks and shrink-to-content centered figure
+    layout so captions stay contained with their images, while direct
+    article-child image paragraphs are centered without interfering with custom
+    div/flexbox image layouts.
+  - [x] `npm test` and `./nodebb build` still succeed after the article media
+    pass.
+  - [x] Follow-up article container pass tightened
+    `nodebb-theme-westgate/scss/westgate/_wiki-prose.scss` so the article body
+    card, sidebar table of contents, and sidebar navigation panels resolve to
+    the same Westgate velvet surface, border, radius, shadow, and font stacks
+    used by forum category containers.
+  - [x] Local Playwright computed-style check confirmed the wiki body, TOC,
+    and navigation cards match the forum category container surface tokens.
+  - [x] Follow-up CKEditor form/dialog pass added global wiki-composer rules
+    for body-mounted CKEditor forms plus explicit find/replace overrides so
+    headers, labels, counters, inputs, placeholders, disabled states, and action
+    buttons inherit Westgate dark panels and UI fonts.
+  - [x] `./nodebb build` still succeeds after the CKEditor form/dialog pass.
   - [ ] Authenticated visual validation still needs to confirm CKEditor
     body-mounted popups inside the wiki composer match the reported table and
     emoji picker screenshots.
