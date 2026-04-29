@@ -25,6 +25,7 @@
  *
  *   Compose only (editable surface + CKEditor UI):
  *   --wiki-compose-editable-bg, --wiki-compose-editable-border-color
+ *   --wiki-compose-editable-focus-shadow
  *   --wiki-ck-base-background, --wiki-ck-base-foreground, --wiki-ck-base-border, --wiki-ck-base-text
  *   --wiki-ck-ui-text (maps to --ck-color-text; required for toolbar icons via currentColor)
  *   --wiki-ck-toolbar-icon-color (toolbar + dropdown trigger buttons)
@@ -423,7 +424,7 @@ body:has(#westgate-wiki-compose) .ck.ck-dropdown__panel .ck.ck-list__item .ck-bu
 
 .westgate-wiki-compose .wiki-article-prose .ck.ck-editor__editable_inline.ck-focused,
 .westgate-wiki-compose .ck.ck-editor__editable_inline.wiki-article-prose.ck-focused {
-  box-shadow: none !important;
+  box-shadow: var(--wiki-compose-editable-focus-shadow, none) !important;
 }
 
 /*

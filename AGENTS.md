@@ -263,6 +263,102 @@ Exit criteria:
 - Missing links provide a create path instead of a dead end.
 - Page creation remains namespace-aware.
 
+### Phase 8: Westgate Theme Alignment
+
+Goal:
+Bring wiki editor chrome and wiki page containers in line with
+`nodebb-theme-westgate` while keeping Westgate-specific visual decisions in the
+theme rather than duplicating theme CSS in this plugin.
+
+Assessment, 2026-04-29:
+
+- The plugin already exposes the right theming contract in `public/wiki.css` and
+  `public/wiki-article-body.css`: wiki surfaces, prose, floating tools,
+  redlinks, and CKEditor all route through `--wiki-*` custom properties with
+  Bootstrap fallbacks.
+- The Westgate theme already consumes that contract in
+  `/home/vicky/Projects/nodebb-dev/nodebb-theme-westgate/scss/westgate/_wiki-prose.scss`.
+  It sets Westgate palette variables and gives selected wiki cards the same
+  shadow as forum cards.
+- The plugin templates already provide useful semantic hooks:
+  `.westgate-wiki`, `.wiki-page-content`, `.wiki-namespace-index`,
+  `.wiki-sidebar-panel`, `.wiki-article-toc`, `.wiki-status-card`,
+  `.wiki-card`, `.wiki-topic-card`, `.wiki-compose-form`,
+  `.wiki-compose-editor`, and `.wiki-article-prose`.
+- Screenshot 1 editor issues are mostly theme-skin issues, not data-flow
+  issues: CKEditor focus still presents too much like browser/default blue,
+  toolbar button sizing/wrapping is cramped, and the compose form reads flatter
+  than the forum's velvet category/topic panels.
+- Screenshot 2 vs screenshot 3 container mismatch is also mostly theme-side:
+  forum category rows use richer `--wg-velvet-panel`, muted gold borders,
+  `8px` radius, and `--wg-velvet-shadow`; wiki article and sidebar cards are
+  close structurally but flatter and less connected to the forum container
+  language.
+- The plugin currently uses `.card` on the right elements. That should stay.
+  The next step is to make the active theme style those cards more precisely,
+  not to hard-code Westgate gradients into plugin CSS.
+
+Ownership decision:
+
+- Plugin owns stable semantic classes, neutral layout, CKEditor loading, and
+  fallback CSS.
+- `nodebb-theme-westgate` owns the Westgate visual result in
+  `scss/westgate/_wiki-prose.scss`.
+- Prefer adding or correcting plugin classes only when the theme lacks a stable
+  selector. Do not add one-off Westgate palette values to `public/wiki.css`.
+
+Tasks:
+
+1. Confirm rendered wiki pages use the template hooks expected by the theme:
+   article view, namespace view, landing page, redlink missing-page state, and
+   compose/edit page.
+2. In `nodebb-theme-westgate/scss/westgate/_wiki-prose.scss`, expand the wiki
+   surface list to cover all real plugin containers that need forum-style
+   depth:
+   `.wiki-page-content`, `.wiki-namespace-index`, `.wiki-sidebar-panel`,
+   `.wiki-article-toc`, `.wiki-status-card`, `.wiki-card`,
+   `.wiki-topic-card`, and `.wiki-compose-form`.
+3. Match those surfaces to the forum container contract:
+   `background: var(--wg-velvet-panel)`, `border: 1px solid var(--wg-border)`,
+   `border-radius: 8px`, `box-shadow: var(--wg-velvet-shadow)`, and the same
+   restrained hover/focus treatment where interaction exists.
+4. Keep the wiki article body document-like inside the shell: preserve readable
+   prose line height and spacing, but use Westgate heading, link, code,
+   blockquote, table, and caption variables from the theme.
+5. Theme the TOC/sidebar as compact utility panels, not nested decorative
+   cards: muted headings, gold links, clear active/current row states, tight
+   indentation, and stable sticky/mobile behavior.
+6. Theme the floating wiki action dock with the same icon-button language as
+   forum tools: fixed dimensions, muted gold icon color, clear hover/focus
+   states, and restrained danger treatment for delete.
+7. Theme the compose editor in `nodebb-theme-westgate` through the existing
+   `--wiki-ck-*` and `--wiki-compose-*` variables:
+   toolbar background/border, button hover/on states, disabled state, dropdown
+   panels, tooltip colors, input colors, source-editing view, editable
+   background, and editable focus ring.
+8. Replace the visible blue editor focus with a muted gold focus border/shadow
+   that remains accessible.
+9. Normalize CKEditor toolbar wrapping and density through theme selectors
+   scoped to `.westgate-wiki-compose` or `body:has(#westgate-wiki-compose)`.
+   Verify dropdown and balloon panels because CKEditor may mount them outside
+   the editor element.
+10. Add plugin-side classes only if theme selectors would otherwise have to be
+    brittle. Candidate additions, if needed: a class on the article layout root
+    for page-vs-namespace composition and a class on the compose card for
+    theme-owned editor shell styling.
+
+Exit criteria:
+
+- Wiki page article, TOC, namespace index, status cards, and compose form share
+  the forum's container depth and palette without moving Westgate CSS into the
+  plugin.
+- CKEditor toolbar, dropdowns, focus states, and editable area match the active
+  Westgate theme at desktop and mobile widths.
+- Forum category styling remains unchanged except for deliberate shared-token
+  consistency.
+- The plugin still degrades cleanly under non-Westgate themes through its
+  Bootstrap-backed `--wiki-*` fallbacks.
+
 ## Deferred Work
 
 These items are intentionally out of initialization scope unless the project explicitly expands:
@@ -294,6 +390,11 @@ Run or manually verify these after each major step:
 8. Missing slugs fail cleanly.
 9. Restart NodeBB when changing `plugin.json`, server-side route registration, or plugin initialization code.
 10. Rebuild NodeBB assets when changing plugin templates or CSS.
+11. For Westgate theme alignment, rebuild assets after theme SCSS changes and
+    compare `/categories`, a wiki article page, a wiki namespace page, and a
+    wiki compose/edit page at desktop and mobile widths.
+12. Check CKEditor toolbar wrapping, dropdowns, balloon panels, focus rings,
+    source-editing mode, and editable prose styling on the compose page.
 
 ## Content Model
 
@@ -341,6 +442,52 @@ Mark items here as work lands in the repository.
 
 - [x] Add operational scripts or documented manual checks.
 - [ ] Verify the plugin in a live NodeBB development instance.
+- [-] Implement the Westgate theme alignment plan in
+  `nodebb-theme-westgate/scss/westgate/_wiki-prose.scss`, using this plugin's
+  existing `--wiki-*` hooks and semantic classes.
+  - [x] Added a neutral `--wiki-compose-editable-focus-shadow` hook in
+    `public/wiki-article-body.css` so themes can own CKEditor editable focus
+    styling.
+  - [x] Expanded `nodebb-theme-westgate/scss/westgate/_wiki-prose.scss` to
+    style wiki page, namespace, sidebar/TOC, status, card, floating action, and
+    compose/editor surfaces through the plugin's existing semantic classes.
+  - [x] `npm test` passes in this plugin.
+  - [x] `./nodebb build` succeeds in `/home/vicky/Projects/nodebb-dev/forum`.
+  - [-] Local anonymous Playwright smoke checks passed for `/wiki`,
+    `/wiki/30/big-test-1`, mobile `/wiki/30/big-test-1`, and `/categories`.
+    Authenticated CKEditor visual validation remains pending because
+    `/wiki/edit/30` redirects to login in the test session.
+  - [x] Follow-up editor pass tightened wiki composer CKEditor button theming
+    in `nodebb-theme-westgate/scss/westgate/_wiki-prose.scss`: toolbar
+    buttons, split buttons, text buttons, color/input-color buttons, dropdown
+    panel buttons, dialog buttons, hover/focus/on/disabled states, icon fill,
+    and body-mounted CKEditor panel variables now use Westgate dark/gold
+    styling instead of CKEditor's light defaults.
+  - [x] `./nodebb build` still succeeds after the editor button pass.
+  - [ ] Authenticated visual validation still needs to confirm the hover/on
+    state shown in the reported composer screenshot no longer flashes a light
+    button background.
+  - [x] Follow-up source/code block pass updated
+    `nodebb-theme-westgate/scss/westgate/_wiki-prose.scss` so CKEditor source
+    editing areas use dark Westgate editor colors and wiki code blocks render
+    as raised dark wells with gold-edged borders, themed code text, and dark
+    language labels.
+  - [x] `./nodebb build` still succeeds after the source/code block pass.
+  - [ ] Authenticated visual validation still needs to confirm source editing
+    mode and code block widgets in the composer no longer use light/Harmony
+    defaults.
+  - [x] Follow-up CKEditor popup pass updated the Westgate theme selectors for
+    the insert-table grid and emoji picker so popup cells, labels, search
+    fields, category buttons, and hover/focus states stay on dark Westgate
+    panel colors instead of CKEditor's light/default floating text.
+  - [x] `./nodebb build` still succeeds after the popup theming pass.
+  - [x] Follow-up color-grid pass excluded CKEditor color selector tiles from
+    the generic dark popup button overrides so marker/font color swatches keep
+    their actual colors while still using Westgate focus rings and labels.
+  - [x] `./nodebb build` still succeeds after the color-grid pass.
+  - [ ] Authenticated visual validation still needs to confirm CKEditor
+    body-mounted popups inside the wiki composer match the reported table and
+    emoji picker screenshots.
 
 ## Agent Execution Order
 
