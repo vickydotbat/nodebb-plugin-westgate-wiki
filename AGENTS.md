@@ -359,11 +359,379 @@ Exit criteria:
 - The plugin still degrades cleanly under non-Westgate themes through its
   Bootstrap-backed `--wiki-*` fallbacks.
 
+## Planned Work: Human-Readable Wiki Paths
+
+Current wiki article URLs inherit NodeBB topic slugs:
+
+```text
+/wiki/29/map-creation-guide
+```
+
+That is stable and easy to resolve because the topic id is embedded in the
+path, but it is not wiki-shaped. The desired canonical URL should use configured
+wiki namespace/category paths followed by the page slug:
+
+```text
+/wiki/development/guides/map-creation-guide
+```
+
+This should be implemented as a plugin-owned routing layer over NodeBB
+categories and topics. NodeBB category and topic ids should remain internal
+identifiers, not public wiki path requirements.
+
+### Assessment
+
+The plugin already has the data model needed for this:
+
+- Configured categories are wiki namespaces.
+- Child categories can be included as nested namespaces.
+- Topic titles and NodeBB slugs already provide page slugs.
+- Internal wiki links already resolve namespace paths in
+  `lib/wiki-links.js`.
+- Serialization currently emits `/wiki/${topic.slug}`, which preserves the
+  topic id because NodeBB topic slugs include it.
+
+The missing piece is a canonical wiki path resolver that maps:
+
+```text
+namespace/category path + page slug -> category + topic
+```
+
+without relying on the topic id in the request path.
+
+### Phase 0: Define Canonical Path Rules
+
+Goal:
+Make URL behavior deterministic before changing routes.
+
+Rules:
+
+1. Namespace segments come from the configured category hierarchy.
+2. Page segments come from the NodeBB topic slug leaf with the numeric topic id
+   removed.
+3. The canonical article path is
+   `/wiki/:namespace_path_segments/:page_slug`.
+4. The canonical namespace index path is `/wiki/:namespace_path_segments`.
+5. Existing ID-based paths continue to resolve and redirect to canonical paths.
+6. If a namespace and page would produce the same path, namespace wins for the
+   index route and page creation must reject or disambiguate the collision.
+
+Exit criteria:
+
+- Every wiki namespace has one canonical public path.
+- Every wiki page has one canonical public path.
+- Existing URLs remain backward compatible through redirects.
+
+### Phase 1: Build A Path Resolver Service
+
+Goal:
+Centralize URL construction and lookup instead of scattering path logic through
+routes and serializers.
+
+Tasks:
+
+1. Add a plugin service such as `lib/wiki-paths.js`.
+2. Build namespace paths from category ancestors within the effective wiki
+   namespace set.
+3. Normalize path segments with the same slug rules used by NodeBB for category
+   and topic slugs where possible.
+4. Resolve a namespace path to a category id.
+5. Resolve a full article path to `{ cid, tid, topic }` by finding a topic in
+   the resolved category whose slug leaf matches the requested page slug.
+6. Return structured failure reasons:
+   - namespace not found
+   - page not found in namespace
+   - ambiguous duplicate page slug
+   - hidden or unauthorized content
+
+Exit criteria:
+
+- Routes, breadcrumbs, internal wiki links, and navigation can ask one service
+  for canonical wiki URLs.
+- No template needs to manually construct `/wiki/${topic.slug}`.
+
+### Phase 2: Add Canonical Routes
+
+Goal:
+Support clean URLs while preserving the current ID-based routes during
+migration.
+
+Tasks:
+
+1. Add a catch-all wiki route for canonical paths after more specific routes:
+   `/wiki/:path(*)`.
+2. Resolve the path first as a namespace index, then as a page within the
+   deepest matching namespace.
+3. Keep existing routes:
+   - `/wiki/category/:category_id/:slug?`
+   - `/wiki/:topic_id/:slug?`
+4. Change existing routes to redirect to the canonical namespace or page path
+   for non-API requests.
+5. Ensure utility routes such as `/wiki/compose/:cid`,
+   `/wiki/edit/:topic_id`, and `/wiki/namespace/create/:parent_cid` are matched
+   before the catch-all route.
+
+Exit criteria:
+
+- `/wiki/development/guides/map-creation-guide` renders the article.
+- `/wiki/29/map-creation-guide` redirects to the canonical article URL.
+- `/wiki/category/12/development/guides` redirects to the canonical namespace
+  URL.
+- Compose, edit, delete, and namespace-create routes remain unaffected.
+
+### Phase 3: Update Link Generation
+
+Goal:
+Make every wiki-facing link prefer canonical paths.
+
+Tasks:
+
+1. Update `lib/serializer.js` to emit canonical `wikiPath` values for sections
+   and topics.
+2. Update `lib/wiki-links.js` so `[[Page]]`, `[[Namespace/Page]]`, and
+   `[[ns:Namespace]]` render clean wiki URLs.
+3. Update breadcrumbs in `lib/wiki-breadcrumb-trail.js`.
+4. Update namespace search results in `lib/wiki-namespace-search.js`.
+5. Update compose cancel/redirect targets so authors return to clean URLs after
+   create or edit.
+6. Keep forum discussion links pointed at `/topic/{topic.slug}` because the
+   forum view is still NodeBB-owned.
+
+Exit criteria:
+
+- New links generated by the wiki no longer expose topic ids or category ids.
+- Forum discussion links still use normal NodeBB topic URLs.
+
+### Phase 4: Collision And Rename Handling
+
+Goal:
+Handle the cases that numeric ids used to make trivial.
+
+Tasks:
+
+1. Detect duplicate page slug leaves inside the same namespace.
+2. On collision, either reject the new page title or route the duplicate through
+   a deterministic fallback until renamed.
+3. Redirect old clean paths after topic or category renames where practical.
+4. Consider storing lightweight alias records for renamed wiki pages and
+   namespaces if real content frequently changes names.
+5. Keep redirects loop-safe and bounded.
+
+Exit criteria:
+
+- Clean URLs remain predictable when pages are renamed.
+- Duplicate titles do not silently point to the wrong page.
+
+### Phase 5: Verification
+
+Run these checks before considering clean paths complete:
+
+1. Root namespace, child namespace, and deeply nested namespace URLs render.
+2. Article URLs render at `/wiki/{namespace path}/{page slug}`.
+3. Current ID-based article and category URLs redirect to canonical paths.
+4. Internal wiki links generate canonical URLs.
+5. Redlinks still open page creation in the intended namespace.
+6. Private or unauthorized namespaces do not leak through path lookup.
+7. Slug collisions fail safely.
+8. NodeBB `/topic/...` forum routes continue to work.
+
+## Planned Work: Wiki-Aware Revision History
+
+NodeBB's built-in post edit history is forum-shaped. The current core path is:
+
+- `forum/src/posts/diffs.js` stores reverse unified patches for each edit and
+  reconstructs a full historical post snapshot on demand.
+- `forum/src/api/posts.js#getDiffs` returns all revision metadata at once.
+- `forum/public/src/client/topic/diffs.js` opens a Bootbox modal, renders a
+  single `<select>`, and loads one full reconstructed post into
+  `partials/posts_list`.
+- `forum/src/views/modals/post-history.tpl` is designed around selecting and
+  viewing an entire post revision.
+
+That works acceptably for short forum posts, but it is a poor default for wiki
+articles because a single article revision can be several screens long and the
+most useful question is usually "what changed?", not "show the whole page at
+this timestamp."
+
+### Assessment
+
+The apparent "only the most recent revision is visible" issue should be treated
+as a UI and data-flow problem until proven otherwise. NodeBB currently returns a
+full revision list, but the modal collapses that list into a normal single-row
+select and immediately fills the modal with the full current post. For large
+wiki articles, the revision navigation is visually dominated by the rendered
+article and can become slow or hard to use.
+
+The larger issue is architectural: `GET /posts/:pid/diffs/:since` returns a
+full post snapshot and the client renders it as a forum post. That means wiki
+history inherits forum presentation, including the entire article body, author
+row, image layout, and topic-post chrome.
+
+### Phase 0: Verify The Current Failure Mode
+
+Goal:
+Confirm whether NodeBB is losing revisions or only presenting them poorly.
+
+Tasks:
+
+1. Inspect the API response for a large wiki article through
+   `/api/v3/posts/:pid/diffs` or the existing write route used by
+   `forum/topic/diffs`.
+2. Count `timestamps`, `revisions`, and the rendered `<select> option` nodes in
+   the modal DOM.
+3. Record article content size, revision count, modal render time, and whether
+   `posts.diffs.load` reconstruction becomes slow.
+4. Repeat the same checks with a normal forum post to avoid breaking the forum
+   use case while optimizing wiki behavior.
+
+Exit criteria:
+
+- We know whether the data layer returns every revision.
+- We know whether the problem is select usability, full-post rendering cost, or
+  an actual truncation bug.
+
+### Phase 1: Low-Risk Modal Improvements
+
+Goal:
+Improve the existing NodeBB history modal without changing the diff storage
+format or forum restore/delete semantics.
+
+Tasks:
+
+1. Replace the single-row revision `<select>` with a scrollable revision list or
+   compact table showing timestamp, editor, current/original markers, and
+   deleted state.
+2. Keep restore and delete wired to the existing NodeBB endpoints and privilege
+   checks.
+3. Avoid loading full post content until a revision is selected intentionally.
+4. Add a "View full revision" action instead of making full snapshot rendering
+   the default.
+5. Add a content-length threshold so long posts default to compact history while
+   short forum posts can keep the existing behavior.
+
+Exit criteria:
+
+- Forum history remains familiar.
+- Wiki history no longer opens directly into a full article wall.
+- All existing permissions and restore/delete behavior are preserved.
+
+### Phase 2: Diff-First API Surface
+
+Goal:
+Add a non-breaking way to ask "what changed?" instead of "render the whole post
+at this revision."
+
+Tasks:
+
+1. Add or propose a NodeBB endpoint such as
+   `GET /posts/:pid/diffs/compare?from=&to=&mode=text|html|wiki`.
+2. Return structured data:
+   - revision endpoints and timestamps
+   - editor metadata
+   - title/tag changes
+   - added, removed, and changed counts
+   - changed hunks with limited surrounding context
+   - collapsed unchanged block counts
+3. Preserve the existing `GET /posts/:pid/diffs/:since` snapshot endpoint for
+   compatibility.
+4. Escape or sanitize all diff output before rendering because wiki articles
+   are HTML-heavy.
+5. Reuse `diffsPrivilegeCheck` and existing post history privileges.
+
+Exit criteria:
+
+- Consumers can render compact revision comparisons without loading a full
+  post partial.
+- Existing NodeBB clients continue to work.
+
+### Phase 3: Wiki-Specific History UI
+
+Goal:
+Give wiki pages their own revision history experience while still using NodeBB's
+post history as the source of truth.
+
+Tasks:
+
+1. Add a wiki-owned route such as `/wiki/:topic_id/:slug?/history`.
+2. Treat the first post `pid` as the article revision target.
+3. Build a two-pane layout:
+   - left: paginated or virtualized revision list
+   - right: selected comparison, defaulting to selected revision versus previous
+     revision or current revision
+4. Render title/tag changes separately from body changes.
+5. Group body changes by wiki section heading when possible.
+6. Provide "View full revision" and "Restore this revision" as secondary
+   actions, not the primary view.
+7. Link from the wiki article byline or tools area to the wiki history route.
+
+Exit criteria:
+
+- Wiki users see a history page that answers what changed first.
+- Full historical snapshots remain available but no longer dominate the flow.
+- The implementation remains a presentation layer over NodeBB post diffs.
+
+### Phase 4: Plugin Integration Strategy
+
+Goal:
+Keep the wiki plugin independent enough to ship locally while identifying which
+parts should become NodeBB core improvements.
+
+Tasks:
+
+1. Start plugin-side by wrapping existing NodeBB diff services where practical.
+2. If direct access to `posts.diffs` is not clean from the plugin, add the
+   smallest NodeBB hook or API extension needed for revision comparison.
+3. Candidate core hooks:
+   - `filter:post.getDiffs` for metadata enrichment already exists.
+   - A new load/compare hook for compact diff output.
+   - A client hook before `forum/topic/diffs` opens its modal, allowing plugins
+     to substitute a custom history UI for wiki main posts.
+4. Avoid storing separate wiki revision records in phase one. NodeBB post
+   history should remain authoritative.
+
+Exit criteria:
+
+- The plugin can provide a wiki-first history UI without forking the whole topic
+  history implementation.
+- Any NodeBB core change is small, reusable for forums, and not Westgate-only.
+
+### Phase 5: Large Article Performance
+
+Goal:
+Make revision history usable for long wiki articles with many edits.
+
+Tasks:
+
+1. Add pagination or cursor support to revision metadata instead of loading all
+   revisions forever.
+2. Cache reconstructed snapshots or comparison summaries by `pid`, revision
+   pair, and current edit timestamp.
+3. Lazy-render diff hunks and collapse unchanged content by default.
+4. Consider a wiki-only section index that stores heading anchors or block hashes
+   at save time, but only after the basic diff-first UI proves insufficient.
+
+Exit criteria:
+
+- A large wiki article with dozens of revisions opens quickly.
+- Comparing revisions does not require rendering the entire article body.
+
+### Phase 6: Verification
+
+Run these checks before considering the feature complete:
+
+1. Large wiki article with many revisions shows every revision in the history
+   list.
+2. Opening history defaults to compact diff output, not full article output.
+3. Full revision view still works when requested.
+4. Restore and delete still respect NodeBB privileges.
+5. A normal forum post still has a reasonable history experience.
+6. HTML-heavy article diffs do not produce unsafe or broken markup.
+7. Mobile history view remains navigable.
+
 ## Deferred Work
 
 These items are intentionally out of initialization scope unless the project explicitly expands:
 
-- Revision history
 - Infobox or template systems
 - API publishing endpoints
 - Search indexing
@@ -372,7 +740,7 @@ These items are intentionally out of initialization scope unless the project exp
 - Wiki-only namespaces created directly from plugin ACP
 - Hiding wiki namespaces from standard forum category surfaces without breaking NodeBB assumptions
 - Full DokuWiki-style sidebar/tree navigation
-- Dedicated wiki revision UI separate from NodeBB post history
+- Semantic section-level revision storage beyond NodeBB's patch history
 
 Do not start on these until the MVP route and configuration model are stable.
 
