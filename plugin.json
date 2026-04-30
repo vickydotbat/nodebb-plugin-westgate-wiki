@@ -69,6 +69,30 @@
     {
       "hook": "filter:category.build",
       "method": "filterCategoryBuild"
+    },
+    {
+      "hook": "filter:topics.updateRecent",
+      "method": "filterTopicsUpdateRecent"
+    },
+    {
+      "hook": "filter:topics.filterSortedTids",
+      "method": "filterTopicsFilterSortedTids"
+    },
+    {
+      "hook": "filter:topics.getUnreadTids",
+      "method": "filterTopicsGetUnreadTids"
+    },
+    {
+      "hook": "filter:search.inContent",
+      "method": "filterSearchInContent"
+    },
+    {
+      "hook": "filter:search.indexTopics",
+      "method": "filterSearchIndexTopics"
+    },
+    {
+      "hook": "filter:search.indexPosts",
+      "method": "filterSearchIndexPosts"
     }
   ]
 }

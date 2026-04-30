@@ -12,6 +12,9 @@ const wikiService = require("./lib/wiki-service");
 const wikiTopicPurge = require("./lib/wiki-topic-purge");
 const wikiRoutes = require("./routes/wiki");
 const filterCategoriesForum = require("./lib/filter-categories-forum");
+const filterForumFeeds = require("./lib/filter-forum-feeds");
+const filterForumSearch = require("./lib/filter-forum-search");
+const forumExclusionService = require("./lib/forum-exclusion-service");
 
 const plugin = module.exports;
 
@@ -19,6 +22,7 @@ plugin.init = async function (params) {
   const { router } = params;
 
   await config.ensureDefaults();
+  await forumExclusionService.removeWikiTopicsFromRecentSet();
 
   routeHelpers.setupAdminPageRoute(
     router,
@@ -83,6 +87,12 @@ plugin.wikiFilterTopicDelete = async function (data) {
 };
 plugin.filterCategoriesBuild = filterCategoriesForum.filterCategoriesBuild;
 plugin.filterCategoryBuild = filterCategoriesForum.filterCategoryBuild;
+plugin.filterTopicsUpdateRecent = filterForumFeeds.filterTopicsUpdateRecent;
+plugin.filterTopicsFilterSortedTids = filterForumFeeds.filterTopicsFilterSortedTids;
+plugin.filterTopicsGetUnreadTids = filterForumFeeds.filterTopicsGetUnreadTids;
+plugin.filterSearchInContent = filterForumSearch.filterSearchInContent;
+plugin.filterSearchIndexTopics = filterForumSearch.filterSearchIndexTopics;
+plugin.filterSearchIndexPosts = filterForumSearch.filterSearchIndexPosts;
 plugin.wikiFilterPrivilegesTopicsGet = async function (data) {
   if (!data || data.tid === undefined || data.tid === null) {
     return data;
@@ -98,6 +108,7 @@ plugin.wikiFilterPrivilegesTopicsGet = async function (data) {
 plugin.services = {
   cacheService,
   config,
+  forumExclusionService,
   serializer,
   topicService,
   wikiLinks,

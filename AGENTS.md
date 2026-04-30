@@ -728,6 +728,290 @@ Run these checks before considering the feature complete:
 6. HTML-heavy article diffs do not produce unsafe or broken markup.
 7. Mobile history view remains navigable.
 
+## Planned Work: Forum/Wiki Feed Separation
+
+Current wiki categories are hidden from the forum category tree by
+`lib/filter-categories-forum.js`, but their topics can still appear in global
+forum activity surfaces because NodeBB stores topic ids in shared topic sets:
+
+- `/recent`, `/top`, and `/popular` are backed by `topics.getSortedTopics`.
+- `/unread` and the header unread count are backed by
+  `topics.getUnreadTids`.
+- Global search is backed by `filter:search.query` providers such as
+  `nodebb-plugin-dbsearch`, then filtered through NodeBB post/topic privilege
+  checks.
+
+Assessment, 2026-04-30:
+
+- Current NodeBB source exposes `filter:topics.updateRecent` in
+  `src/topics/recent.js`. Returning a falsey or incomplete payload prevents a
+  topic from being added to the global `topics:recent` sorted set. This is the
+  best low-cost way to keep future wiki edits and replies out of `/recent`.
+- Current NodeBB source exposes `filter:topics.filterSortedTids` in
+  `src/topics/sorted.js` after normal privilege, ignored-topic, category, tag,
+  and user-block filtering. This is the best presentation filter for existing
+  wiki topics already present in `topics:recent`, and for `/top` and
+  `/popular`, which use the same sorted-topic pipeline.
+- Current NodeBB source exposes `filter:topics.getUnreadTids` in
+  `src/topics/unread.js` after unread candidate calculation and before counts
+  are returned. This hook can remove wiki topics from all unread filters and
+  recompute counts so the `/unread` page and header unread count agree.
+- Current NodeBB source exposes `filter:search.inContent` and
+  `filter:search.contentGetResult` in `src/search.js`. For global forum search
+  hiding, `filter:search.inContent` is the safest generic post-id filter
+  because it runs after privilege filtering and before pagination/result
+  rendering.
+- Bundled `nodebb-plugin-dbsearch` already supports an ACP
+  `excludeCategories` list and also fires `filter:search.indexTopics` and
+  `filter:search.indexPosts` before writing its index. If dbsearch remains the
+  active search provider, wiki categories can be excluded either by syncing its
+  configuration or by filtering those indexing hook payloads. The generic
+  global-search filter is still needed for non-dbsearch providers.
+
+Ownership decision:
+
+- This plugin owns deciding which category ids are wiki namespaces through
+  `config.getSettings().effectiveCategoryIds`.
+- This plugin should hide wiki topics from forum-owned global activity surfaces
+  by filtering topic ids, not by changing NodeBB category privileges. Category
+  permissions remain the source of truth for whether a user may read or edit a
+  wiki page.
+- `/topic/:slug` should remain reachable for direct discussion access unless a
+  later product decision explicitly disables it. The separation goal is to keep
+  wiki content out of forum discovery surfaces, not to make wiki topics
+  unreadable.
+- Wiki-owned search should be implemented as a `/wiki` feature that searches
+  only effective wiki namespaces. It should not depend on main forum search
+  including wiki categories.
+
+Implementation status, 2026-04-30:
+
+- `lib/forum-exclusion-service.js` centralizes effective wiki cid checks and
+  ordered tid/pid filtering through NodeBB topic/post APIs.
+- Plugin startup removes current wiki topic ids from the global
+  `topics:recent` sorted set, and the update hook removes wiki tids again if a
+  future edit/reply attempts to re-add them.
+- `lib/filter-forum-feeds.js` now handles:
+  - `filter:topics.updateRecent`
+  - `filter:topics.filterSortedTids`
+  - `filter:topics.getUnreadTids`
+- `lib/filter-forum-search.js` now handles:
+  - `filter:search.inContent`
+  - `filter:search.indexTopics`
+  - `filter:search.indexPosts`
+- `plugin.json` registers those hooks, so deployment requires a NodeBB restart;
+  no asset rebuild is required for the server-side hook changes alone.
+- `npm test` passed after the hook implementation.
+- No NodeBB core files were changed.
+- Known remaining gap: `/api/recent/posts` and `/recentposts.rss` call
+  `posts.getRecentPosts`, and current NodeBB source does not expose a clean
+  plugin hook in that method. The startup `topics:recent` cleanup does not
+  affect the global `posts:pid` set. Avoid monkey-patching for the first
+  shippable pass; if those surfaces matter in production, propose a small
+  NodeBB core hook after `privileges.posts.filter` and before
+  `getPostSummaryByPids`, or add a carefully-scoped route/controller wrapper as
+  a separate task.
+
+### Phase 0: Confirm Surface Inventory
+
+Goal:
+Identify every global forum surface that currently leaks wiki topics before
+adding filters.
+
+Tasks:
+
+1. Verify `/categories` and direct `/category/:cid` behavior still uses
+   `filter:categories.build` and `filter:category.build` as expected.
+2. Check `/recent`, `/top`, `/popular`, `/unread`, header unread count,
+   `/recent.rss`, `/recentposts.rss`, and main `/search`.
+3. Record whether the active production search provider is bundled dbsearch,
+   Elasticsearch, Solr, or another plugin.
+4. Capture a test wiki topic id and category id, then confirm where that topic
+   appears before filtering.
+
+Exit criteria:
+
+- The leak surfaces are known and split into topic-list, unread, feed, and
+  search categories.
+- The active search provider and its hook behavior are known.
+
+### Phase 1: Add A Shared Forum-Exclusion Service
+
+Goal:
+Avoid duplicating category checks across hooks.
+
+Tasks:
+
+1. Add a plugin-owned helper, for example `lib/forum-exclusion-service.js`.
+2. Reuse `config.getSettings().effectiveCategoryIds` and expose:
+   - `getWikiCidSet()`
+   - `isWikiCid(cid)`
+   - `filterNonWikiTopics(topicData)`
+   - `filterNonWikiTids(tids, uid)`
+   - `filterNonWikiPids(pids, uid)`
+3. Use NodeBB APIs (`topics.getTopicsFields`, `posts.getPostsFields`) for cid
+   lookups instead of direct database assumptions.
+4. Preserve input ordering and tolerate missing/deleted topics or posts.
+5. Treat missing config as no filtering.
+
+Exit criteria:
+
+- All future feed/search hooks can use one helper to remove wiki-backed forum
+  content.
+
+### Phase 2: Hide Wiki Topics From Recent, Top, And Popular
+
+Goal:
+Keep wiki topics out of forum topic-list discovery.
+
+Tasks:
+
+1. Register `filter:topics.updateRecent` and return no `tid`/`timestamp` when
+   the topic's cid is a wiki cid.
+2. Register `filter:topics.filterSortedTids` and remove wiki topic ids from
+   `data.tids`.
+3. Keep filtering conditional: if `params.cids` explicitly targets a wiki cid
+   through a core forum route, prefer redirecting the category route to `/wiki`
+   rather than returning mixed behavior.
+4. Remove existing wiki tids from `topics:recent` on plugin startup, and keep
+   the cleanup idempotent so restarts are safe.
+5. Re-run topic creation, reply, edit, and move flows to ensure a topic moved
+   into a wiki category disappears from forum lists, and a topic moved out of a
+   wiki category can appear again.
+
+Exit criteria:
+
+- New wiki topics and replies do not enter `/recent`.
+- Existing wiki topics are filtered out of `/recent`, `/top`, and `/popular`.
+- Forum topics outside wiki namespaces are unaffected.
+
+### Phase 3: Hide Wiki Topics From Unread
+
+Goal:
+Make `/unread` and unread counts ignore wiki-backed topics.
+
+Tasks:
+
+1. Register `filter:topics.getUnreadTids`.
+2. Remove wiki tids from `data.tids`.
+3. Remove wiki tids from every `data.tidsByFilter` array.
+4. Recompute `data.counts` from the filtered `tidsByFilter` values.
+5. Remove wiki cids from `data.unreadCids`.
+6. Verify the hook handles both full unread-list calls and `count: true` calls
+   used by `topics.getTotalUnread` and `topics.pushUnreadCount`.
+7. Decide whether opening a wiki page should mark its backing topic read. If
+   not, unread filtering must remain permanent so hidden unread wiki topics do
+   not keep inflating header counters.
+
+Exit criteria:
+
+- Wiki topics do not appear on `/unread`.
+- Header unread counts do not include wiki topics.
+- Mark-all-read behavior for forums remains unchanged.
+
+### Phase 4: Hide Wiki Content From Main Search
+
+Goal:
+Keep global forum search scoped to forum content while leaving room for
+wiki-specific search.
+
+Tasks:
+
+1. Register `filter:search.inContent` and remove pids whose topic cid is a
+   wiki cid from `data.pids`.
+2. Do not register `filter:search.filterAndSort` for the first shippable pass:
+   merely having a listener forces NodeBB to load matched post/topic metadata
+   during relevance searches. Add it only if a provider-specific ordering path
+   is proven to reintroduce wiki posts before `filter:search.inContent`.
+3. For bundled dbsearch, register `filter:search.indexTopics` and
+   `filter:search.indexPosts` to avoid indexing wiki topic titles and post
+   bodies in the main search index.
+4. If using dbsearch in production, either:
+   - sync its ACP `excludeCategories` with wiki effective cids, or
+   - keep the plugin-side indexing filters authoritative and trigger a dbsearch
+     reindex after deployment.
+5. For Elasticsearch/Solr providers, confirm whether they expose equivalent
+   indexing hooks or honor `filter:search.query` cid restrictions. If not,
+   rely on `filter:search.inContent` for result hiding and document that index
+   storage may still contain wiki content until provider-specific exclusion is
+   added.
+6. Keep `filter:topic.search` behavior in mind: in-topic search inside a wiki
+   discussion should either be allowed as direct topic functionality or routed
+   to a wiki-owned search UI.
+
+Exit criteria:
+
+- Main forum search does not return wiki posts or wiki topic-title matches.
+- Existing search index contents are either purged/reindexed or filtered at
+  query time until a reindex is completed.
+- The chosen behavior for direct in-topic search is documented.
+
+### Phase 5: Add Wiki-Owned Search
+
+Goal:
+Replace main-search visibility with an intentional `/wiki` search surface.
+
+Tasks:
+
+1. Add a wiki search route or API under `/wiki/search` or
+   `/api/westgate-wiki/search`.
+2. Search only `effectiveCategoryIds`.
+3. Return canonical wiki article and namespace URLs, not `/topic/...` URLs.
+4. Preserve NodeBB category/topic read privileges for each result.
+5. Prefer first-post/article-body results for MVP, then add namespace and title
+   ranking after the basic flow works.
+6. Add a search input to wiki templates only after the backend result shape is
+   stable.
+
+Exit criteria:
+
+- Users can find wiki content from the wiki UI.
+- Main forum search remains forum-only.
+
+### Phase 6: Feed And API Follow-Up
+
+Goal:
+Close non-page leaks after the primary surfaces are handled.
+
+Tasks:
+
+1. Check `/recent.rss`; it uses recent topic data and may be covered by
+   `filter:topics.filterSortedTids`.
+2. Check `/recentposts.rss`; it uses recent posts and may need a post/pid
+   filter or a small NodeBB hook if none exists.
+3. Check `/api/recent`, `/api/unread`, and any mobile/client consumers of the
+   same controllers.
+4. Check widgets or plugins that call `topics.getLatestTopics` directly,
+   because that helper reads `topics:recent` without the sorted-topic filter.
+   If needed, add cleanup of `topics:recent` and propose a NodeBB hook for
+   `getLatestTopics`.
+
+Exit criteria:
+
+- RSS/API/widget surfaces do not leak wiki topics in normal operation.
+- Any remaining core hook gap is documented with the smallest proposed NodeBB
+  change.
+
+### Phase 7: Verification
+
+Run these checks before considering forum/wiki feed separation complete:
+
+1. Create a normal forum topic and a wiki topic; only the normal topic appears
+   in `/recent`.
+2. Reply to a wiki topic; it still does not appear in `/recent`.
+3. `/top` and `/popular` do not show wiki topics.
+4. `/unread` and the header unread count exclude unread wiki topics.
+5. A user with direct wiki permissions can still open the wiki article and its
+   `/topic/...` discussion link.
+6. Main `/search` does not return wiki title or body matches.
+7. Wiki search returns wiki title/body matches with canonical `/wiki` links.
+8. Moving a topic into a wiki namespace removes it from forum discovery after
+   the next relevant update/reindex.
+9. Moving a topic out of a wiki namespace allows it to participate in forum
+   discovery again.
+10. Rebuild NodeBB assets only if templates/client assets change; restart
+    NodeBB after changing `plugin.json` hooks or server-side hook handlers.
+
 ## Deferred Work
 
 These items are intentionally out of initialization scope unless the project explicitly expands:
@@ -786,6 +1070,9 @@ Run or manually verify these after each major step:
 - Parent namespaces can now automatically include descendant categories as effective wiki namespaces.
 - Wiki namespaces now expose page-creation affordances when NodeBB category permissions allow topic creation.
 - Wiki article pages now expose namespace-local navigation for sibling pages and child namespaces.
+- Forum/wiki feed separation now hides wiki topics from `/recent`, `/top`,
+  `/popular`, `/unread`, unread counts, and main search results through
+  plugin-owned NodeBB hooks.
 
 Mark items here as work lands in the repository.
 
@@ -805,10 +1092,31 @@ Mark items here as work lands in the repository.
 - [x] `wiki-page.tpl` exists.
 - [x] Root wiki namespaces are separated from nested configured namespaces on the landing page.
 - [x] ACP provides a category tree UI for selecting wiki-enabled namespaces.
+- [x] Wiki topic ids are filtered out of forum sorted-topic discovery through
+  `filter:topics.updateRecent` and `filter:topics.filterSortedTids`.
+- [x] Existing wiki topic ids are removed from `topics:recent` during plugin
+  startup so direct recent-set consumers are less likely to leak wiki topics.
+- [x] Wiki topic ids are filtered out of unread lists and unread-count buckets
+  through `filter:topics.getUnreadTids`.
+- [x] Wiki post ids are filtered out of main forum search result rendering
+  through `filter:search.inContent`.
+- [x] Wiki topics/posts are filtered from bundled dbsearch indexing through
+  `filter:search.indexTopics` and `filter:search.indexPosts`.
 
 ## Pending Steps
 
 - [x] Add operational scripts or documented manual checks.
+- [ ] Restart the live NodeBB server after deploying the forum/wiki feed
+  separation hook changes in `plugin.json`.
+- [ ] Manually verify `/recent`, `/top`, `/popular`, `/unread`, header unread
+  count, and main `/search` on the live server with at least one normal topic
+  and one wiki topic.
+- [ ] If dbsearch is the live search provider, run a search reindex when
+  convenient so wiki content is removed from the stored search index, not only
+  filtered from result rendering.
+- [ ] Decide whether `/api/recent/posts` and `/recentposts.rss` need a NodeBB
+  core hook or separate wrapper to filter recent post summaries from wiki
+  categories.
 - [ ] Verify the plugin in a live NodeBB development instance.
 - [-] Implement the Westgate theme alignment plan in
   `nodebb-theme-westgate/scss/westgate/_wiki-prose.scss`, using this plugin's
