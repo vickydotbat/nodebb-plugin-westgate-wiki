@@ -812,6 +812,14 @@ Implementation status, 2026-04-30:
   `getPostSummaryByPids`, or add a carefully-scoped route/controller wrapper as
   a separate task.
 
+Live verification, 2026-05-01:
+
+- Confirmed on the live server that wiki posts no longer appear in Recent.
+- Confirmed on the live server that main forum search no longer returns wiki
+  posts.
+- Remaining live checks: `/top`, `/popular`, `/unread`, header unread count,
+  `/recent.rss`, `/api/recent/posts`, and `/recentposts.rss`.
+
 ### Phase 0: Confirm Surface Inventory
 
 Goal:
@@ -1102,15 +1110,22 @@ Mark items here as work lands in the repository.
   through `filter:search.inContent`.
 - [x] Wiki topics/posts are filtered from bundled dbsearch indexing through
   `filter:search.indexTopics` and `filter:search.indexPosts`.
+- [x] Live server check confirmed wiki posts no longer appear in Recent.
+- [x] Live server check confirmed wiki posts no longer appear in main forum
+  search.
 
 ## Pending Steps
 
 - [x] Add operational scripts or documented manual checks.
-- [ ] Restart the live NodeBB server after deploying the forum/wiki feed
+- [x] Restart the live NodeBB server after deploying the forum/wiki feed
   separation hook changes in `plugin.json`.
-- [ ] Manually verify `/recent`, `/top`, `/popular`, `/unread`, header unread
+- [-] Manually verify `/recent`, `/top`, `/popular`, `/unread`, header unread
   count, and main `/search` on the live server with at least one normal topic
   and one wiki topic.
+  - [x] `/recent` no longer shows wiki posts.
+  - [x] Main `/search` no longer returns wiki posts.
+  - [ ] `/top`, `/popular`, `/unread`, and header unread count still need live
+    confirmation.
 - [ ] If dbsearch is the live search provider, run a search reindex when
   convenient so wiki content is removed from the stored search index, not only
   filtered from result rendering.
