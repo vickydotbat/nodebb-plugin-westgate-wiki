@@ -41,32 +41,45 @@ The existing implementation already does the following:
 - Exposes a wiki page navigation rail for namespace-local browsing
 - Supports first-pass internal wiki links in article bodies via `[[Page Title]]`, `[[Child Namespace/Page Title]]`, and `[[Root Namespace/Child Namespace/Page Title]]`
 - Treats unresolved wiki links as redlinks that open prefilled page creation in the target namespace
+- Provides canonical human-readable wiki namespace and page paths through `lib/wiki-paths.js`
+- Keeps old ID-based wiki URLs as backward-compatible redirect aliases
 - Exposes reusable internal services through `plugin.services` for future extension work
 - Uses route and service modules instead of placing everything in `library.js`
 
-The implementation does not yet provide a real initialization standard, configuration flow, page rendering model, or verification discipline. This document fills that gap.
+The implementation now has a working MVP shape. This document tracks remaining
+hardening, verification, and phase-two work so future changes do not invent a
+new architecture mid-flight.
 
 ## Current Priority
 
-The namespace/path refactor is now the top priority for this plugin. Do this
-before expanding wiki-side search, before adding more article-history UI, and
-before broadening feed-separation follow-ups beyond live verification.
+The namespace/path foundation is now implemented. Do not rebuild it from
+scratch; extend `lib/wiki-paths.js` and existing callers.
 
-Immediate priority order:
+Current priority order:
 
-1. Build the canonical namespace/page path resolver.
-2. Add canonical clean routes and redirect existing ID-based wiki routes.
-3. Move every wiki-owned link generator onto the resolver.
-4. Update compose, redlinks, breadcrumbs, namespace search helpers, the
-   forum/wiki link autocomplete helper, and future wiki search planning to
-   consume canonical paths.
-5. Resume wiki-owned search only after canonical path construction and lookup
-   are stable.
+1. Live-verify clean wiki paths in a running NodeBB instance after fixing the
+   local `theme-not-found` build blocker.
+2. Harden collision and setup-error handling for duplicate namespace paths,
+   duplicate page slug leaves, and reserved first path segments.
+3. Add focused resolver tests or fixture-backed checks for canonical path
+   construction, legacy redirects, collision failures, and reserved segments.
+4. Resume wiki-owned search and forum/wiki autocomplete only through
+   `lib/wiki-paths.js`; do not let client code or templates construct
+   `/wiki/...` manually.
+5. Continue Westgate theme alignment after clean path behavior has been
+   verified live.
 
-The reason is architectural: search results, redlinks, breadcrumbs, authoring
-redirects, and future aliases all need one source of truth for wiki paths. Any
-new user-facing wiki feature that emits `/wiki/${topic.slug}` will create work
-that must be unwound by the refactor.
+Deprecated priority items, completed 2026-05-01:
+
+- Build the canonical namespace/page path resolver.
+- Add canonical clean routes and redirect existing ID-based wiki routes.
+- Move wiki-owned link generation for routes, breadcrumbs, redlinks, compose
+  redirects, namespace search, sidebars, namespace indexes, and delete redirects
+  onto canonical paths.
+
+Architectural rule: search results, redlinks, breadcrumbs, authoring redirects,
+and future aliases must use one source of truth for wiki paths. New wiki-facing
+features must call `lib/wiki-paths.js` or a service that wraps it.
 
 ## Initialization Objective
 
@@ -384,9 +397,35 @@ Exit criteria:
 - The plugin still degrades cleanly under non-Westgate themes through its
   Bootstrap-backed `--wiki-*` fallbacks.
 
-## Top Priority: Human-Readable Wiki Paths
+## Implemented Foundation: Human-Readable Wiki Paths
 
-Current wiki article URLs inherit NodeBB topic slugs:
+Implementation status, 2026-05-01:
+
+- `lib/wiki-paths.js` is the canonical wiki path service.
+- Canonical namespace paths use configured category hierarchy segments:
+  `/wiki/{namespace path}`.
+- If the configured top-level wiki namespace category itself has slug `wiki`,
+  that segment is treated as the route root and is omitted from child namespace
+  URLs. Example: category chain `wiki/about` becomes `/wiki/about`, not
+  `/wiki/wiki/about`.
+- Canonical article paths use namespace path plus the NodeBB topic slug leaf:
+  `/wiki/{namespace path}/{page slug}`.
+- Legacy article and category routes remain as migration aliases and redirect
+  to canonical paths for normal page requests.
+- Wiki-owned links now prefer canonical `wikiPath` values through service data,
+  breadcrumbs, redlinks, namespace search, compose redirects, page navigation,
+  namespace creation responses, and delete redirects.
+- The resolver is exposed as `plugin.services.wikiPaths`.
+- `npm test` includes syntax checking for `lib/wiki-paths.js` and currently
+  passes.
+- Full NodeBB asset verification is still pending because `./nodebb build`
+  currently fails before asset compilation with `theme-not-found`.
+
+Deprecated guidance: the phases below document the refactor plan and completion
+criteria. Phases 0 through 3 are implemented and should not be repeated as new
+work. Use the remaining open items for hardening and follow-up planning.
+
+Before the refactor, wiki article URLs inherited NodeBB topic slugs:
 
 ```text
 /wiki/29/map-creation-guide
@@ -400,9 +439,9 @@ wiki namespace/category paths followed by the page slug:
 /wiki/development/guides/map-creation-guide
 ```
 
-This should be implemented as a plugin-owned routing layer over NodeBB
-categories and topics. NodeBB category and topic ids should remain internal
-identifiers, not public wiki path requirements.
+This is now implemented as a plugin-owned routing layer over NodeBB categories
+and topics. NodeBB category and topic ids remain internal identifiers, not
+public wiki path requirements.
 
 Priority decision, 2026-05-01:
 
@@ -416,7 +455,7 @@ Priority decision, 2026-05-01:
 - Keep route compatibility for old wiki URLs, but treat them as migration
   aliases rather than canonical paths.
 
-### Assessment
+### Historical Assessment
 
 The plugin already has the data model needed for this:
 
@@ -425,14 +464,14 @@ The plugin already has the data model needed for this:
 - Topic titles and NodeBB slugs already provide page slugs.
 - Internal wiki links already resolve namespace paths in
   `lib/wiki-links.js`.
-- Serialization currently emits `/wiki/${topic.slug}`, which preserves the
+- Serialization previously emitted `/wiki/${topic.slug}`, which preserved the
   topic id because NodeBB topic slugs include it.
-- Namespace compose search currently emits the same ID-shaped wiki path and
-  must be updated during this refactor.
-- Future wiki-owned search should not ship until it can call this resolver for
-  both result URLs and namespace scope metadata.
+- Namespace compose search previously emitted the same ID-shaped wiki path and
+  has been updated for canonical paths.
+- Future wiki-owned search must call `lib/wiki-paths.js` for both result URLs
+  and namespace scope metadata.
 
-The missing piece is a canonical wiki path resolver that maps:
+The implemented resolver maps:
 
 ```text
 namespace/category path + page slug -> category + topic
@@ -441,6 +480,9 @@ namespace/category path + page slug -> category + topic
 without relying on the topic id in the request path.
 
 ### Phase 0: Define Canonical Path Rules
+
+Status, 2026-05-01: Completed. Keep this section as canonical behavior
+documentation. Do not reopen unless product requirements change.
 
 Goal:
 Make URL behavior deterministic before changing routes.
@@ -478,6 +520,12 @@ Exit criteria:
 
 ### Phase 1: Build A Path Resolver Service
 
+Status, 2026-05-01: Completed for the shippable foundation. Implemented in
+`lib/wiki-paths.js` with namespace/article builders, legacy builders,
+namespace lookup, article lookup by page slug leaf, reserved first-segment
+handling, and structured failure statuses. Remaining work is test coverage and
+admin-facing collision/setup messages, not rebuilding the resolver.
+
 Goal:
 Centralize URL construction and lookup instead of scattering path logic through
 routes and serializers. This service is the blocking foundation for search,
@@ -513,7 +561,7 @@ Tasks:
    render unauthorized data.
 10. Add focused unit-style tests around normalization, collision detection,
     deepest-namespace matching, and legacy-path construction where the existing
-    test harness allows it.
+    test harness allows it. Status: still open.
 
 Exit criteria:
 
@@ -523,6 +571,12 @@ Exit criteria:
 - Search implementation has a stable path API to depend on.
 
 ### Phase 2: Add Canonical Routes
+
+Status, 2026-05-01: Completed for route behavior. `routes/wiki.js` now registers
+specific utility routes first, redirects legacy ID-based article/category
+routes, and resolves clean catch-all paths through `lib/wiki-paths.js`.
+Remaining work is live verification in NodeBB once the local theme/build issue
+is fixed.
 
 Goal:
 Support clean URLs while preserving the current ID-based routes during
@@ -556,6 +610,11 @@ Exit criteria:
 
 ### Phase 3: Update Link Generation
 
+Status, 2026-05-01: Completed for existing wiki-owned links. New link work must
+reuse the resolver. A repository search for direct `/wiki/${topic.slug}` or
+`/wiki/category/${category.slug}` construction should only find legacy helpers,
+utility routes, or documented fallbacks.
+
 Goal:
 Make every wiki-facing link prefer canonical paths.
 
@@ -586,6 +645,11 @@ Exit criteria:
 
 ### Phase 4: Collision And Rename Handling
 
+Status, 2026-05-01: Partially implemented. The resolver returns structured
+statuses for namespace collisions, page collisions, and reserved first path
+segments. Still open: admin/setup surfacing, create/edit-time rejection for
+duplicate page slug leaves, and any deliberate rename alias policy.
+
 Goal:
 Handle the cases that numeric ids used to make trivial.
 
@@ -613,6 +677,10 @@ Exit criteria:
 
 ### Phase 4A: Search And Authoring Dependency Update
 
+Status, 2026-05-01: Partially completed. Existing namespace compose search,
+compose success/cancel redirects, and redlink flows now use canonical paths.
+Full wiki-owned search remains a follow-up and must consume the resolver.
+
 Goal:
 Make later wiki-side search and authoring work depend on canonical paths rather
 than ID-shaped routes.
@@ -638,6 +706,9 @@ Exit criteria:
 - The path resolver becomes the required interface for all wiki URL generation.
 
 ### Phase 4B: Wiki Link Autocomplete Helper
+
+Status, 2026-05-01: Open. This remains the next authoring/search feature after
+live clean-path verification and collision hardening.
 
 Goal:
 Expand the lightweight autocomplete helper into a reusable link-picker surface
@@ -719,6 +790,11 @@ Exit criteria:
 - The helper remains distinct from full wiki search and does bounded work.
 
 ### Phase 5: Verification
+
+Status, 2026-05-01: Partially complete. `npm test` passes, and route patterns
+were checked against NodeBB's installed `path-to-regexp`. Full running-NodeBB
+verification is blocked by the local `./nodebb build` failure:
+`theme-not-found`.
 
 Run these checks before considering clean paths complete:
 
