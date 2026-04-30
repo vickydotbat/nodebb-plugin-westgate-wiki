@@ -12,6 +12,7 @@ const wikiAlphabeticalIndex = require("../lib/wiki-alphabetical-index");
 const wikiService = require("../lib/wiki-service");
 const topicService = require("../lib/topic-service");
 const wikiBreadcrumbTrail = require("../lib/wiki-breadcrumb-trail");
+const wikiPaths = require("../lib/wiki-paths");
 
 function getCreateIntentTitle(req) {
   return String((req.query && req.query.create) || "").trim();
@@ -204,21 +205,7 @@ function register(params) {
     }
   });
 
-  routeHelpers.setupPageRoute(router, "/wiki/category/:category_id/:slug?", async (req, res, next) => {
-    const wikiSection = await wikiService.getSection(req.params.category_id, req.uid);
-
-    if (wikiSection.status === "invalid" || wikiSection.status === "not-found" || wikiSection.status === "not-wiki") {
-      return next();
-    }
-
-    if (wikiSection.status === "forbidden") {
-      return helpers.notAllowed(req, res);
-    }
-
-    if (!res.locals.isAPI && req.params.slug !== wikiSection.section.slugPath) {
-      return helpers.redirect(res, appendQueryString(wikiSection.section.wikiPath, req), true);
-    }
-
+  async function renderSection(req, res, next, wikiSection) {
     const createIntentTitle = getCreateIntentTitle(req);
     const hasCreateIntent = !!(createIntentTitle && wikiSection.section.privileges.canCreatePage);
 
@@ -251,14 +238,10 @@ function register(params) {
       createIntentTitle,
       canCreateWikiNamespaces
     });
-  });
+  }
 
-  routeHelpers.setupPageRoute(router, "/wiki/compose/:cid", [middleware.ensureLoggedIn], composeController.renderCompose);
-
-  routeHelpers.setupPageRoute(router, "/wiki/edit/:tid", [middleware.ensureLoggedIn], composeController.renderEdit);
-
-  routeHelpers.setupPageRoute(router, "/wiki/:topic_id/:slug?", async (req, res, next) => {
-    const wikiPage = await topicService.getWikiPage(req.params.topic_id, req.uid);
+  async function renderArticle(req, res, next, tid) {
+    const wikiPage = await topicService.getWikiPage(tid, req.uid);
 
     if (wikiPage.status === "invalid" || wikiPage.status === "not-found" || wikiPage.status === "not-wiki") {
       return next();
@@ -266,10 +249,6 @@ function register(params) {
 
     if (wikiPage.status === "forbidden") {
       return helpers.notAllowed(req, res);
-    }
-
-    if (!res.locals.isAPI && req.params.slug !== wikiPage.topic.slug.split("/").slice(1).join("/")) {
-      return helpers.redirect(res, appendQueryString(`/wiki/${wikiPage.topic.slug}`, req), true);
     }
 
     const settings = await config.getSettings();
@@ -283,6 +262,75 @@ function register(params) {
       canCreateWikiNamespaces
     };
     res.render("wiki-page", pageData);
+  }
+
+  routeHelpers.setupPageRoute(router, "/wiki/category/:category_id/:slug?", async (req, res, next) => {
+    const wikiSection = await wikiService.getSection(req.params.category_id, req.uid);
+
+    if (wikiSection.status === "invalid" || wikiSection.status === "not-found" || wikiSection.status === "not-wiki") {
+      return next();
+    }
+
+    if (wikiSection.status === "forbidden") {
+      return helpers.notAllowed(req, res);
+    }
+
+    if (!res.locals.isAPI) {
+      return helpers.redirect(res, appendQueryString(wikiSection.section.wikiPath, req), true);
+    }
+
+    return renderSection(req, res, next, wikiSection);
+  });
+
+  routeHelpers.setupPageRoute(router, "/wiki/compose/:cid", [middleware.ensureLoggedIn], composeController.renderCompose);
+
+  routeHelpers.setupPageRoute(router, "/wiki/edit/:tid", [middleware.ensureLoggedIn], composeController.renderEdit);
+
+  routeHelpers.setupPageRoute(router, "/wiki/:topic_id(\\d+)/:slug?", async (req, res, next) => {
+    const wikiPage = await topicService.getWikiPage(req.params.topic_id, req.uid);
+
+    if (wikiPage.status === "invalid" || wikiPage.status === "not-found" || wikiPage.status === "not-wiki") {
+      return next();
+    }
+
+    if (wikiPage.status === "forbidden") {
+      return helpers.notAllowed(req, res);
+    }
+
+    if (!res.locals.isAPI) {
+      const canonicalPath = wikiPage.topic.wikiPath || await wikiPaths.getArticlePath(wikiPage.topic);
+      if (canonicalPath) {
+        return helpers.redirect(res, appendQueryString(canonicalPath, req), true);
+      }
+    }
+
+    return renderArticle(req, res, next, req.params.topic_id);
+  });
+
+  routeHelpers.setupPageRoute(router, "/wiki/:path(*)", async (req, res, next) => {
+    const pathSegments = wikiPaths.splitPath(req.params.path);
+    if (!pathSegments.length) {
+      return next();
+    }
+
+    const namespace = await wikiPaths.resolveNamespacePath(pathSegments);
+    if (namespace.status === "ok") {
+      const wikiSection = await wikiService.getSection(namespace.cid, req.uid);
+      if (wikiSection.status === "forbidden") {
+        return helpers.notAllowed(req, res);
+      }
+      if (wikiSection.status !== "ok") {
+        return next();
+      }
+      return renderSection(req, res, next, wikiSection);
+    }
+
+    const article = await wikiPaths.resolveArticlePath(pathSegments);
+    if (article.status !== "ok") {
+      return next();
+    }
+
+    return renderArticle(req, res, next, article.tid);
   });
 }
 

@@ -21,13 +21,14 @@ $(document).ready(function () {
       return null;
     }
 
-    if (url.origin !== window.location.origin || !url.pathname.includes("/wiki/category/")) {
+    if (url.origin !== window.location.origin || !url.pathname.includes("/wiki/")) {
       return null;
     }
 
     const title = (url.searchParams.get("create") || "").trim();
+    const cidParam = url.searchParams.get("cid");
     const cidMatch = url.pathname.match(/\/wiki\/category\/(\d+)(?:\/|$)/);
-    const cid = cidMatch ? parseInt(cidMatch[1], 10) : NaN;
+    const cid = cidParam ? parseInt(cidParam, 10) : (cidMatch ? parseInt(cidMatch[1], 10) : NaN);
 
     if (!title || !Number.isInteger(cid) || cid <= 0) {
       return null;
@@ -36,6 +37,7 @@ $(document).ready(function () {
     return {
       cid: cid,
       title: title,
+      namespacePath: url.pathname.replace(((window.config && window.config.relative_path) || ""), "") || url.pathname,
       href: url.toString(),
       isRedlink: url.searchParams.get("redlink") === "1"
     };
@@ -48,7 +50,8 @@ $(document).ready(function () {
 
     pendingWikiCreate = {
       cid: intent.cid,
-      title: intent.title || ""
+      title: intent.title || "",
+      namespacePath: intent.namespacePath || ""
     };
 
     let target = `wiki/compose/${intent.cid}`;
@@ -161,8 +164,11 @@ $(document).ready(function () {
         payload.data.slug
       ) {
         pendingAutoCreateHref = null;
+        const slugLeaf = String(payload.data.slug || "").split("/").filter(Boolean).pop();
+        const namespacePath = pendingWikiCreate && pendingWikiCreate.namespacePath;
+        const cleanPath = namespacePath && slugLeaf ? `${namespacePath.replace(/\/$/, "")}/${slugLeaf}` : `wiki/${payload.data.slug}`;
         clearPendingWikiCreate();
-        ajaxify.go(`wiki/${payload.data.slug}`);
+        ajaxify.go(cleanPath.replace(/^\//, ""));
       }
     });
 

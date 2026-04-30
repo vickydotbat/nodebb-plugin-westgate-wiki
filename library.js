@@ -9,6 +9,7 @@ const topicService = require("./lib/topic-service");
 const wikiLinks = require("./lib/wiki-links");
 const wikiHtmlParse = require("./lib/wiki-html-parse");
 const wikiService = require("./lib/wiki-service");
+const wikiPaths = require("./lib/wiki-paths");
 const wikiTopicPurge = require("./lib/wiki-topic-purge");
 const wikiRoutes = require("./routes/wiki");
 const filterCategoriesForum = require("./lib/filter-categories-forum");
@@ -112,5 +113,6 @@ plugin.services = {
   serializer,
   topicService,
   wikiLinks,
+  wikiPaths,
   wikiService
 };

@@ -246,10 +246,13 @@ function initWikiComposePage() {
             return;
           }
 
-          if (wikiSlug && typeof ajaxify !== "undefined" && ajaxify.go) {
-            ajaxify.go(`wiki/${wikiSlug}`);
-          } else if (wikiSlug) {
-            window.location.href = `${payload.relativePath || ""}/wiki/${wikiSlug}`;
+          const slugLeaf = wikiSlug ? String(wikiSlug).split("/").filter(Boolean).pop() : "";
+          const cleanWikiPath = payload.sectionWikiPath && slugLeaf ? `${payload.sectionWikiPath}/${slugLeaf}` : "";
+
+          if (cleanWikiPath && typeof ajaxify !== "undefined" && ajaxify.go) {
+            ajaxify.go(cleanWikiPath.replace(/^\//, ""));
+          } else if (cleanWikiPath) {
+            window.location.href = `${payload.relativePath || ""}${cleanWikiPath}`;
           } else {
             throw new Error("Unexpected API response");
           }
