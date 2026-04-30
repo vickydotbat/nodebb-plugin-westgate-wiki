@@ -46,6 +46,28 @@ The existing implementation already does the following:
 
 The implementation does not yet provide a real initialization standard, configuration flow, page rendering model, or verification discipline. This document fills that gap.
 
+## Current Priority
+
+The namespace/path refactor is now the top priority for this plugin. Do this
+before expanding wiki-side search, before adding more article-history UI, and
+before broadening feed-separation follow-ups beyond live verification.
+
+Immediate priority order:
+
+1. Build the canonical namespace/page path resolver.
+2. Add canonical clean routes and redirect existing ID-based wiki routes.
+3. Move every wiki-owned link generator onto the resolver.
+4. Update compose, redlinks, breadcrumbs, namespace search helpers, the
+   forum/wiki link autocomplete helper, and future wiki search planning to
+   consume canonical paths.
+5. Resume wiki-owned search only after canonical path construction and lookup
+   are stable.
+
+The reason is architectural: search results, redlinks, breadcrumbs, authoring
+redirects, and future aliases all need one source of truth for wiki paths. Any
+new user-facing wiki feature that emits `/wiki/${topic.slug}` will create work
+that must be unwound by the refactor.
+
 ## Initialization Objective
 
 Initialize the plugin so that a developer or agent can take it from scaffold to MVP in a controlled order, with explicit completion criteria and without inventing architecture mid-flight.
@@ -70,7 +92,7 @@ The first usable version of this plugin must support:
 - Category-backed wiki sections
 - Nested wiki namespaces when configured categories are parent/child in NodeBB
 - Topic listings per wiki section
-- A dedicated wiki page view for a topic slug
+- A dedicated wiki page view at a canonical namespace/page path
 - Clean wiki styling that coexists with the active NodeBB theme
 - Graceful handling of missing categories, empty sections, and disabled configuration
 
@@ -191,7 +213,9 @@ Add a dedicated wiki article view.
 
 Tasks:
 
-1. Introduce a canonical wiki article route. Current implementation uses `/wiki/:topic_id/:slug?` to match NodeBB topic slugs.
+1. Introduce a canonical wiki article route. Current implementation uses
+   `/wiki/:topic_id/:slug?` to match NodeBB topic slugs, but the target route is
+   `/wiki/:namespace_path_segments/:page_slug`.
 2. Resolve the topic through NodeBB APIs, not direct database assumptions.
 3. Treat the first post as article content.
 4. Fetch enough topic metadata to render title, breadcrumbs, category, author, and timestamps.
@@ -215,7 +239,8 @@ Tasks:
    - tag-based inclusion
    - explicit topic setting
 2. Decide slug canonicalization rules.
-3. Decide whether `/topic/:slug` and `/wiki/:slug` should both exist and which is canonical.
+3. Keep `/topic/:slug` as the NodeBB-owned discussion route and make
+   `/wiki/:namespace_path_segments/:page_slug` the canonical wiki article route.
 4. Add breadcrumb and cross-navigation from landing page to article page.
 5. Document what qualifies as wiki content versus normal forum content.
 6. Clarify how configured child categories behave as nested wiki namespaces.
@@ -359,7 +384,7 @@ Exit criteria:
 - The plugin still degrades cleanly under non-Westgate themes through its
   Bootstrap-backed `--wiki-*` fallbacks.
 
-## Planned Work: Human-Readable Wiki Paths
+## Top Priority: Human-Readable Wiki Paths
 
 Current wiki article URLs inherit NodeBB topic slugs:
 
@@ -379,6 +404,18 @@ This should be implemented as a plugin-owned routing layer over NodeBB
 categories and topics. NodeBB category and topic ids should remain internal
 identifiers, not public wiki path requirements.
 
+Priority decision, 2026-05-01:
+
+- This refactor blocks wiki-owned search expansion. Search result URLs,
+  namespace filters, redlink create suggestions, and future search snippets must
+  all point at canonical wiki paths from the start.
+- Do not add new public wiki routes that expose topic ids or category ids except
+  backward-compatible redirect routes.
+- Existing forum discussion links remain `/topic/{topic.slug}` because those
+  are NodeBB-owned, not wiki-owned.
+- Keep route compatibility for old wiki URLs, but treat them as migration
+  aliases rather than canonical paths.
+
 ### Assessment
 
 The plugin already has the data model needed for this:
@@ -390,6 +427,10 @@ The plugin already has the data model needed for this:
   `lib/wiki-links.js`.
 - Serialization currently emits `/wiki/${topic.slug}`, which preserves the
   topic id because NodeBB topic slugs include it.
+- Namespace compose search currently emits the same ID-shaped wiki path and
+  must be updated during this refactor.
+- Future wiki-owned search should not ship until it can call this resolver for
+  both result URLs and namespace scope metadata.
 
 The missing piece is a canonical wiki path resolver that maps:
 
@@ -412,21 +453,35 @@ Rules:
 3. The canonical article path is
    `/wiki/:namespace_path_segments/:page_slug`.
 4. The canonical namespace index path is `/wiki/:namespace_path_segments`.
-5. Existing ID-based paths continue to resolve and redirect to canonical paths.
-6. If a namespace and page would produce the same path, namespace wins for the
+5. `/wiki` remains the wiki home route and cannot be claimed by a namespace.
+6. Reserved first path segments are blocked for namespaces and pages:
+   `category`, `compose`, `edit`, `namespace`, `search`, `admin`, `api`, and
+   any future plugin utility route.
+7. Existing ID-based paths continue to resolve and redirect to canonical paths.
+8. If a namespace and page would produce the same path, namespace wins for the
    index route and page creation must reject or disambiguate the collision.
+9. If two categories normalize to the same namespace path, the configured
+   namespace tree is invalid for clean routing and the UI should expose a setup
+   error rather than choosing one silently.
+10. If two topics in one namespace normalize to the same page slug leaf, the
+    route must fail safely and the authoring path should reject the collision
+    until a deliberate fallback or alias policy exists.
+11. Query strings must survive canonical redirects where they carry meaningful
+    authoring/search context.
 
 Exit criteria:
 
 - Every wiki namespace has one canonical public path.
 - Every wiki page has one canonical public path.
 - Existing URLs remain backward compatible through redirects.
+- Collision and reserved-word behavior is documented before route code changes.
 
 ### Phase 1: Build A Path Resolver Service
 
 Goal:
 Centralize URL construction and lookup instead of scattering path logic through
-routes and serializers.
+routes and serializers. This service is the blocking foundation for search,
+redlinks, breadcrumbs, and authoring redirects.
 
 Tasks:
 
@@ -435,20 +490,37 @@ Tasks:
    namespace set.
 3. Normalize path segments with the same slug rules used by NodeBB for category
    and topic slugs where possible.
-4. Resolve a namespace path to a category id.
-5. Resolve a full article path to `{ cid, tid, topic }` by finding a topic in
+4. Expose path builders:
+   - `getNamespacePath(categoryOrCid, uid?)`
+   - `getArticlePath(topicOrTid, uid?)`
+   - `getLegacyNamespacePath(category)`
+   - `getLegacyArticlePath(topic)`
+5. Resolve a namespace path to a category id.
+6. Resolve a full article path to `{ cid, tid, topic }` by finding a topic in
    the resolved category whose slug leaf matches the requested page slug.
-6. Return structured failure reasons:
+7. Resolve the deepest matching namespace first, then treat the remaining final
+   segment as the page slug.
+8. Return structured failure reasons:
    - namespace not found
    - page not found in namespace
    - ambiguous duplicate page slug
    - hidden or unauthorized content
+   - reserved path segment
+   - namespace collision
+   - page collision
+9. Preserve NodeBB category/topic permission checks in the services that call
+   path resolution. The resolver may identify candidates, but routes must not
+   render unauthorized data.
+10. Add focused unit-style tests around normalization, collision detection,
+    deepest-namespace matching, and legacy-path construction where the existing
+    test harness allows it.
 
 Exit criteria:
 
 - Routes, breadcrumbs, internal wiki links, and navigation can ask one service
   for canonical wiki URLs.
 - No template needs to manually construct `/wiki/${topic.slug}`.
+- Search implementation has a stable path API to depend on.
 
 ### Phase 2: Add Canonical Routes
 
@@ -468,8 +540,11 @@ Tasks:
 4. Change existing routes to redirect to the canonical namespace or page path
    for non-API requests.
 5. Ensure utility routes such as `/wiki/compose/:cid`,
-   `/wiki/edit/:topic_id`, and `/wiki/namespace/create/:parent_cid` are matched
-   before the catch-all route.
+   `/wiki/edit/:topic_id`, `/wiki/namespace/create/:parent_cid`, and
+   `/wiki/search` are matched before the catch-all route.
+6. Return NodeBB-style 404/permission responses without revealing whether a
+   hidden namespace or page exists.
+7. Keep `/topic/:slug` unchanged and link it only as the discussion view.
 
 Exit criteria:
 
@@ -494,13 +569,20 @@ Tasks:
 4. Update namespace search results in `lib/wiki-namespace-search.js`.
 5. Update compose cancel/redirect targets so authors return to clean URLs after
    create or edit.
-6. Keep forum discussion links pointed at `/topic/{topic.slug}` because the
+6. Update redlink creation targets so unresolved links carry the intended
+   namespace and title while the eventual successful submit lands on the clean
+   article URL.
+7. Update wiki sidebar, namespace index, landing-page sections, parent-page
+   links, and home-page links to use resolver output.
+8. Keep forum discussion links pointed at `/topic/{topic.slug}` because the
    forum view is still NodeBB-owned.
 
 Exit criteria:
 
 - New links generated by the wiki no longer expose topic ids or category ids.
 - Forum discussion links still use normal NodeBB topic URLs.
+- A repository search for `/wiki/${topic.slug}` and
+  `/wiki/category/${category.slug}` only finds legacy redirect helpers or tests.
 
 ### Phase 4: Collision And Rename Handling
 
@@ -512,15 +594,129 @@ Tasks:
 1. Detect duplicate page slug leaves inside the same namespace.
 2. On collision, either reject the new page title or route the duplicate through
    a deterministic fallback until renamed.
-3. Redirect old clean paths after topic or category renames where practical.
-4. Consider storing lightweight alias records for renamed wiki pages and
+3. Detect namespace segment collisions caused by category rename/move,
+   configured descendant inclusion, or reserved route names.
+4. Redirect old clean paths after topic or category renames where practical.
+5. Consider storing lightweight alias records for renamed wiki pages and
    namespaces if real content frequently changes names.
-5. Keep redirects loop-safe and bounded.
+6. Keep redirects loop-safe and bounded.
+7. Do not implement a broad alias table in the first pass unless clean-path
+   redirects after rename become a product requirement. Prefer predictable
+   canonical behavior over hidden magic.
 
 Exit criteria:
 
 - Clean URLs remain predictable when pages are renamed.
 - Duplicate titles do not silently point to the wrong page.
+- Bad namespace configuration is surfaced as an admin/setup problem instead of
+  producing ambiguous public routes.
+
+### Phase 4A: Search And Authoring Dependency Update
+
+Goal:
+Make later wiki-side search and authoring work depend on canonical paths rather
+than ID-shaped routes.
+
+Tasks:
+
+1. Treat wiki-owned search as blocked until `lib/wiki-paths.js` can build and
+   resolve canonical namespace/page URLs.
+2. Update the planned search result contract to require:
+   - canonical `wikiPath`
+   - namespace path display text
+   - stable internal `cid`/`tid` for API consumers that need it
+   - separate `topicPath` only for discussion links
+3. Update compose success redirects and cancel links before exposing search
+   suggestions that create pages.
+4. Update redlink create flows before adding search "create page" suggestions.
+5. Keep namespace compose autocomplete title-only if needed, but route its link
+   serialization through the path resolver.
+
+Exit criteria:
+
+- No search or authoring plan asks templates or client code to build wiki URLs.
+- The path resolver becomes the required interface for all wiki URL generation.
+
+### Phase 4B: Wiki Link Autocomplete Helper
+
+Goal:
+Expand the lightweight autocomplete helper into a reusable link-picker surface
+for two authoring contexts:
+
+- Forum composer: find a wiki page and insert a normal link to its canonical
+  wiki URL.
+- Wiki composer/editor: find a wiki page and insert an internal wiki link that
+  can remain namespace-aware.
+
+This is not the full wiki search experience. It is a low-latency authoring
+helper that depends on canonical paths and returns small, predictable result
+objects.
+
+Tasks:
+
+1. Replace or wrap `lib/wiki-namespace-search.js` with a reusable service such
+   as `lib/wiki-link-autocomplete.js`.
+2. Expose one API that can serve both contexts, for example
+   `/api/v3/plugins/westgate-wiki/link-autocomplete`, with parameters:
+   - `q`: normalized title query
+   - `context`: `forum` or `wiki`
+   - `cid`: current wiki namespace when known
+   - `scope`: `current-namespace`, `descendants`, or `all-wiki`
+   - `limit`: capped server-side
+3. Preserve the existing namespace-local compose flow by mapping it to
+   `context=wiki&scope=current-namespace`.
+4. Return a compact result shape:
+   - `type`: `page` or `namespace`
+   - `title`
+   - `titleLeaf`
+   - `namespacePath`
+   - `wikiPath`
+   - `cid`
+   - `tid`, for page results only
+   - `insertText`, computed server-side for the requested context
+5. For forum composer results, `insertText` should be a normal forum-safe link
+   to the canonical wiki URL, such as Markdown or the active composer format's
+   equivalent. Do not insert `[[...]]` syntax into normal forum posts unless a
+   later parser deliberately supports it outside wiki article bodies.
+6. For wiki composer results, `insertText` should prefer internal wiki-link
+   syntax:
+   - same namespace: `[[Page Title]]`
+   - child or sibling namespace: `[[Namespace/Page Title]]`
+   - ambiguous title leaf: include enough namespace path to disambiguate
+   - optional label support can come later as `[[Target|Label]]` if the parser
+     supports it
+7. Use the canonical path resolver for every returned `wikiPath`. Client code
+   should never assemble `/wiki/...` manually.
+8. Respect NodeBB read privileges for all returned pages and namespaces. A
+   hidden wiki page must be indistinguishable from a non-match.
+9. Keep creation suggestions context-sensitive:
+   - forum composer should not offer to create wiki pages unless the user is in
+     an explicit wiki-link picker with a selected target namespace
+   - wiki composer may offer a redlink/create suggestion when the current
+     namespace allows topic creation
+10. Keep the helper fast:
+    - title and namespace-name matching only
+    - minimum query length unless showing recent/current namespace suggestions
+    - capped candidate reads per namespace
+    - no body snippets
+    - no full post HTML
+11. Add client integration only after the API contract is stable:
+    - forum composer button or slash/mention-style trigger that opens the wiki
+      link picker
+    - wiki composer toolbar action/typeahead that inserts internal wiki links
+    - keyboard navigation, escape-to-close, and no-results states
+12. Keep UI labels clear so forum authors understand they are linking to the
+    wiki, while wiki authors understand they are creating internal page links.
+
+Exit criteria:
+
+- Forum posts can link to wiki pages through canonical URLs without exposing
+  topic ids.
+- Wiki pages can link to other wiki pages through internal wiki-link syntax
+  without authors manually typing namespace paths.
+- The same server-side helper controls result permissions, ranking, and URL
+  generation for both authoring contexts.
+- The helper remains distinct from full wiki search and does bounded work.
 
 ### Phase 5: Verification
 
@@ -534,6 +730,13 @@ Run these checks before considering clean paths complete:
 6. Private or unauthorized namespaces do not leak through path lookup.
 7. Slug collisions fail safely.
 8. NodeBB `/topic/...` forum routes continue to work.
+9. `/wiki/search`, `/wiki/compose/:cid`, `/wiki/edit/:tid`, and
+   `/wiki/namespace/create/:parent_cid` are not swallowed by the catch-all
+   route.
+10. Search/compose namespace helper results use canonical wiki paths.
+11. Create/edit flows redirect to canonical wiki article URLs.
+12. Forum composer wiki-link autocomplete inserts canonical wiki URLs.
+13. Wiki composer autocomplete inserts namespace-aware internal wiki links.
 
 ## Planned Work: Wiki-Aware Revision History
 
@@ -652,7 +855,9 @@ post history as the source of truth.
 
 Tasks:
 
-1. Add a wiki-owned route such as `/wiki/:topic_id/:slug?/history`.
+1. Add a wiki-owned history route under the canonical article path, for example
+   `/wiki/:namespace_path_segments/:page_slug/history`, while redirecting any
+   legacy ID-based history route if one is introduced during migration.
 2. Treat the first post `pid` as the article revision target.
 3. Build a two-pane layout:
    - left: paginated or virtualized revision list
@@ -783,6 +988,12 @@ Ownership decision:
 - Wiki-owned search should be implemented as a `/wiki` feature that searches
   only effective wiki namespaces. It should not depend on main forum search
   including wiki categories.
+- The existing `lib/wiki-namespace-search.js` endpoint is an authoring helper,
+  not a general wiki search surface. It supports compose/autocomplete for one
+  namespace, only searches topic titles, scans a bounded namespace topic list,
+  and currently emits ID-based `/wiki/${topic.slug}` paths. Keep it small or
+  replace it with a reusable search service rather than stretching it into the
+  full user-facing search implementation.
 
 Implementation status, 2026-04-30:
 
@@ -799,6 +1010,10 @@ Implementation status, 2026-04-30:
   - `filter:search.inContent`
   - `filter:search.indexTopics`
   - `filter:search.indexPosts`
+- `lib/wiki-namespace-search.js` exposes a limited namespace-local topic-title
+  search for compose/edit flows. It is useful prior art for API shape,
+  privilege checks, and link autocomplete, but it is not enough for wiki-wide
+  title/body search.
 - `plugin.json` registers those hooks, so deployment requires a NodeBB restart;
   no asset rebuild is required for the server-side hook changes alone.
 - `npm test` passed after the hook implementation.
@@ -958,23 +1173,157 @@ Exit criteria:
 
 Goal:
 Replace main-search visibility with an intentional `/wiki` search surface.
+This phase is blocked until the human-readable namespace/path refactor is
+complete. Search must consume canonical path services instead of emitting
+ID-shaped wiki URLs.
 
 Tasks:
 
-1. Add a wiki search route or API under `/wiki/search` or
-   `/api/westgate-wiki/search`.
-2. Search only `effectiveCategoryIds`.
-3. Return canonical wiki article and namespace URLs, not `/topic/...` URLs.
-4. Preserve NodeBB category/topic read privileges for each result.
-5. Prefer first-post/article-body results for MVP, then add namespace and title
-   ranking after the basic flow works.
-6. Add a search input to wiki templates only after the backend result shape is
-   stable.
+1. Add a plugin-owned search service, for example `lib/wiki-search-service.js`,
+   instead of growing route code or reusing forum search result objects
+   directly in templates.
+2. Expose a route/API pair:
+   - page route: `/wiki/search`
+   - API route: `/api/v3/plugins/westgate-wiki/search`
+3. Search only `config.getSettings().effectiveCategoryIds`, then run NodeBB
+   category/topic/post privilege checks before returning any hit. Do not leak
+   hidden namespace names, topic titles, excerpts, tids, pids, or result counts
+   for unauthorized content.
+4. MVP result types:
+   - wiki pages, backed by topics whose first post is the article body
+   - namespaces, backed by configured categories
+   - optional redlink/create suggestion when the query has no exact page match
+     and the current namespace allows topic creation
+5. Return canonical wiki URLs for all wiki results. Keep `/topic/...` as a
+   secondary discussion link only when the UI explicitly labels it as
+   discussion.
+6. Start with title and namespace-name ranking before body search:
+   - exact title or title-leaf match
+   - prefix match
+   - word-boundary contains match
+   - namespace match
+   - recent article update as a tie-breaker
+7. Add first-post body search only after the title/namespace result shape is
+   stable. Keep snippets short, sanitized, and generated from plain text rather
+   than raw HTML.
+8. Keep the existing namespace compose search as a separate authoring helper
+   until the new service can provide the same low-latency result shape, but
+   move its URL serialization onto the canonical path resolver first.
+9. Add a search input to wiki templates only after API behavior is stable. Use
+   progressive enhancement: normal form submission to `/wiki/search`, then
+   optional typeahead once the page route works.
+10. Add empty, loading, and error states that keep users inside the wiki surface:
+    no results, search unavailable, namespace hidden, and query too short.
 
 Exit criteria:
 
 - Users can find wiki content from the wiki UI.
 - Main forum search remains forum-only.
+- Search results are permission-safe, canonical-link-safe, and usable without
+  client-side JavaScript.
+
+### Phase 5A: Wiki Search Performance Plan
+
+Goal:
+Make wiki search responsive without turning every request into a full content
+scan.
+
+Tasks:
+
+1. Enforce query normalization and limits:
+   - trim whitespace
+   - case-fold consistently
+   - reject or return an empty state for queries shorter than two useful
+     characters, except exact namespace shortcuts
+   - cap query length, page size, and maximum scanned candidates
+2. Prefer category/topic indexes already maintained by NodeBB for candidate
+   discovery. Avoid scanning every post body on each request.
+3. For the first implementation, use a two-stage query:
+   - load configured readable namespaces
+   - collect bounded topic candidates per namespace from category topic sorted
+     sets, then score titles in memory
+4. When body search is added, choose one of these deliberate paths:
+   - maintain a plugin-owned lightweight index for first-post plain text by
+     `tid`, `pid`, `cid`, slug leaf, title leaf, and update timestamp
+   - or call the active search provider through a constrained cid query and
+     re-filter with wiki privileges and canonical serializers
+5. Do not let main forum dbsearch indexing become the wiki search dependency.
+   The current feed-separation plan intentionally removes wiki content from
+   forum search indexing where possible.
+6. Cache only stable, permission-neutral pieces:
+   - effective wiki cid set
+   - namespace path metadata
+   - topic title/slug/cid rows for configured namespaces
+   Do not cache user-specific readable result sets without a uid/group-aware
+   cache key.
+7. Invalidate or tolerate stale cache on:
+   - wiki category configuration change
+   - topic create/edit/delete/restore
+   - topic move between namespaces
+   - category rename, move, delete, or privilege change
+8. Keep result payloads small:
+   - default page size: 10 or 20
+   - max page size: 50
+   - snippets: one or two short fragments
+   - no full post HTML in search responses
+9. Add timing logs or debug counters during development for candidate count,
+   filtered count, returned count, and slow searches.
+
+Exit criteria:
+
+- A normal wiki search does bounded work proportional to configured namespaces
+  and page size, not total forum post count.
+- Body-search expansion has a chosen indexing/provider strategy before it is
+  exposed in the UI.
+
+### Phase 5B: Wiki Search UX And Edge Cases
+
+Goal:
+Make search behavior predictable for authors and readers.
+
+Tasks:
+
+1. Define result grouping before building UI:
+   - exact page match
+   - pages
+   - namespaces
+   - create suggestion, when allowed
+2. Preserve namespace context. A search launched from a namespace should support
+   both "this namespace" and "all wiki" scopes, with the narrower scope selected
+   by default only when that is visible in the UI.
+3. Handle duplicate page title leaves across namespaces by always showing the
+   namespace path beside the page title. Never route a duplicate title by title
+   alone.
+4. Handle duplicate or renamed slugs through the canonical path resolver. Do not
+   ship user-facing wiki search against ID-shaped wiki URLs.
+5. Treat deleted, scheduled, shadow, moved, or hidden topics as non-results
+   unless NodeBB permissions and product requirements explicitly allow a
+   moderator/admin state.
+6. Respect configured descendant namespace inclusion. If a parent namespace is
+   selected and child inclusion is enabled, child namespace content can appear;
+   otherwise only explicitly configured cids should appear.
+7. Avoid confusing redlinks:
+   - show a create suggestion only for a valid page title
+   - choose the current namespace if one exists
+   - otherwise require the user to pick a namespace before composing
+8. Keep snippets safe:
+   - strip HTML to text before matching
+   - escape rendered highlights
+   - do not show hidden embeds, scripts, raw attributes, or oversized tables
+9. Provide useful no-result states:
+   - query too short
+   - no readable wiki namespaces
+   - no matches in current scope
+   - wiki not configured
+10. Mobile UI should be a plain results list with compact filters, not a dense
+    table. Keyboard users should be able to submit, refine, and open the first
+    result without typeahead.
+
+Exit criteria:
+
+- Search stays inside the wiki mental model and does not send users into forum
+  discovery surfaces by surprise.
+- Edge cases fail closed for privacy and fail clearly for usability.
 
 ### Phase 6: Feed And API Follow-Up
 
@@ -1026,7 +1375,7 @@ These items are intentionally out of initialization scope unless the project exp
 
 - Infobox or template systems
 - API publishing endpoints
-- Search indexing
+- Dedicated wiki search indexing beyond the first bounded MVP
 - Compare or revert views
 - Custom editor workflows
 - Wiki-only namespaces created directly from plugin ACP
@@ -1045,15 +1394,19 @@ Run or manually verify these after each major step:
 3. `/wiki` renders an empty state when configuration is absent.
 4. Invalid configured category IDs do not crash the route.
 5. Wiki CSS only affects wiki pages.
-6. `/wiki/category/:category_id/:slug?` resolves a configured category and redirects to the canonical wiki section URL when needed.
-7. `/wiki/:topic_id/:slug?` resolves a valid configured topic.
-8. Missing slugs fail cleanly.
-9. Restart NodeBB when changing `plugin.json`, server-side route registration, or plugin initialization code.
-10. Rebuild NodeBB assets when changing plugin templates or CSS.
-11. For Westgate theme alignment, rebuild assets after theme SCSS changes and
+6. `/wiki/:namespace_path_segments` resolves a configured namespace.
+7. `/wiki/:namespace_path_segments/:page_slug` resolves a valid configured wiki
+   topic.
+8. `/wiki/category/:category_id/:slug?` and `/wiki/:topic_id/:slug?` resolve
+   legacy requests and redirect to canonical wiki URLs for normal page
+   requests.
+9. Missing or ambiguous slugs fail cleanly without leaking hidden content.
+10. Restart NodeBB when changing `plugin.json`, server-side route registration, or plugin initialization code.
+11. Rebuild NodeBB assets when changing plugin templates or CSS.
+12. For Westgate theme alignment, rebuild assets after theme SCSS changes and
     compare `/categories`, a wiki article page, a wiki namespace page, and a
     wiki compose/edit page at desktop and mobile widths.
-12. Check CKEditor toolbar wrapping, dropdowns, balloon panels, focus rings,
+13. Check CKEditor toolbar wrapping, dropdowns, balloon panels, focus rings,
     source-editing mode, and editable prose styling on the compose page.
 
 ## Content Model
@@ -1065,7 +1418,12 @@ Run or manually verify these after each major step:
 - The `/wiki` landing page should prefer root configured namespaces; child namespaces are reached from their parent namespace pages.
 - Wiki namespace enablement is plugin-specific configuration layered on top of normal NodeBB categories.
 - Automatic descendant inclusion is a quality-of-life layer on top of explicit namespace selection, not a replacement for NodeBB category permissions.
-- The canonical wiki view is `/wiki/:topic_id/:slug?`; `/topic/:slug` remains the discussion thread view for the same underlying topic.
+- The current legacy wiki article route is `/wiki/:topic_id/:slug?`; it should
+  redirect to the canonical namespace/page route once the path refactor lands.
+- The target canonical wiki article view is
+  `/wiki/:namespace_path_segments/:page_slug`.
+- `/topic/:slug` remains the discussion thread view for the same underlying
+  topic.
 
 ## Completed Steps
 
@@ -1116,6 +1474,19 @@ Mark items here as work lands in the repository.
 
 ## Pending Steps
 
+- [ ] Highest priority: implement the human-readable namespace/page path
+  resolver and canonical route refactor before expanding wiki-owned search,
+  wiki history, or additional feed/API follow-ups.
+- [ ] Add `lib/wiki-paths.js` with canonical namespace/page path construction,
+  path resolution, reserved segment handling, and collision detection.
+- [ ] Add canonical clean wiki routes and convert existing ID-based wiki article
+  and category routes into redirects for normal page requests.
+- [ ] Move serializers, breadcrumbs, internal links, redlinks, compose
+  redirects, sidebar links, and namespace compose search results onto canonical
+  wiki paths.
+- [ ] Expand the namespace compose search into a reusable wiki link
+  autocomplete helper that supports forum composer canonical links and wiki
+  composer internal links.
 - [x] Add operational scripts or documented manual checks.
 - [x] Restart the live NodeBB server after deploying the forum/wiki feed
   separation hook changes in `plugin.json`.
@@ -1132,6 +1503,11 @@ Mark items here as work lands in the repository.
 - [ ] Decide whether `/api/recent/posts` and `/recentposts.rss` need a NodeBB
   core hook or separate wrapper to filter recent post summaries from wiki
   categories.
+- [ ] After canonical paths land, implement the wiki-owned search backend
+  contract under `/wiki/search` and `/api/v3/plugins/westgate-wiki/search`.
+- [ ] After canonical paths land, update the existing namespace compose search
+  to share canonical link and privilege-safe result serialization with the
+  wiki link autocomplete service.
 - [ ] Verify the plugin in a live NodeBB development instance.
 - [-] Implement the Westgate theme alignment plan in
   `nodebb-theme-westgate/scss/westgate/_wiki-prose.scss`, using this plugin's
@@ -1203,10 +1579,13 @@ Mark items here as work lands in the repository.
 
 If an agent is asked to initialize this project, execute in this order:
 
-1. Complete Phase 0 and Phase 1 before adding new features.
-2. Complete Phase 2 before adding `/wiki/:slug`.
-3. Complete Phase 3 and Phase 4 to reach MVP.
-4. Stop and update this file before starting deferred work.
+1. Use `Current Priority` as the controlling order for new work.
+2. Complete the human-readable namespace/path refactor first:
+   `lib/wiki-paths.js`, canonical routes, legacy redirects, and canonical link
+   generation.
+3. Then expand authoring helpers, including forum/wiki link autocomplete.
+4. Then resume wiki-owned search, history, and remaining feed/API follow-ups.
+5. Stop and update this file before starting deferred work.
 
 ## Definition of Done For Initialization
 
@@ -1215,7 +1594,8 @@ Initialization is complete when all of the following are true:
 - The plugin no longer relies on hard-coded wiki category IDs.
 - `/wiki` is configuration-driven and resilient.
 - Route logic is modular enough to support growth.
-- A wiki page route exists and renders a topic as an article.
+- A canonical namespace/page wiki route exists and renders a topic as an
+  article, with legacy ID-based wiki routes redirecting to it.
 - Manual verification steps are documented and usable.
 - Namespace configuration and navigation are manageable without hand-editing IDs.
 - The completed and pending sections in this file reflect reality.
