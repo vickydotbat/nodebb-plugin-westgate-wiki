@@ -1103,6 +1103,36 @@ a[href*="/wiki/"][href*="redlink=1"] {
   min-height: 28rem;
 }
 
+.westgate-wiki-compose .wiki-compose-guide {
+  border-left: 3px solid var(--wiki-chrome-border-color, var(--bs-border-color, currentColor));
+  padding-left: 0.85rem;
+}
+
+.westgate-wiki-compose .wiki-compose-guide__list {
+  display: grid;
+  gap: 0.35rem 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+}
+
+.westgate-wiki-compose .wiki-compose-guide__list > div {
+  min-width: 0;
+}
+
+.westgate-wiki-compose .wiki-compose-guide dt {
+  color: var(--wiki-chrome-heading-color, var(--bs-emphasis-color, inherit));
+  font-weight: 600;
+}
+
+.westgate-wiki-compose .wiki-compose-guide dd {
+  margin-bottom: 0;
+}
+
+.westgate-wiki a.wiki-user-mention {
+  font-weight: 600;
+  text-decoration-thickness: from-font;
+  text-underline-offset: 0.14em;
+}
+
 /* CKEditor editable sizing / chrome: see wiki-article-body.css (loads after CKEditor on compose) */
 
 @media (max-width: 767px) {

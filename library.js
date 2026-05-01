@@ -11,6 +11,7 @@ const wikiLinks = require("./lib/wiki-links");
 const wikiFootnotes = require("./lib/wiki-footnotes");
 const wikiHtmlParse = require("./lib/wiki-html-parse");
 const wikiNamespaceMainPages = require("./lib/wiki-namespace-main-pages");
+const wikiUserMentions = require("./lib/wiki-user-mentions");
 const wikiService = require("./lib/wiki-service");
 const wikiPaths = require("./lib/wiki-paths");
 const wikiPageValidation = require("./lib/wiki-page-validation");
@@ -105,6 +106,7 @@ plugin.addAdminNavigation = async function (header) {
 };
 
 plugin.transformWikiPostContent = wikiLinks.transformWikiPostContent;
+plugin.transformWikiUserMentions = wikiUserMentions.transformWikiUserMentions;
 plugin.transformWikiFootnotes = wikiFootnotes.transformWikiFootnotes;
 plugin.wikiMarkdownBeforeParse = wikiHtmlParse.markdownBeforeParse;
 plugin.clearWikiPostParseCache = cacheService.clearWikiPostParseCache;
@@ -162,6 +164,7 @@ plugin.services = {
   wikiLinkAutocomplete,
   wikiFootnotes,
   wikiLinks,
+  wikiUserMentions,
   wikiNamespaceMainPages,
   wikiPageValidation,
   wikiPaths,
