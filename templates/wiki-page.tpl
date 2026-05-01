@@ -35,23 +35,55 @@
               <summary class="wiki-sidebar-disclosure__summary" id="wiki-article-wiki-nav-heading">Navigation</summary>
               <div class="wiki-sidebar-disclosure__body wiki-sidebar-disclosure__body--nav wiki-sidebar-panel-scroll">
                 <nav class="wiki-sidebar-merged-nav" aria-label="Namespace, pages, and child namespaces">
-                  <ul class="wiki-sidebar-nav-rows">
-                    <!-- BEGIN wikiSidebarNavRows -->
-                    <li class="wiki-sidebar-nav-row<!-- IF wikiSidebarNavRows.isPage --> wiki-sidebar-nav-row--page<!-- ENDIF wikiSidebarNavRows.isPage --><!-- IF wikiSidebarNavRows.isNamespace --> wiki-sidebar-nav-row--namespace<!-- ENDIF wikiSidebarNavRows.isNamespace --><!-- IF wikiSidebarNavRows.isActive --> is-active<!-- ENDIF wikiSidebarNavRows.isActive -->"<!-- IF wikiSidebarNavRows.isCurrentNamespace --> data-wiki-current-namespace="1"<!-- ENDIF wikiSidebarNavRows.isCurrentNamespace --> style="--wiki-nav-depth: {wikiSidebarNavRows.depth};">
-                      <!-- IF wikiSidebarNavRows.isNamespace -->
-                      <a class="wiki-sidebar-nav-ns" href="{config.relative_path}{wikiSidebarNavRows.wikiPath}">{wikiSidebarNavRows.name}</a>
-                      <!-- ENDIF wikiSidebarNavRows.isNamespace -->
-                      <!-- IF wikiSidebarNavRows.isPage -->
-                      <a class="wiki-sidebar-nav-page" href="{config.relative_path}{wikiSidebarNavRows.wikiPath}">
-                        <!-- IF wikiSidebarNavRows.hasParentPath -->
-                        <span class="wiki-sidebar-parent-path">{wikiSidebarNavRows.parentTitlePathText}</span>
-                        <!-- ENDIF wikiSidebarNavRows.hasParentPath -->
-                        <span class="wiki-sidebar-page-title">{wikiSidebarNavRows.titleLeaf}</span>
-                      </a>
-                      <!-- ENDIF wikiSidebarNavRows.isPage -->
-                    </li>
-                    <!-- END wikiSidebarNavRows -->
-                  </ul>
+                  <div
+                    class="wiki-sidebar-directory"
+                    data-wiki-directory-mount="1"
+                    data-cid="{sectionNavigation.cid}"
+                    data-initial-cursor="{sectionNavigation.directoryNextCursor}"
+                    data-initial-has-more="<!-- IF sectionNavigation.directoryHasMore -->1<!-- ELSE -->0<!-- ENDIF -->"
+                    data-wiki-directory-endpoint="pages"
+                    data-wiki-directory-mode="nav"
+                    data-around-tid="{topic.tid}"
+                    data-current-tid="{topic.tid}"
+                    data-limit="35"
+                  >
+                    <label class="visually-hidden" for="wiki-sidebar-dir-filter-{topic.tid}">Filter pages in this namespace</label>
+                    <input
+                      type="search"
+                      id="wiki-sidebar-dir-filter-{topic.tid}"
+                      class="form-control form-control-sm wiki-directory-filter"
+                      placeholder="Filter pages…"
+                      data-wiki-directory-filter="1"
+                      autocomplete="off"
+                    />
+                    <!-- IF sectionNavigation -->
+                    <ul class="wiki-sidebar-nav-rows wiki-sidebar-nav-rows--namespace-lead" role="list">
+                      <li class="wiki-sidebar-nav-row wiki-sidebar-nav-row--namespace" data-wiki-current-namespace="1" style="--wiki-nav-depth: 0;">
+                        <a class="wiki-sidebar-nav-ns" href="{config.relative_path}{sectionNavigation.wikiPath}">{sectionNavigation.name}</a>
+                      </li>
+                    </ul>
+                    <!-- ENDIF sectionNavigation -->
+                    <ul class="wiki-sidebar-nav-rows wiki-sidebar-nav-rows--child-pages" data-wiki-directory-list role="list">
+                      <!-- BEGIN wikiSidebarPageRows -->
+                      <li class="wiki-sidebar-nav-row wiki-sidebar-nav-row--page" data-wiki-nav-tid="{./tid}">
+                        <a class="wiki-sidebar-nav-page" href="{config.relative_path}{./wikiPath}">
+                          <!-- IF ./hasParentPath -->
+                          <span class="wiki-sidebar-parent-path">{./parentTitlePathText}</span>
+                          <!-- ENDIF ./hasParentPath -->
+                          <span class="wiki-sidebar-page-title">{./titleLeaf}</span>
+                        </a>
+                      </li>
+                      <!-- END wikiSidebarPageRows -->
+                    </ul>
+                    <p class="wiki-directory-status small text-muted mb-0" data-wiki-directory-status aria-live="polite"></p>
+                    <!-- IF sectionNavigation.directoryHasMore -->
+                    <button type="button" class="btn btn-sm btn-outline-secondary mt-2" data-wiki-directory-more>
+                      Load more
+                    </button>
+                    <div data-wiki-directory-sentinel class="wiki-directory-sentinel" aria-hidden="true"></div>
+                    <!-- ENDIF sectionNavigation.directoryHasMore -->
+                  </div>
+
                   <!-- IF hasSectionChildNamespaces -->
                   <hr class="wiki-sidebar-divider" />
                   <h2 class="wiki-sidebar-child-ns-heading" id="wiki-sidebar-child-ns-heading">Child namespaces</h2>

@@ -1,6 +1,16 @@
 /* global WikiEditorBundle, ajaxify */
 "use strict";
 
+/** Must match `MAX_WIKI_MAIN_BODY_UTF8_BYTES` in lib/wiki-page-validation.js */
+const MAX_WIKI_MAIN_BODY_UTF8_BYTES = 512 * 1024;
+
+function utf8ByteLength(str) {
+  if (typeof TextEncoder !== "undefined") {
+    return new TextEncoder().encode(str).length;
+  }
+  return unescape(encodeURIComponent(str)).length;
+}
+
 function decodePayloadB64(b64) {
   const bin = atob(b64);
   const bytes = new Uint8Array(bin.length);
@@ -82,6 +92,7 @@ function initWikiComposePage() {
   const linkPick = document.getElementById("wiki-compose-link-pick");
   const linkInsert = document.getElementById("wiki-compose-link-insert");
   const cancelLink = document.getElementById("wiki-compose-cancel");
+  const namespaceMainPageCheckbox = document.getElementById("wiki-compose-namespace-main-page");
 
   let editorInstance = null;
   let destroyStarted = false;
@@ -258,6 +269,17 @@ function initWikiComposePage() {
           return;
         }
 
+        const bodyBytes = utf8ByteLength(content);
+        if (bodyBytes > MAX_WIKI_MAIN_BODY_UTF8_BYTES) {
+          setStatus(
+            statusEl,
+            "Article body is too large (max " +
+              Math.round(MAX_WIKI_MAIN_BODY_UTF8_BYTES / 1024) +
+              " KiB UTF-8). Shorten the content before submitting."
+          );
+          return;
+        }
+
         submitBtn.disabled = true;
         const isEdit = payload.mode === "edit" && payload.postEditUrl;
         setStatus(statusEl, isEdit ? "Saving…" : "Publishing…");
@@ -326,6 +348,10 @@ function initWikiComposePage() {
 
           const responsePayload = body.response;
           let wikiSlug = null;
+          const savedTid = (
+            responsePayload &&
+            (responsePayload.tid || (responsePayload.topic && responsePayload.topic.tid))
+          ) || payload.tid;
 
           if (isEdit && responsePayload && responsePayload.topic && responsePayload.topic.slug) {
             wikiSlug = responsePayload.topic.slug;
@@ -333,9 +359,39 @@ function initWikiComposePage() {
             wikiSlug = responsePayload.slug;
           }
 
+          if (
+            payload.canSetNamespaceMainPage &&
+            payload.namespaceMainPageApiUrl &&
+            namespaceMainPageCheckbox &&
+            savedTid
+          ) {
+            const mainRes = await fetch(payload.namespaceMainPageApiUrl, {
+              method: "PUT",
+              credentials: "same-origin",
+              headers: {
+                "Content-Type": "application/json",
+                "x-csrf-token": payload.csrfToken
+              },
+              body: JSON.stringify({
+                tid: parseInt(savedTid, 10),
+                active: namespaceMainPageCheckbox.checked
+              })
+            });
+            if (!mainRes.ok) {
+              let mainJson = null;
+              try {
+                mainJson = await mainRes.json();
+              } catch (e) {
+                mainJson = null;
+              }
+              const mainMsg = (mainJson && mainJson.status && mainJson.status.message) || mainRes.statusText;
+              throw new Error("Page saved, but the namespace main page was not updated: " + mainMsg);
+            }
+          }
+
           let homepageSetOk = false;
           if (!isEdit && payload.setAsWikiHome && payload.wikiHomepageApiUrl) {
-            const tidVal = responsePayload && (responsePayload.tid || (responsePayload.topic && responsePayload.topic.tid));
+            const tidVal = savedTid;
             if (tidVal) {
               const putRes = await fetch(payload.wikiHomepageApiUrl, {
                 method: "PUT",

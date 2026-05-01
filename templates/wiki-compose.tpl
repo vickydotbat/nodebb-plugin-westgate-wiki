@@ -20,6 +20,14 @@
       <input id="wiki-compose-title" class="form-control" type="text" value="{defaultTitle}" maxlength="255" />
     </div>
 
+    <!-- IF showNamespaceMainPageToggle -->
+    <div class="form-check mb-3">
+      <input id="wiki-compose-namespace-main-page" class="form-check-input" type="checkbox"<!-- IF isNamespaceMainPage --> checked<!-- ENDIF isNamespaceMainPage --> />
+      <label class="form-check-label" for="wiki-compose-namespace-main-page">Use as the main page for this namespace</label>
+      <p class="small text-muted mb-0">The main page is pinned to the top of this namespace's navigation.</p>
+    </div>
+    <!-- ENDIF showNamespaceMainPageToggle -->
+
     <div class="mb-2">
       <label class="form-label">Article body</label>
       <p class="small text-muted mb-1">The editor saves HTML for the wiki topic. Wiki links like <code>[[Page]]</code>, <code>[[Page|Custom label]]</code>, <code>[[ns:Root/Child]]</code> (namespace index), and namespaced articles <code>[[Namespace/Page]]</code> are turned into links when the page is viewed. You can still import Markdown below and load it into the editor.</p>

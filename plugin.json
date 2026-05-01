@@ -7,7 +7,8 @@
   "scripts": [
     "public/wiki.js",
     "public/wiki-namespace-create.js",
-    "public/wiki-article-toc.js"
+    "public/wiki-article-toc.js",
+    "public/wiki-directory.js"
   ],
   "css": [
     "public/wiki.css"
@@ -101,6 +102,10 @@
     {
       "hook": "filter:search.indexPosts",
       "method": "filterSearchIndexPosts"
+    },
+    {
+      "hook": "action:topic.move",
+      "method": "onWikiTopicMoved"
     }
   ]
 }

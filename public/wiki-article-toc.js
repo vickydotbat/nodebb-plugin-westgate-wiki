@@ -5,6 +5,8 @@
     return;
   }
   const HEADING_SEL = "h1, h2, h3, h4, h5, h6";
+  /** Cap headings processed for ToC to avoid freezing the browser on pathological pages. */
+  const MAX_TOC_HEADINGS = 200;
   const ROOT_ARTICLE = "article.wiki-page-content.wiki-article-prose";
   const BODY = ".card-body";
   const ATTR_ROOT = "data-wiki-article-toc-root";
@@ -119,7 +121,9 @@
       return;
     }
 
-    const raw = [].slice.call(contentRoot.querySelectorAll(HEADING_SEL));
+    const rawAll = [].slice.call(contentRoot.querySelectorAll(HEADING_SEL));
+    const truncated = rawAll.length > MAX_TOC_HEADINGS;
+    const raw = truncated ? rawAll.slice(0, MAX_TOC_HEADINGS) : rawAll;
 
     const mount = document.querySelector("[" + ATTR_MOUNT + "]");
     const wrap = document.querySelector("[" + ATTR_ROOT + "]");
@@ -140,6 +144,16 @@
     ensureHeadingIds(raw);
     const list = buildNestedList(raw);
     mount.innerHTML = "";
+    if (truncated) {
+      const note = document.createElement("p");
+      note.className = "wiki-article-toc__truncated-note small text-muted mb-2";
+      note.setAttribute("role", "status");
+      note.textContent =
+        "Showing the first " +
+        MAX_TOC_HEADINGS +
+        " headings in this table of contents. The article has more headings.";
+      mount.appendChild(note);
+    }
     if (list) {
       mount.appendChild(list);
     }

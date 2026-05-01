@@ -9,6 +9,7 @@ const topicService = require("./lib/topic-service");
 const wikiLinkAutocomplete = require("./lib/wiki-link-autocomplete");
 const wikiLinks = require("./lib/wiki-links");
 const wikiHtmlParse = require("./lib/wiki-html-parse");
+const wikiNamespaceMainPages = require("./lib/wiki-namespace-main-pages");
 const wikiService = require("./lib/wiki-service");
 const wikiPaths = require("./lib/wiki-paths");
 const wikiPageValidation = require("./lib/wiki-page-validation");
@@ -18,6 +19,7 @@ const filterCategoriesForum = require("./lib/filter-categories-forum");
 const filterForumFeeds = require("./lib/filter-forum-feeds");
 const filterForumSearch = require("./lib/filter-forum-search");
 const forumExclusionService = require("./lib/forum-exclusion-service");
+const wikiDirectoryController = require("./lib/controllers/wiki-directory");
 
 const plugin = module.exports;
 
@@ -70,10 +72,24 @@ plugin.registerApiRoutes = async function ({ router, middleware }) {
   );
   routeHelpers.setupApiRoute(
     router,
+    "put",
+    "/westgate-wiki/namespace-main-page",
+    [middleware.ensureLoggedIn, middleware.checkRequired.bind(null, ["tid"])],
+    wikiNamespaceMainPages.putNamespaceMainPage
+  );
+  routeHelpers.setupApiRoute(
+    router,
     "post",
     "/westgate-wiki/namespace",
     [middleware.ensureLoggedIn],
     wikiNamespaceCreateController.postNamespace
+  );
+  routeHelpers.setupApiRoute(
+    router,
+    "get",
+    "/westgate-wiki/namespace/:cid/pages",
+    [],
+    wikiDirectoryController.getNamespacePages
   );
 };
 
@@ -112,6 +128,17 @@ plugin.filterTopicsGetUnreadTids = filterForumFeeds.filterTopicsGetUnreadTids;
 plugin.filterSearchInContent = filterForumSearch.filterSearchInContent;
 plugin.filterSearchIndexTopics = filterForumSearch.filterSearchIndexTopics;
 plugin.filterSearchIndexPosts = filterForumSearch.filterSearchIndexPosts;
+plugin.onWikiTopicMoved = async function (data) {
+  const wikiDirectory = require("./lib/wiki-directory-service");
+  const fromCid = parseInt(data && data.fromCid, 10);
+  const toCid = parseInt(data && data.toCid, 10);
+  if (Number.isInteger(fromCid) && fromCid > 0) {
+    wikiDirectory.invalidateNamespace(fromCid);
+  }
+  if (Number.isInteger(toCid) && toCid > 0) {
+    wikiDirectory.invalidateNamespace(toCid);
+  }
+};
 plugin.wikiFilterPrivilegesTopicsGet = async function (data) {
   if (!data || data.tid === undefined || data.tid === null) {
     return data;
@@ -132,7 +159,9 @@ plugin.services = {
   topicService,
   wikiLinkAutocomplete,
   wikiLinks,
+  wikiNamespaceMainPages,
   wikiPageValidation,
   wikiPaths,
-  wikiService
+  wikiService,
+  wikiDirectory: require("./lib/wiki-directory-service")
 };
