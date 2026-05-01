@@ -447,3 +447,5 @@ if (document.readyState === "loading") {
 } else {
   initWikiComposePage();
 }
+
+window.westgateWikiInitComposePage = initWikiComposePage;

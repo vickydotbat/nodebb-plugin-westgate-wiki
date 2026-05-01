@@ -111,6 +111,12 @@ $(document).ready(function () {
     });
   }
 
+  function maybeInitComposePage() {
+    if (window.westgateWikiInitComposePage) {
+      window.westgateWikiInitComposePage();
+    }
+  }
+
   function handleWikiCreateLinkClick(event) {
     const link = event.target && event.target.closest ? event.target.closest("a") : null;
     const intent = link ? getCreateIntentFromUrl(link.getAttribute("href")) : null;
@@ -357,6 +363,7 @@ $(document).ready(function () {
       markRedLinks();
       maybeOpenCreateFromLocation();
       maybeOpenCreateFromMarkup();
+      maybeInitComposePage();
     });
     },
     function (err) {
@@ -400,6 +407,7 @@ $(document).ready(function () {
   markRedLinks();
   maybeOpenCreateFromLocation();
   maybeOpenCreateFromMarkup();
+  maybeInitComposePage();
 
   function getCsrfToken() {
     if (window.config && window.config.csrf_token) {
