@@ -47,6 +47,14 @@
       "method": "clearWikiPostParseCache"
     },
     {
+      "hook": "filter:topic.post",
+      "method": "wikiFilterTopicPost"
+    },
+    {
+      "hook": "filter:topic.edit",
+      "method": "wikiFilterTopicEdit"
+    },
+    {
       "hook": "action:post.edit",
       "method": "clearWikiPostEditCache"
     },

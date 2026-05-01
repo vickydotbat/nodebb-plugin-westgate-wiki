@@ -4,6 +4,44 @@
   <div class="row m-0">
     <div id="spy-container" class="col-12 col-md-8 px-0 mb-4" tabindex="0">
       <form role="form" class="westgate-wiki-settings">
+        <!-- IF hasSetupErrors -->
+        <div class="alert alert-warning" role="alert">
+          <strong>Clean wiki path setup needs attention.</strong>
+          <p class="mb-2">
+            Resolve these namespace conflicts before relying on clean wiki URLs for affected pages.
+          </p>
+          <!-- IF hasNamespaceCollisions -->
+          <div class="mb-2">
+            <strong>Duplicate namespace paths</strong>
+            <ul class="mb-0">
+              <!-- BEGIN namespaceCollisions -->
+              <li>
+                <code>{namespaceCollisions.path}</code>
+                <span class="text-muted">is shared by {namespaceCollisions.categoriesText}</span>
+              </li>
+              <!-- END namespaceCollisions -->
+            </ul>
+          </div>
+          <!-- ENDIF hasNamespaceCollisions -->
+          <!-- IF hasReservedNamespacePaths -->
+          <div class="mb-0">
+            <strong>Reserved namespace paths</strong>
+            <ul class="mb-0">
+              <!-- BEGIN reservedNamespacePaths -->
+              <li>
+                <code>{reservedNamespacePaths.path}</code>
+                <span class="text-muted">
+                  starts with reserved segment <code>{reservedNamespacePaths.reservedSegment}</code>
+                  for #{reservedNamespacePaths.category.cid} {reservedNamespacePaths.category.name}
+                </span>
+              </li>
+              <!-- END reservedNamespacePaths -->
+            </ul>
+          </div>
+          <!-- ENDIF hasReservedNamespacePaths -->
+        </div>
+        <!-- ENDIF hasSetupErrors -->
+
         <div class="mb-4">
           <div class="d-flex justify-content-between align-items-center gap-3 mb-2">
             <label class="form-label mb-0" for="categoryIds">Wiki Namespaces</label>

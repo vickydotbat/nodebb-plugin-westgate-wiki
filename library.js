@@ -6,10 +6,12 @@ const config = require("./lib/config");
 const adminControllers = require("./lib/controllers/admin");
 const serializer = require("./lib/serializer");
 const topicService = require("./lib/topic-service");
+const wikiLinkAutocomplete = require("./lib/wiki-link-autocomplete");
 const wikiLinks = require("./lib/wiki-links");
 const wikiHtmlParse = require("./lib/wiki-html-parse");
 const wikiService = require("./lib/wiki-service");
 const wikiPaths = require("./lib/wiki-paths");
+const wikiPageValidation = require("./lib/wiki-page-validation");
 const wikiTopicPurge = require("./lib/wiki-topic-purge");
 const wikiRoutes = require("./routes/wiki");
 const filterCategoriesForum = require("./lib/filter-categories-forum");
@@ -38,6 +40,20 @@ plugin.registerApiRoutes = async function ({ router, middleware }) {
   const wikiNamespaceSearch = require("./lib/wiki-namespace-search");
   const wikiHomepage = require("./lib/wiki-homepage");
   const wikiNamespaceCreateController = require("./lib/controllers/wiki-namespace-create");
+  routeHelpers.setupApiRoute(
+    router,
+    "get",
+    "/westgate-wiki/page-title/check",
+    [middleware.ensureLoggedIn],
+    wikiPageValidation.checkPageTitle
+  );
+  routeHelpers.setupApiRoute(
+    router,
+    "get",
+    "/westgate-wiki/link-autocomplete",
+    [],
+    wikiLinkAutocomplete.apiSearch
+  );
   routeHelpers.setupApiRoute(
     router,
     "get",
@@ -76,6 +92,8 @@ plugin.wikiMarkdownBeforeParse = wikiHtmlParse.markdownBeforeParse;
 plugin.clearWikiPostParseCache = cacheService.clearWikiPostParseCache;
 plugin.clearWikiPostEditCache = cacheService.clearWikiPostEditCache;
 plugin.onWikiTopicDelete = wikiTopicPurge.onTopicDelete;
+plugin.wikiFilterTopicPost = wikiPageValidation.validateTopicPost;
+plugin.wikiFilterTopicEdit = wikiPageValidation.validateTopicEdit;
 plugin.wikiFilterTopicDelete = async function (data) {
   if (!data || !data.topicData) {
     return data;
@@ -112,7 +130,9 @@ plugin.services = {
   forumExclusionService,
   serializer,
   topicService,
+  wikiLinkAutocomplete,
   wikiLinks,
+  wikiPageValidation,
   wikiPaths,
   wikiService
 };

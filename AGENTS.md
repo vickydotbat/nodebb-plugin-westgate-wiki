@@ -45,6 +45,17 @@ The existing implementation already does the following:
 - Keeps old ID-based wiki URLs as backward-compatible redirect aliases
 - Exposes reusable internal services through `plugin.services` for future extension work
 - Uses route and service modules instead of placing everything in `library.js`
+- Live production checks on 2026-05-01 confirmed clean wiki article and
+  namespace paths are working, including internal links such as
+  `[[Map Creation Guide]]` resolving to canonical clean paths.
+- Surfaces clean-path setup diagnostics in the ACP for duplicate namespace
+  paths and reserved namespace route segments.
+- Rejects wiki page create/edit titles that would collide with an existing page
+  slug leaf, a child namespace path, a reserved root route, or an ambiguous
+  namespace configuration.
+- Exposes a reusable wiki link autocomplete service/API that returns canonical
+  wiki paths and server-computed insert text for wiki and forum authoring
+  contexts.
 
 The implementation now has a working MVP shape. This document tracks remaining
 hardening, verification, and phase-two work so future changes do not invent a
@@ -57,17 +68,14 @@ scratch; extend `lib/wiki-paths.js` and existing callers.
 
 Current priority order:
 
-1. Live-verify clean wiki paths in a running NodeBB instance after fixing the
-   local `theme-not-found` build blocker.
-2. Harden collision and setup-error handling for duplicate namespace paths,
-   duplicate page slug leaves, and reserved first path segments.
-3. Add focused resolver tests or fixture-backed checks for canonical path
-   construction, legacy redirects, collision failures, and reserved segments.
-4. Resume wiki-owned search and forum/wiki autocomplete only through
+1. Live-verify the new collision diagnostics, title rejection, and autocomplete
+   API in a running NodeBB instance after deployment.
+2. Continue wiki-owned search only through
    `lib/wiki-paths.js`; do not let client code or templates construct
    `/wiki/...` manually.
-5. Continue Westgate theme alignment after clean path behavior has been
-   verified live.
+3. Add the forum-composer UI integration for the server-side wiki link
+   autocomplete API.
+4. Continue Westgate theme alignment and full live smoke checks.
 
 Deprecated priority items, completed 2026-05-01:
 
@@ -76,6 +84,12 @@ Deprecated priority items, completed 2026-05-01:
 - Move wiki-owned link generation for routes, breadcrumbs, redlinks, compose
   redirects, namespace search, sidebars, namespace indexes, and delete redirects
   onto canonical paths.
+- Live-verify clean wiki paths in a running NodeBB instance.
+- Add focused resolver tests for canonical namespace paths, collisions,
+  reserved route segments, page collisions, and namespace/page path collisions.
+- Harden create/edit-time rejection for duplicate page slug leaves, reserved
+  root page paths, namespace/page path collisions, and ambiguous namespace
+  setup.
 
 Architectural rule: search results, redlinks, breadcrumbs, authoring redirects,
 and future aliases must use one source of truth for wiki paths. New wiki-facing
@@ -416,9 +430,15 @@ Implementation status, 2026-05-01:
   breadcrumbs, redlinks, namespace search, compose redirects, page navigation,
   namespace creation responses, and delete redirects.
 - The resolver is exposed as `plugin.services.wikiPaths`.
-- `npm test` includes syntax checking for `lib/wiki-paths.js` and currently
-  passes.
-- Full NodeBB asset verification is still pending because `./nodebb build`
+- `npm test` now includes syntax checks plus focused `tests/wiki-paths.test.js`
+  fixture coverage for canonical namespace construction, namespace collisions,
+  reserved route segments, duplicate page slug leaves, and namespace/page path
+  collisions. It currently passes.
+- Live production checks on 2026-05-01 confirmed clean article paths such as
+  `/wiki/mechanics/classes/acolyte` and
+  `/wiki/development/guides/map-creation-guide`, namespace navigation, and
+  existing internal links resolving to canonical clean paths.
+- Full local NodeBB asset verification is still pending because `./nodebb build`
   currently fails before asset compilation with `theme-not-found`.
 
 Deprecated guidance: the phases below document the refactor plan and completion
@@ -523,8 +543,9 @@ Exit criteria:
 Status, 2026-05-01: Completed for the shippable foundation. Implemented in
 `lib/wiki-paths.js` with namespace/article builders, legacy builders,
 namespace lookup, article lookup by page slug leaf, reserved first-segment
-handling, and structured failure statuses. Remaining work is test coverage and
-admin-facing collision/setup messages, not rebuilding the resolver.
+handling, structured failure statuses, focused fixture tests, and admin-facing
+namespace setup diagnostics. Remaining work is deliberate alias policy for
+renames, not rebuilding the resolver.
 
 Goal:
 Centralize URL construction and lookup instead of scattering path logic through
@@ -561,7 +582,8 @@ Tasks:
    render unauthorized data.
 10. Add focused unit-style tests around normalization, collision detection,
     deepest-namespace matching, and legacy-path construction where the existing
-    test harness allows it. Status: still open.
+    test harness allows it. Status: partially covered by
+    `tests/wiki-paths.test.js`; add more cases as the resolver grows.
 
 Exit criteria:
 
@@ -645,10 +667,14 @@ Exit criteria:
 
 ### Phase 4: Collision And Rename Handling
 
-Status, 2026-05-01: Partially implemented. The resolver returns structured
-statuses for namespace collisions, page collisions, and reserved first path
-segments. Still open: admin/setup surfacing, create/edit-time rejection for
-duplicate page slug leaves, and any deliberate rename alias policy.
+Status, 2026-05-01: Implemented for collision prevention and setup surfacing.
+The resolver returns structured statuses for namespace collisions, page
+collisions, namespace/page path collisions, and reserved first path segments.
+The ACP surfaces duplicate namespace paths and reserved namespace route
+segments. Wiki topic create/edit flows reject duplicate page slug leaves,
+reserved root page paths, namespace/page path collisions, and ambiguous
+namespace setup through `filter:topic.post`, `filter:topic.edit`, and the wiki
+compose preflight endpoint. Still open: any deliberate rename alias policy.
 
 Goal:
 Handle the cases that numeric ids used to make trivial.
@@ -677,9 +703,10 @@ Exit criteria:
 
 ### Phase 4A: Search And Authoring Dependency Update
 
-Status, 2026-05-01: Partially completed. Existing namespace compose search,
-compose success/cancel redirects, and redlink flows now use canonical paths.
-Full wiki-owned search remains a follow-up and must consume the resolver.
+Status, 2026-05-01: Completed for existing authoring flows. Existing namespace
+compose search, compose success/cancel redirects, redlink flows, and page title
+validation now use canonical paths or resolver-backed services. Full wiki-owned
+search remains a follow-up and must consume the resolver.
 
 Goal:
 Make later wiki-side search and authoring work depend on canonical paths rather
@@ -707,8 +734,13 @@ Exit criteria:
 
 ### Phase 4B: Wiki Link Autocomplete Helper
 
-Status, 2026-05-01: Open. This remains the next authoring/search feature after
-live clean-path verification and collision hardening.
+Status, 2026-05-01: Partially implemented. `lib/wiki-link-autocomplete.js`
+backs `/api/v3/plugins/westgate-wiki/link-autocomplete`, returns compact page
+and namespace results with canonical `wikiPath` values, respects category read
+privileges, and computes `insertText` for `forum` and `wiki` contexts. The old
+namespace-local compose search now wraps this service, and the wiki compose page
+uses the new endpoint for its insert-link picker. Still open: a polished forum
+composer UI integration and richer keyboard/no-results client behavior.
 
 Goal:
 Expand the lightweight autocomplete helper into a reusable link-picker surface
@@ -726,17 +758,18 @@ objects.
 Tasks:
 
 1. Replace or wrap `lib/wiki-namespace-search.js` with a reusable service such
-   as `lib/wiki-link-autocomplete.js`.
+   as `lib/wiki-link-autocomplete.js`. Status: done.
 2. Expose one API that can serve both contexts, for example
-   `/api/v3/plugins/westgate-wiki/link-autocomplete`, with parameters:
+   `/api/v3/plugins/westgate-wiki/link-autocomplete`, with parameters.
+   Status: done.
    - `q`: normalized title query
    - `context`: `forum` or `wiki`
    - `cid`: current wiki namespace when known
    - `scope`: `current-namespace`, `descendants`, or `all-wiki`
    - `limit`: capped server-side
 3. Preserve the existing namespace-local compose flow by mapping it to
-   `context=wiki&scope=current-namespace`.
-4. Return a compact result shape:
+   `context=wiki&scope=current-namespace`. Status: done.
+4. Return a compact result shape. Status: done:
    - `type`: `page` or `namespace`
    - `title`
    - `titleLeaf`
@@ -757,9 +790,10 @@ Tasks:
    - optional label support can come later as `[[Target|Label]]` if the parser
      supports it
 7. Use the canonical path resolver for every returned `wikiPath`. Client code
-   should never assemble `/wiki/...` manually.
+   should never assemble `/wiki/...` manually. Status: done for the service.
 8. Respect NodeBB read privileges for all returned pages and namespaces. A
-   hidden wiki page must be indistinguishable from a non-match.
+   hidden wiki page must be indistinguishable from a non-match. Status: done
+   through category `topics:read` checks.
 9. Keep creation suggestions context-sensitive:
    - forum composer should not offer to create wiki pages unless the user is in
      an explicit wiki-link picker with a selected target namespace
@@ -771,7 +805,8 @@ Tasks:
     - capped candidate reads per namespace
     - no body snippets
     - no full post HTML
-11. Add client integration only after the API contract is stable:
+11. Add client integration only after the API contract is stable. Status:
+    wiki compose integration is done; forum composer integration remains open:
     - forum composer button or slash/mention-style trigger that opens the wiki
       link picker
     - wiki composer toolbar action/typeahead that inserts internal wiki links
@@ -791,28 +826,39 @@ Exit criteria:
 
 ### Phase 5: Verification
 
-Status, 2026-05-01: Partially complete. `npm test` passes, and route patterns
-were checked against NodeBB's installed `path-to-regexp`. Full running-NodeBB
-verification is blocked by the local `./nodebb build` failure:
-`theme-not-found`.
+Status, 2026-05-01: Partially complete. `npm test` passes, including focused
+resolver fixture tests. Route patterns were checked against NodeBB's installed
+`path-to-regexp`. Live production checks confirmed clean article paths,
+namespace navigation, and internal links resolving to canonical clean paths.
+Full local running-NodeBB verification is still blocked by the local
+`./nodebb build` failure: `theme-not-found`.
 
 Run these checks before considering clean paths complete:
 
 1. Root namespace, child namespace, and deeply nested namespace URLs render.
-2. Article URLs render at `/wiki/{namespace path}/{page slug}`.
+   Status: live production spot checks passed for nested namespaces.
+2. Article URLs render at `/wiki/{namespace path}/{page slug}`. Status: live
+   production spot checks passed.
 3. Current ID-based article and category URLs redirect to canonical paths.
-4. Internal wiki links generate canonical URLs.
+4. Internal wiki links generate canonical URLs. Status: live production spot
+   check passed for `[[Map Creation Guide]]`.
 5. Redlinks still open page creation in the intended namespace.
 6. Private or unauthorized namespaces do not leak through path lookup.
-7. Slug collisions fail safely.
+7. Slug collisions fail safely. Status: fixture tests cover duplicate page slug
+   leaves and namespace/page path collisions; live verification still pending.
 8. NodeBB `/topic/...` forum routes continue to work.
 9. `/wiki/search`, `/wiki/compose/:cid`, `/wiki/edit/:tid`, and
    `/wiki/namespace/create/:parent_cid` are not swallowed by the catch-all
    route.
-10. Search/compose namespace helper results use canonical wiki paths.
-11. Create/edit flows redirect to canonical wiki article URLs.
+10. Search/compose namespace helper results use canonical wiki paths. Status:
+    implemented through `lib/wiki-link-autocomplete.js`; live verification
+    pending.
+11. Create/edit flows redirect to canonical wiki article URLs. Status:
+    existing compose redirects are implemented; new title collision preflight
+    live verification pending.
 12. Forum composer wiki-link autocomplete inserts canonical wiki URLs.
 13. Wiki composer autocomplete inserts namespace-aware internal wiki links.
+    Status: implemented for the compose link picker; live verification pending.
 
 ## Planned Work: Wiki-Aware Revision History
 
@@ -1067,9 +1113,9 @@ Ownership decision:
 - The existing `lib/wiki-namespace-search.js` endpoint is an authoring helper,
   not a general wiki search surface. It supports compose/autocomplete for one
   namespace, only searches topic titles, scans a bounded namespace topic list,
-  and currently emits ID-based `/wiki/${topic.slug}` paths. Keep it small or
-  replace it with a reusable search service rather than stretching it into the
-  full user-facing search implementation.
+  and now wraps `lib/wiki-link-autocomplete.js` so result URLs and insert text
+  come from resolver-backed canonical paths. Keep it small rather than
+  stretching it into the full user-facing search implementation.
 
 Implementation status, 2026-04-30:
 
@@ -1087,9 +1133,9 @@ Implementation status, 2026-04-30:
   - `filter:search.indexTopics`
   - `filter:search.indexPosts`
 - `lib/wiki-namespace-search.js` exposes a limited namespace-local topic-title
-  search for compose/edit flows. It is useful prior art for API shape,
-  privilege checks, and link autocomplete, but it is not enough for wiki-wide
-  title/body search.
+  search for compose/edit flows and delegates result serialization to
+  `lib/wiki-link-autocomplete.js`. It is not enough for wiki-wide title/body
+  search.
 - `plugin.json` registers those hooks, so deployment requires a NodeBB restart;
   no asset rebuild is required for the server-side hook changes alone.
 - `npm test` passed after the hook implementation.
@@ -1550,19 +1596,23 @@ Mark items here as work lands in the repository.
 
 ## Pending Steps
 
-- [ ] Highest priority: implement the human-readable namespace/page path
+- [x] Highest priority: implement the human-readable namespace/page path
   resolver and canonical route refactor before expanding wiki-owned search,
   wiki history, or additional feed/API follow-ups.
-- [ ] Add `lib/wiki-paths.js` with canonical namespace/page path construction,
+- [x] Add `lib/wiki-paths.js` with canonical namespace/page path construction,
   path resolution, reserved segment handling, and collision detection.
-- [ ] Add canonical clean wiki routes and convert existing ID-based wiki article
+- [x] Add canonical clean wiki routes and convert existing ID-based wiki article
   and category routes into redirects for normal page requests.
-- [ ] Move serializers, breadcrumbs, internal links, redlinks, compose
+- [x] Move serializers, breadcrumbs, internal links, redlinks, compose
   redirects, sidebar links, and namespace compose search results onto canonical
   wiki paths.
-- [ ] Expand the namespace compose search into a reusable wiki link
+- [-] Expand the namespace compose search into a reusable wiki link
   autocomplete helper that supports forum composer canonical links and wiki
   composer internal links.
+  - [x] Server-side helper/API exists and supports `forum` and `wiki`
+    `insertText`.
+  - [x] Namespace-local wiki compose picker uses the helper.
+  - [ ] Forum composer UI integration remains open.
 - [x] Add operational scripts or documented manual checks.
 - [x] Restart the live NodeBB server after deploying the forum/wiki feed
   separation hook changes in `plugin.json`.
@@ -1581,9 +1631,15 @@ Mark items here as work lands in the repository.
   categories.
 - [ ] After canonical paths land, implement the wiki-owned search backend
   contract under `/wiki/search` and `/api/v3/plugins/westgate-wiki/search`.
-- [ ] After canonical paths land, update the existing namespace compose search
+- [x] After canonical paths land, update the existing namespace compose search
   to share canonical link and privilege-safe result serialization with the
   wiki link autocomplete service.
+- [x] Add resolver fixture tests for canonical namespace construction,
+  namespace collisions, reserved segments, duplicate page slug leaves, and
+  namespace/page path collisions.
+- [x] Surface namespace clean-path setup diagnostics in the ACP.
+- [x] Reject duplicate/reserved/colliding clean wiki page titles in wiki
+  create/edit flows.
 - [ ] Verify the plugin in a live NodeBB development instance.
 - [-] Implement the Westgate theme alignment plan in
   `nodebb-theme-westgate/scss/westgate/_wiki-prose.scss`, using this plugin's

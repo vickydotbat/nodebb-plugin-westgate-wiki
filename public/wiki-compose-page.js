@@ -103,16 +103,27 @@ function initWikiComposePage() {
       const q = (linkSearch && linkSearch.value) || "";
       linkPick.innerHTML = "";
       try {
-        const url = `${payload.namespaceSearchUrl}?q=${encodeURIComponent(q)}`;
+        const params = new URLSearchParams({
+          q: q,
+          context: "wiki",
+          cid: String(payload.cid),
+          scope: "current-namespace",
+          limit: "25"
+        });
+        const url = payload.linkAutocompleteUrl ?
+          `${payload.linkAutocompleteUrl}?${params.toString()}` :
+          `${payload.namespaceSearchUrl}?q=${encodeURIComponent(q)}`;
         const res = await fetch(url, { credentials: "same-origin" });
         const body = await res.json();
         if (!res.ok) {
           throw new Error(body && body.status && body.status.message ? body.status.message : res.statusText);
         }
-        const topics = (body.response && body.response.topics) || [];
+        const topics = payload.linkAutocompleteUrl ?
+          ((body.response && body.response.results) || []).filter(function (r) { return r.type === "page"; }) :
+          ((body.response && body.response.topics) || []);
         topics.forEach(function (t) {
           const opt = document.createElement("option");
-          opt.value = t.titleLeaf || t.title;
+          opt.value = t.insertText || `[[${t.titleLeaf || t.title}]]`;
           opt.textContent = t.titleLeaf || t.title;
           linkPick.appendChild(opt);
         });
@@ -132,7 +143,7 @@ function initWikiComposePage() {
         if (!label) {
           return;
         }
-        const snippet = `[[${label}]]`;
+        const snippet = label;
         editorInstance.model.change(function (writer) {
           writer.insertText(snippet, editorInstance.model.document.selection.getFirstPosition());
         });
@@ -159,6 +170,27 @@ function initWikiComposePage() {
         try {
           let res;
           let body;
+
+          if (payload.pageTitleCheckUrl) {
+            const params = new URLSearchParams({
+              cid: String(payload.cid),
+              title: title
+            });
+            if (payload.mode === "edit" && payload.tid) {
+              params.set("tid", String(payload.tid));
+            }
+            const checkRes = await fetch(`${payload.pageTitleCheckUrl}?${params.toString()}`, {
+              credentials: "same-origin"
+            });
+            const checkBody = await checkRes.json();
+            if (!checkRes.ok) {
+              const msg = (checkBody && checkBody.status && checkBody.status.message) || checkRes.statusText;
+              throw new Error(msg);
+            }
+            if (checkBody && checkBody.response && checkBody.response.ok === false) {
+              throw new Error(checkBody.response.message || "This title cannot be published at a clean wiki URL.");
+            }
+          }
 
           if (isEdit) {
             res = await fetch(payload.postEditUrl, {
