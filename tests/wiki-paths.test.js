@@ -97,7 +97,6 @@ require.main.require = function requireNodebbStub(id) {
         const t = state.topics.get(parseInt(tid, 10));
         return t && Object.prototype.hasOwnProperty.call(t, field) ? t[field] : null;
       }
-      getTopicsFields: async (tids) => tids.map((tid) => state.topics.get(parseInt(tid, 10))).filter(Boolean)
     },
     "nconf": {
       get: (key) => (key === "relative_path" ? "" : undefined)
@@ -185,7 +184,7 @@ function reset(settings, categories, topics) {
     { categoryIds: "1, 2" },
     [
       { cid: 1, name: "Wiki", slug: "1/wiki", parentCid: 0 },
-      { cid: 2, name: "Development", slug: "2/development", parentCid: 1 }
+      { cid: 2, name: "Development", slug: "2/development", parentCid: 1, topic_count: 1 }
     ],
     [
       { tid: 20, cid: 2, title: "Map Creation Guide", slug: "20/map-creation-guide" }
@@ -195,6 +194,29 @@ function reset(settings, categories, topics) {
     await wikiLinks.replaceWikiLinks("[[development:Map Creation Guide]]", 1, await require("../lib/config").getSettings()),
     /href="\/wiki\/development\/map-creation-guide"/
   );
+
+  reset(
+    { categoryIds: "1, 2, 3" },
+    [
+      { cid: 1, name: "Wiki", slug: "1/wiki", parentCid: 0 },
+      { cid: 2, name: "Development", slug: "2/development", parentCid: 1 },
+      { cid: 3, name: "Guides", slug: "3/guides", parentCid: 2, topic_count: 2 }
+    ],
+    [
+      { tid: 30, cid: 3, title: "Module Development: Setup on Windows", slug: "30/module-development-setup-on-windows", deleted: 0, scheduled: 0, postcount: 1 },
+      { tid: 31, cid: 3, title: "Module Development: Linux Setup", slug: "31/module-development-linux-setup", deleted: 0, scheduled: 0, postcount: 1 }
+    ]
+  );
+  assert.match(
+    await wikiLinks.replaceWikiLinks("[[development/guides/module-development-setup-on-windows]]", 3, await require("../lib/config").getSettings()),
+    /href="\/wiki\/development\/guides\/module-development-setup-on-windows"/
+  );
+  assert.match(
+    await wikiLinks.replaceWikiLinks("[[module-development-setup-on-windows]]", 3, await require("../lib/config").getSettings()),
+    /href="\/wiki\/development\/guides\/module-development-setup-on-windows"/
+  );
+  assert.strictEqual(wikiLinks.getViewerUid({ uid: 42 }), 42);
+  assert.strictEqual(wikiLinks.getViewerUid({ userData: { uid: 43 } }), 43);
 
   console.log("wiki-paths tests passed");
 })().catch((err) => {
