@@ -97,6 +97,47 @@
     return root;
   }
 
+  function bindTocSmoothScroll(tocMount) {
+    if (!tocMount || tocMount.dataset.wikiTocSmoothBound === "1") {
+      return;
+    }
+    tocMount.dataset.wikiTocSmoothBound = "1";
+    tocMount.addEventListener("click", function onTocLinkClick(ev) {
+      const anchor = ev.target && ev.target.closest
+        ? ev.target.closest("a.wiki-article-toc__link")
+        : null;
+      if (!anchor || !tocMount.contains(anchor)) {
+        return;
+      }
+      const href = anchor.getAttribute("href");
+      if (!href || href.charAt(0) !== "#") {
+        return;
+      }
+      const id = decodeURIComponent(href.slice(1));
+      if (!id) {
+        return;
+      }
+      let target;
+      try {
+        target = document.getElementById(id);
+      } catch (eId) {
+        return;
+      }
+      if (!target) {
+        return;
+      }
+      ev.preventDefault();
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (typeof history.replaceState === "function") {
+        try {
+          history.replaceState(null, "", href);
+        } catch (eHist) {
+          /* ignore */
+        }
+      }
+    });
+  }
+
   function collapseTocOnSmallScreens() {
     if (typeof window.matchMedia !== "function" || !window.matchMedia("(max-width: 767px)").matches) {
       return;
@@ -161,6 +202,7 @@
       wrap.removeAttribute("hidden");
       wrap.setAttribute("aria-hidden", "false");
     }
+    bindTocSmoothScroll(mount);
     collapseTocOnSmallScreens();
   }
 
