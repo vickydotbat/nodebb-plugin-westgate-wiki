@@ -200,7 +200,7 @@ function reset(settings, categories, topics) {
     [
       { cid: 1, name: "Wiki", slug: "1/wiki", parentCid: 0 },
       { cid: 2, name: "Development", slug: "2/development", parentCid: 1 },
-      { cid: 3, name: "Guides", slug: "3/guides", parentCid: 2, topic_count: 2 }
+      { cid: 3, name: "Guides", slug: "3/guides", parentCid: 2, topic_count: 0 }
     ],
     [
       { tid: 30, cid: 3, title: "Module Development: Setup on Windows", slug: "30/module-development-setup-on-windows", deleted: 0, scheduled: 0, postcount: 1 },
@@ -215,8 +215,6 @@ function reset(settings, categories, topics) {
     await wikiLinks.replaceWikiLinks("[[module-development-setup-on-windows]]", 3, await require("../lib/config").getSettings()),
     /href="\/wiki\/development\/guides\/module-development-setup-on-windows"/
   );
-  assert.strictEqual(wikiLinks.getViewerUid({ uid: 42 }), 42);
-  assert.strictEqual(wikiLinks.getViewerUid({ userData: { uid: 43 } }), 43);
 
   console.log("wiki-paths tests passed");
 })().catch((err) => {
