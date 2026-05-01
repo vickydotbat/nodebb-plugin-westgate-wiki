@@ -97,6 +97,10 @@ require.main.require = function requireNodebbStub(id) {
         const t = state.topics.get(parseInt(tid, 10));
         return t && Object.prototype.hasOwnProperty.call(t, field) ? t[field] : null;
       }
+      getTopicsFields: async (tids) => tids.map((tid) => state.topics.get(parseInt(tid, 10))).filter(Boolean)
+    },
+    "nconf": {
+      get: (key) => (key === "relative_path" ? "" : undefined)
     }
   };
 
@@ -107,6 +111,7 @@ require.main.require = function requireNodebbStub(id) {
 };
 
 const wikiPaths = require("../lib/wiki-paths");
+const wikiLinks = require("../lib/wiki-links");
 
 function reset(settings, categories, topics) {
   state.settings = {
@@ -175,6 +180,21 @@ function reset(settings, categories, topics) {
   );
   assert.strictEqual((await wikiPaths.validatePageTitlePath(1, "Guides")).status, "namespace-page-collision");
   assert.strictEqual((await wikiPaths.validatePageTitlePath(1, "Search")).status, "reserved-path-segment");
+
+  reset(
+    { categoryIds: "1, 2" },
+    [
+      { cid: 1, name: "Wiki", slug: "1/wiki", parentCid: 0 },
+      { cid: 2, name: "Development", slug: "2/development", parentCid: 1 }
+    ],
+    [
+      { tid: 20, cid: 2, title: "Map Creation Guide", slug: "20/map-creation-guide" }
+    ]
+  );
+  assert.match(
+    await wikiLinks.replaceWikiLinks("[[development:Map Creation Guide]]", 1, await require("../lib/config").getSettings()),
+    /href="\/wiki\/development\/map-creation-guide"/
+  );
 
   console.log("wiki-paths tests passed");
 })().catch((err) => {

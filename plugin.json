@@ -62,6 +62,10 @@
       "method": "filterWikiDiscussionTopicReply"
     },
     {
+      "hook": "filter:composer.formatting",
+      "method": "addComposerFormatting"
+    },
+    {
       "hook": "action:topic.post",
       "method": "clearWikiPostParseCache"
     },
