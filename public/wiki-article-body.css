@@ -37,6 +37,7 @@
  *   --wiki-ck-input-background, --wiki-ck-input-border, --wiki-ck-input-text
  *   --wiki-ck-list-background, --wiki-ck-panel-background, --wiki-ck-panel-border
  *   --wiki-ck-tooltip-background, --wiki-ck-tooltip-text
+ *   --wiki-ck-powered-by-background, --wiki-ck-powered-by-border-color, --wiki-ck-powered-by-text-color
  *
  *   Wiki shell (landing / section / page chrome; see public/wiki.css):
  *   --wiki-chrome-surface-bg, --wiki-chrome-surface-border, --wiki-chrome-radius
@@ -57,6 +58,10 @@
  */
 
 /* --- CKEditor UI: map to theme / Bootstrap / optional --wiki-ck-* --- */
+.westgate-wiki-compose .wiki-compose-form {
+  position: relative;
+}
+
 .westgate-wiki-compose .ck.ck-editor {
   --ck-border-radius: var(--bs-border-radius, 0.5rem);
   --ck-color-base-background: var(--wiki-ck-base-background, var(--bs-tertiary-bg, var(--bs-body-bg, #fff)));
@@ -114,8 +119,8 @@
 
 /*
  * After init, we move div.ck-body-wrapper from document.body into #westgate-wiki-ck-body-sink
- * (see wiki-editor-bundle.js) so the BodyCollection host is not a direct child of <body> and
- * does not pick up full-page / flex layout from the theme.
+ * (see wiki-editor-bundle.js) so the BodyCollection host is contained by the compose card and
+ * does not become a stray body child after ajaxify navigation.
  */
 #westgate-wiki-ck-body-sink {
   position: absolute;
@@ -193,10 +198,22 @@ body:has(#westgate-wiki-compose) .ck.ck-balloon-panel:not(.ck-powered-by-balloon
   --ck-powered-by-line-height: 1.2;
   --ck-powered-by-padding-vertical: 4px;
   --ck-powered-by-padding-horizontal: 8px;
-  --ck-powered-by-text-color: var(--bs-secondary-color, #6c757d);
-  --ck-powered-by-background: var(--wiki-ck-base-background, var(--bs-body-bg, #fff));
-  --ck-powered-by-border-color: var(--bs-border-color, #dee2e6);
+  --ck-powered-by-text-color: var(--wiki-ck-powered-by-text-color, var(--bs-secondary-color, #6c757d));
+  --ck-powered-by-background: var(--wiki-ck-powered-by-background, var(--wiki-ck-base-background, var(--bs-body-bg, #fff)));
+  --ck-powered-by-border-color: var(--wiki-ck-powered-by-border-color, var(--bs-border-color, #dee2e6));
   --ck-powered-by-border-radius: var(--bs-border-radius, 0.5rem);
+}
+
+#westgate-wiki-ck-body-sink .ck.ck-balloon-panel.ck-powered-by-balloon {
+  position: absolute !important;
+  right: 0.75rem !important;
+  bottom: 0.75rem !important;
+  left: auto !important;
+  top: auto !important;
+  width: auto !important;
+  max-width: min(18rem, calc(100% - 1.5rem));
+  z-index: 3;
+  pointer-events: auto;
 }
 
 .westgate-wiki-compose .ck.ck-balloon-panel.ck-powered-by-balloon .ck.ck-powered-by .ck-powered-by__label {

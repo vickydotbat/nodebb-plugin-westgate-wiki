@@ -16,6 +16,17 @@ function setStatus(el, text) {
   }
 }
 
+function cleanupOrphanedCKEditorBodyWrappers() {
+  document.querySelectorAll("body > .ck-body-wrapper").forEach(function (wrap) {
+    if (wrap.querySelector(".ck-powered-by, .ck-powered-by-balloon")) {
+      wrap.remove();
+    }
+  });
+  document.querySelectorAll("body > .ck-powered-by-balloon, body > .ck.ck-powered-by-balloon").forEach(function (panel) {
+    panel.remove();
+  });
+}
+
 function waitForBundle(callback, attempts) {
   const max = attempts || 80;
   let n = 0;
@@ -41,6 +52,12 @@ function initWikiComposePage() {
     return;
   }
 
+  if (root.getAttribute("data-wiki-compose-ready") === "1") {
+    return;
+  }
+  root.setAttribute("data-wiki-compose-ready", "1");
+  cleanupOrphanedCKEditorBodyWrappers();
+
   const b64 = dataEl.getAttribute("data-payload-b64");
   if (!b64) {
     return;
@@ -64,8 +81,86 @@ function initWikiComposePage() {
   const linkSearchBtn = document.getElementById("wiki-compose-link-search-btn");
   const linkPick = document.getElementById("wiki-compose-link-pick");
   const linkInsert = document.getElementById("wiki-compose-link-insert");
+  const cancelLink = document.getElementById("wiki-compose-cancel");
 
   let editorInstance = null;
+  let destroyStarted = false;
+
+  async function destroyWikiEditor() {
+    if (destroyStarted || !editorInstance) {
+      return;
+    }
+
+    const editor = editorInstance;
+    editorInstance = null;
+    destroyStarted = true;
+
+    try {
+      if (typeof editor.destroy === "function") {
+        await editor.destroy();
+      }
+    } catch (err) {
+      if (window.console && console.warn) {
+        console.warn("westgate-wiki: CKEditor cleanup failed", err);
+      }
+    } finally {
+      destroyStarted = false;
+      cleanupOrphanedCKEditorBodyWrappers();
+    }
+  }
+
+  async function leaveComposePage(path) {
+    await destroyWikiEditor();
+
+    if (typeof ajaxify !== "undefined" && ajaxify.go) {
+      ajaxify.go(path.replace(/^\//, ""));
+    } else {
+      window.location.href = `${payload.relativePath || ""}${path}`;
+    }
+  }
+
+  function attachLifecycleCleanup() {
+    window.westgateWikiDestroyComposeEditor = destroyWikiEditor;
+
+    if (typeof require === "function" && !window.westgateWikiComposeAjaxCleanupAttached) {
+      window.westgateWikiComposeAjaxCleanupAttached = true;
+      require(["hooks"], function (hooks) {
+        hooks.on("action:ajaxify.start", function () {
+          if (window.westgateWikiDestroyComposeEditor) {
+            window.westgateWikiDestroyComposeEditor();
+          }
+        });
+      });
+    }
+
+    window.addEventListener("pagehide", function () {
+      destroyWikiEditor();
+    }, { once: true });
+
+    if (cancelLink) {
+      cancelLink.addEventListener("click", async function (event) {
+        const href = cancelLink.getAttribute("href") || "";
+
+        if (!href) {
+          return;
+        }
+
+        event.preventDefault();
+        await destroyWikiEditor();
+
+        if (typeof ajaxify !== "undefined" && ajaxify.go) {
+          const url = new URL(href, window.location.origin);
+          const rel = (payload.relativePath || "").replace(/\/$/, "");
+          const route = url.pathname.startsWith(rel) ? url.pathname.slice(rel.length) : url.pathname;
+          ajaxify.go(route.replace(/^\//, ""));
+        } else {
+          window.location.href = href;
+        }
+      });
+    }
+  }
+
+  attachLifecycleCleanup();
 
   waitForBundle(async function () {
     try {
@@ -270,21 +365,15 @@ function initWikiComposePage() {
           }
 
           if (homepageSetOk) {
-            if (typeof ajaxify !== "undefined" && ajaxify.go) {
-              ajaxify.go("wiki");
-            } else {
-              window.location.href = (payload.relativePath || "") + "/wiki";
-            }
+            await leaveComposePage("/wiki");
             return;
           }
 
           const slugLeaf = wikiSlug ? String(wikiSlug).split("/").filter(Boolean).pop() : "";
           const cleanWikiPath = payload.sectionWikiPath && slugLeaf ? `${payload.sectionWikiPath}/${slugLeaf}` : "";
 
-          if (cleanWikiPath && typeof ajaxify !== "undefined" && ajaxify.go) {
-            ajaxify.go(cleanWikiPath.replace(/^\//, ""));
-          } else if (cleanWikiPath) {
-            window.location.href = `${payload.relativePath || ""}${cleanWikiPath}`;
+          if (cleanWikiPath) {
+            await leaveComposePage(cleanWikiPath);
           } else {
             throw new Error("Unexpected API response");
           }
