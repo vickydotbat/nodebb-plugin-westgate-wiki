@@ -1,6 +1,16 @@
 /* global WikiEditorBundle, ajaxify */
 "use strict";
 
+/** Must match `MAX_WIKI_MAIN_BODY_UTF8_BYTES` in lib/wiki-page-validation.js */
+const MAX_WIKI_MAIN_BODY_UTF8_BYTES = 512 * 1024;
+
+function utf8ByteLength(str) {
+  if (typeof TextEncoder !== "undefined") {
+    return new TextEncoder().encode(str).length;
+  }
+  return unescape(encodeURIComponent(str)).length;
+}
+
 function decodePayloadB64(b64) {
   const bin = atob(b64);
   const bytes = new Uint8Array(bin.length);
@@ -14,6 +24,17 @@ function setStatus(el, text) {
   if (el) {
     el.textContent = text || "";
   }
+}
+
+function cleanupOrphanedCKEditorBodyWrappers() {
+  document.querySelectorAll("body > .ck-body-wrapper").forEach(function (wrap) {
+    if (wrap.querySelector(".ck-powered-by, .ck-powered-by-balloon")) {
+      wrap.remove();
+    }
+  });
+  document.querySelectorAll("body > .ck-powered-by-balloon, body > .ck.ck-powered-by-balloon").forEach(function (panel) {
+    panel.remove();
+  });
 }
 
 function waitForBundle(callback, attempts) {
@@ -41,6 +62,12 @@ function initWikiComposePage() {
     return;
   }
 
+  if (root.getAttribute("data-wiki-compose-ready") === "1") {
+    return;
+  }
+  root.setAttribute("data-wiki-compose-ready", "1");
+  cleanupOrphanedCKEditorBodyWrappers();
+
   const b64 = dataEl.getAttribute("data-payload-b64");
   if (!b64) {
     return;
@@ -64,8 +91,88 @@ function initWikiComposePage() {
   const linkSearchBtn = document.getElementById("wiki-compose-link-search-btn");
   const linkPick = document.getElementById("wiki-compose-link-pick");
   const linkInsert = document.getElementById("wiki-compose-link-insert");
+  const cancelLink = document.getElementById("wiki-compose-cancel");
+  const namespaceMainPageCheckbox = document.getElementById("wiki-compose-namespace-main-page");
+  const discussionDisabledCheckbox = document.getElementById("wiki-compose-discussion-disabled");
 
   let editorInstance = null;
+  let destroyStarted = false;
+
+  async function destroyWikiEditor() {
+    if (destroyStarted || !editorInstance) {
+      return;
+    }
+
+    const editor = editorInstance;
+    editorInstance = null;
+    destroyStarted = true;
+
+    try {
+      if (typeof editor.destroy === "function") {
+        await editor.destroy();
+      }
+    } catch (err) {
+      if (window.console && console.warn) {
+        console.warn("westgate-wiki: CKEditor cleanup failed", err);
+      }
+    } finally {
+      destroyStarted = false;
+      cleanupOrphanedCKEditorBodyWrappers();
+    }
+  }
+
+  async function leaveComposePage(path) {
+    await destroyWikiEditor();
+
+    if (typeof ajaxify !== "undefined" && ajaxify.go) {
+      ajaxify.go(path.replace(/^\//, ""));
+    } else {
+      window.location.href = `${payload.relativePath || ""}${path}`;
+    }
+  }
+
+  function attachLifecycleCleanup() {
+    window.westgateWikiDestroyComposeEditor = destroyWikiEditor;
+
+    if (typeof require === "function" && !window.westgateWikiComposeAjaxCleanupAttached) {
+      window.westgateWikiComposeAjaxCleanupAttached = true;
+      require(["hooks"], function (hooks) {
+        hooks.on("action:ajaxify.start", function () {
+          if (window.westgateWikiDestroyComposeEditor) {
+            window.westgateWikiDestroyComposeEditor();
+          }
+        });
+      });
+    }
+
+    window.addEventListener("pagehide", function () {
+      destroyWikiEditor();
+    }, { once: true });
+
+    if (cancelLink) {
+      cancelLink.addEventListener("click", async function (event) {
+        const href = cancelLink.getAttribute("href") || "";
+
+        if (!href) {
+          return;
+        }
+
+        event.preventDefault();
+        await destroyWikiEditor();
+
+        if (typeof ajaxify !== "undefined" && ajaxify.go) {
+          const url = new URL(href, window.location.origin);
+          const rel = (payload.relativePath || "").replace(/\/$/, "");
+          const route = url.pathname.startsWith(rel) ? url.pathname.slice(rel.length) : url.pathname;
+          ajaxify.go(route.replace(/^\//, ""));
+        } else {
+          window.location.href = href;
+        }
+      });
+    }
+  }
+
+  attachLifecycleCleanup();
 
   waitForBundle(async function () {
     try {
@@ -163,6 +270,17 @@ function initWikiComposePage() {
           return;
         }
 
+        const bodyBytes = utf8ByteLength(content);
+        if (bodyBytes > MAX_WIKI_MAIN_BODY_UTF8_BYTES) {
+          setStatus(
+            statusEl,
+            "Article body is too large (max " +
+              Math.round(MAX_WIKI_MAIN_BODY_UTF8_BYTES / 1024) +
+              " KiB UTF-8). Shorten the content before submitting."
+          );
+          return;
+        }
+
         submitBtn.disabled = true;
         const isEdit = payload.mode === "edit" && payload.postEditUrl;
         setStatus(statusEl, isEdit ? "Saving…" : "Publishing…");
@@ -231,6 +349,10 @@ function initWikiComposePage() {
 
           const responsePayload = body.response;
           let wikiSlug = null;
+          const savedTid = (
+            responsePayload &&
+            (responsePayload.tid || (responsePayload.topic && responsePayload.topic.tid))
+          ) || payload.tid;
 
           if (isEdit && responsePayload && responsePayload.topic && responsePayload.topic.slug) {
             wikiSlug = responsePayload.topic.slug;
@@ -238,9 +360,69 @@ function initWikiComposePage() {
             wikiSlug = responsePayload.slug;
           }
 
+          if (
+            payload.canSetNamespaceMainPage &&
+            payload.namespaceMainPageApiUrl &&
+            namespaceMainPageCheckbox &&
+            savedTid
+          ) {
+            const mainRes = await fetch(payload.namespaceMainPageApiUrl, {
+              method: "PUT",
+              credentials: "same-origin",
+              headers: {
+                "Content-Type": "application/json",
+                "x-csrf-token": payload.csrfToken
+              },
+              body: JSON.stringify({
+                tid: parseInt(savedTid, 10),
+                active: namespaceMainPageCheckbox.checked
+              })
+            });
+            if (!mainRes.ok) {
+              let mainJson = null;
+              try {
+                mainJson = await mainRes.json();
+              } catch (e) {
+                mainJson = null;
+              }
+              const mainMsg = (mainJson && mainJson.status && mainJson.status.message) || mainRes.statusText;
+              throw new Error("Page saved, but the namespace main page was not updated: " + mainMsg);
+            }
+          }
+
+          if (
+            isEdit &&
+            payload.discussionSettingsApiUrl &&
+            discussionDisabledCheckbox &&
+            savedTid
+          ) {
+            const discussionRes = await fetch(payload.discussionSettingsApiUrl, {
+              method: "PUT",
+              credentials: "same-origin",
+              headers: {
+                "Content-Type": "application/json",
+                "x-csrf-token": payload.csrfToken
+              },
+              body: JSON.stringify({
+                tid: parseInt(savedTid, 10),
+                disabled: discussionDisabledCheckbox.checked
+              })
+            });
+            if (!discussionRes.ok) {
+              let discussionJson = null;
+              try {
+                discussionJson = await discussionRes.json();
+              } catch (e) {
+                discussionJson = null;
+              }
+              const discussionMsg = (discussionJson && discussionJson.status && discussionJson.status.message) || discussionRes.statusText;
+              throw new Error("Page saved, but the discussion setting was not updated: " + discussionMsg);
+            }
+          }
+
           let homepageSetOk = false;
           if (!isEdit && payload.setAsWikiHome && payload.wikiHomepageApiUrl) {
-            const tidVal = responsePayload && (responsePayload.tid || (responsePayload.topic && responsePayload.topic.tid));
+            const tidVal = savedTid;
             if (tidVal) {
               const putRes = await fetch(payload.wikiHomepageApiUrl, {
                 method: "PUT",
@@ -270,21 +452,15 @@ function initWikiComposePage() {
           }
 
           if (homepageSetOk) {
-            if (typeof ajaxify !== "undefined" && ajaxify.go) {
-              ajaxify.go("wiki");
-            } else {
-              window.location.href = (payload.relativePath || "") + "/wiki";
-            }
+            await leaveComposePage("/wiki");
             return;
           }
 
           const slugLeaf = wikiSlug ? String(wikiSlug).split("/").filter(Boolean).pop() : "";
           const cleanWikiPath = payload.sectionWikiPath && slugLeaf ? `${payload.sectionWikiPath}/${slugLeaf}` : "";
 
-          if (cleanWikiPath && typeof ajaxify !== "undefined" && ajaxify.go) {
-            ajaxify.go(cleanWikiPath.replace(/^\//, ""));
-          } else if (cleanWikiPath) {
-            window.location.href = `${payload.relativePath || ""}${cleanWikiPath}`;
+          if (cleanWikiPath) {
+            await leaveComposePage(cleanWikiPath);
           } else {
             throw new Error("Unexpected API response");
           }
@@ -302,3 +478,5 @@ if (document.readyState === "loading") {
 } else {
   initWikiComposePage();
 }
+
+window.westgateWikiInitComposePage = initWikiComposePage;

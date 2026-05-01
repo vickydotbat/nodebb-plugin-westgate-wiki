@@ -7,7 +7,8 @@
   "scripts": [
     "public/wiki.js",
     "public/wiki-namespace-create.js",
-    "public/wiki-article-toc.js"
+    "public/wiki-article-toc.js",
+    "public/wiki-directory.js"
   ],
   "css": [
     "public/wiki.css"
@@ -39,8 +40,26 @@
       "priority": 6
     },
     {
+      "hook": "filter:parse.post",
+      "method": "transformWikiUserMentions",
+      "priority": 7
+    },
+    {
+      "hook": "filter:parse.post",
+      "method": "transformWikiFootnotes",
+      "priority": 8
+    },
+    {
       "hook": "filter:admin.header.build",
       "method": "addAdminNavigation"
+    },
+    {
+      "hook": "filter:topic.build",
+      "method": "filterWikiDiscussionTopicBuild"
+    },
+    {
+      "hook": "filter:topic.reply",
+      "method": "filterWikiDiscussionTopicReply"
     },
     {
       "hook": "filter:composer.formatting",
@@ -105,6 +124,10 @@
     {
       "hook": "filter:search.indexPosts",
       "method": "filterSearchIndexPosts"
+    },
+    {
+      "hook": "action:topic.move",
+      "method": "onWikiTopicMoved"
     }
   ]
 }

@@ -20,10 +20,48 @@
       <input id="wiki-compose-title" class="form-control" type="text" value="{defaultTitle}" maxlength="255" />
     </div>
 
+    <!-- IF showNamespaceMainPageToggle -->
+    <div class="form-check mb-3">
+      <input id="wiki-compose-namespace-main-page" class="form-check-input" type="checkbox"<!-- IF isNamespaceMainPage --> checked<!-- ENDIF isNamespaceMainPage --> />
+      <label class="form-check-label" for="wiki-compose-namespace-main-page">Use as the main page for this namespace</label>
+      <p class="small text-muted mb-0">The main page is pinned to the top of this namespace's navigation.</p>
+    </div>
+    <!-- ENDIF showNamespaceMainPageToggle -->
+
+    <!-- IF showDiscussionToggle -->
+    <div class="form-check mb-3">
+      <input id="wiki-compose-discussion-disabled" class="form-check-input" type="checkbox"<!-- IF discussionDisabled --> checked<!-- ENDIF discussionDisabled --> />
+      <label class="form-check-label" for="wiki-compose-discussion-disabled">Disable forum discussion for this article</label>
+      <p class="small text-muted mb-0">The forum topic will still link back to the wiki article, but new replies will be blocked.</p>
+    </div>
+    <!-- ENDIF showDiscussionToggle -->
+
     <div class="mb-2">
       <label class="form-label">Article body</label>
-      <p class="small text-muted mb-1">The editor saves HTML for the wiki topic. Wiki links like <code>[[Page]]</code>, <code>[[Page|Custom label]]</code>, <code>[[ns:Root/Child]]</code> (namespace index), and namespaced articles <code>[[Namespace/Page]]</code> are turned into links when the page is viewed. You can still import Markdown below and load it into the editor.</p>
+      <div class="wiki-compose-guide small text-muted mb-2" aria-label="Wiki authoring shortcuts">
+        <p class="wiki-compose-guide__intro mb-2">The editor saves HTML for the wiki topic. These shortcuts are turned into links and notes when the page is viewed:</p>
+        <dl class="wiki-compose-guide__list mb-0">
+          <div>
+            <dt>Wiki pages</dt>
+            <dd><code>[[Page]]</code>, <code>[[Namespace/Page]]</code>, or <code>[[Page|Custom label]]</code></dd>
+          </div>
+          <div>
+            <dt>Namespace indexes</dt>
+            <dd><code>[[ns:Root/Child]]</code></dd>
+          </div>
+          <div>
+            <dt>Forum users</dt>
+            <dd><code>@xtul</code> links to the matching forum profile when that user exists.</dd>
+          </div>
+          <div>
+            <dt>Footnotes</dt>
+            <dd><code>((footnote text))</code> collects a note at the bottom of the article.</dd>
+          </div>
+        </dl>
+        <p class="mb-0 mt-2">You can still import Markdown below and load it into the editor.</p>
+      </div>
       <div id="wiki-compose-editor" class="wiki-compose-editor wiki-article-prose"></div>
+      <div id="westgate-wiki-ck-body-sink"></div>
     </div>
 
     <div class="mb-3">

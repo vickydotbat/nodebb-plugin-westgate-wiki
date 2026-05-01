@@ -67,37 +67,53 @@
 
               <section class="wiki-index-pages-block" aria-labelledby="wiki-index-pages-heading">
                 <h3 class="wiki-index-subsection-title" id="wiki-index-pages-heading">Articles</h3>
+                <p class="wiki-index-subsection-lead mb-2">
+                  This page shows only a subset of pages. Search, jump by letter, or scroll to load more.
+                </p>
 
-                <!-- IF hasMultipleWikiIndexLetterGroups -->
-                <nav class="wiki-index-jump" aria-label="Jump to wiki page letter">
-                  <!-- BEGIN wikiIndexPageLetters -->
-                  <a class="wiki-index-jump-link" href="#wiki-page-letter-{wikiIndexPageLetters.letterAnchor}">{wikiIndexPageLetters.letterLabel}</a>
-                  <!-- END wikiIndexPageLetters -->
-                </nav>
-                <!-- ENDIF hasMultipleWikiIndexLetterGroups -->
+                <div
+                  class="wiki-namespace-directory"
+                  data-wiki-directory-mount="1"
+                  data-cid="{section.cid}"
+                  data-initial-cursor="{section.directoryNextCursor}"
+                  data-initial-has-more="<!-- IF section.directoryHasMore -->1<!-- ELSE -->0<!-- ENDIF -->"
+                  data-wiki-directory-endpoint="pages"
+                >
+                  <label class="visually-hidden" for="wiki-ns-dir-filter-{section.cid}">Filter articles in this namespace</label>
+                  <input
+                    type="search"
+                    id="wiki-ns-dir-filter-{section.cid}"
+                    class="form-control form-control-sm mb-2 wiki-directory-filter"
+                    placeholder="Filter pages…"
+                    data-wiki-directory-filter="1"
+                    autocomplete="off"
+                  />
 
-                <div class="wiki-index-body">
-                  <!-- BEGIN wikiIndexPageLetters -->
-                  <section class="wiki-index-letter-block" aria-labelledby="wiki-page-letter-{wikiIndexPageLetters.letterAnchor}">
-                    <h4 class="wiki-index-letter" id="wiki-page-letter-{wikiIndexPageLetters.letterAnchor}">
-                      <span class="wiki-index-letter-label">{wikiIndexPageLetters.letterLabel}</span>
-                    </h4>
-                    <ul class="wiki-index-list">
-                      {{{ each ./entries }}}
-                      <li class="wiki-index-entry">
-                        <div class="wiki-index-entry-main">
-                          <a class="wiki-index-entry-title" href="{config.relative_path}{../wikiPath}">
-                            {{{ if ../hasParentPath }}}
-                            <span class="wiki-topic-parent-path">{../parentTitlePathText}</span>
-                            {{{ end }}}
-                            <span class="wiki-topic-title-leaf">{../titleLeaf}</span>
-                          </a>
-                        </div>
-                      </li>
-                      {{{ end }}}
-                    </ul>
-                  </section>
-                  <!-- END wikiIndexPageLetters -->
+                  <nav class="wiki-index-jump wiki-index-jump--dynamic mb-2" aria-label="Jump to wiki page letter" data-wiki-directory-letters></nav>
+
+                  <ul class="wiki-index-list" data-wiki-directory-list>
+                    <!-- BEGIN section.topics -->
+                    <li class="wiki-index-entry wiki-directory-row">
+                      <div class="wiki-index-entry-main">
+                        <a class="wiki-index-entry-title" href="{config.relative_path}{./wikiPath}">
+                          <!-- IF ./hasParentPath -->
+                          <span class="wiki-topic-parent-path">{./parentTitlePathText}</span>
+                          <!-- ENDIF ./hasParentPath -->
+                          <span class="wiki-topic-title-leaf">{./titleLeaf}</span>
+                        </a>
+                      </div>
+                    </li>
+                    <!-- END section.topics -->
+                  </ul>
+
+                  <p class="wiki-directory-status small text-muted mb-2" data-wiki-directory-status aria-live="polite"></p>
+
+                  <!-- IF section.directoryHasMore -->
+                  <button type="button" class="btn btn-sm btn-outline-secondary mb-2" data-wiki-directory-more>
+                    Load more pages
+                  </button>
+                  <div data-wiki-directory-sentinel class="wiki-directory-sentinel" aria-hidden="true"></div>
+                  <!-- ENDIF section.directoryHasMore -->
                 </div>
               </section>
               <!-- ENDIF hasWikiIndexPageLetters -->

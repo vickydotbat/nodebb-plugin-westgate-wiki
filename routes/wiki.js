@@ -23,72 +23,18 @@ function appendQueryString(path, req) {
   return queryString ? `${path}?${queryString}` : path;
 }
 
-/**
- * Flat rows for article sidebar: each configured ancestor namespace, then the
- * current namespace, then pages in that namespace only (no pages from parents).
- */
-function buildWikiArticleSidebarNavRows(sectionNavigation, topic) {
-  if (!sectionNavigation) {
-    return [];
-  }
-  const rows = [];
-  const ancestors = Array.isArray(sectionNavigation.ancestorSections)
-    ? sectionNavigation.ancestorSections
-    : [];
-  const currentTid = String(topic && topic.tid != null ? topic.tid : "");
-
-  ancestors.forEach((ancestor, index) => {
-    rows.push({
-      depth: index,
-      isNamespace: true,
-      isPage: false,
-      name: ancestor.name,
-      wikiPath: ancestor.wikiPath
-    });
-  });
-
-  const nsDepth = ancestors.length;
-  rows.push({
-    depth: nsDepth,
-    isNamespace: true,
-    isPage: false,
-    isCurrentNamespace: true,
-    name: sectionNavigation.name,
-    wikiPath: sectionNavigation.wikiPath
-  });
-
-  const topics = Array.isArray(sectionNavigation.topics) ? sectionNavigation.topics : [];
-  topics.forEach((t) => {
-    rows.push({
-      depth: nsDepth + 1,
-      isNamespace: false,
-      isPage: true,
-      tid: t.tid,
-      titleLeaf: t.titleLeaf,
-      hasParentPath: t.hasParentPath,
-      parentTitlePathText: t.parentTitlePathText,
-      wikiPath: t.wikiPath,
-      isActive: String(t.tid) === currentTid
-    });
-  });
-
-  return rows;
-}
-
 function buildWikiPageRenderData(wikiPage, { isWikiHome }) {
   const trail = wikiBreadcrumbTrail.forArticleView(wikiPage);
 
-  const wikiSidebarNavRows = buildWikiArticleSidebarNavRows(
-    wikiPage.sectionNavigation,
-    wikiPage.topic
-  );
+  const wikiSidebarPageRows = (wikiPage.sectionNavigation && wikiPage.sectionNavigation.topics) || [];
 
   return {
     title: wikiPage.topic.title,
     ...trail,
     topic: wikiPage.topic,
     isWikiHome: !!isWikiHome,
-    showWikiDiscussionLink: !isWikiHome,
+    discussionDisabled: !!wikiPage.discussionDisabled,
+    showWikiDiscussionLink: !isWikiHome && !wikiPage.discussionDisabled,
     pageTitle: wikiPage.pageTitlePath.length ? wikiPage.pageTitlePath[wikiPage.pageTitlePath.length - 1] : wikiPage.topic.title,
     pageTitlePath: wikiPage.pageTitlePath,
     hasPageParents: wikiPage.parentPages.length > 0,
@@ -102,8 +48,9 @@ function buildWikiPageRenderData(wikiPage, { isWikiHome }) {
     /* Inline ToC mount: avoids Benchpress empty IF/ELSE in wiki-page.tpl */
     showWikiTocInline: !wikiPage.sectionNavigation,
     hasSectionChildNamespaces: !!(wikiPage.sectionNavigation && wikiPage.sectionNavigation.childSections.length),
-    hasSectionPages: !!(wikiPage.sectionNavigation && wikiPage.sectionNavigation.topics.length),
-    wikiSidebarNavRows,
+    hasSectionPages: !!(wikiPage.sectionNavigation && (wikiPage.sectionNavigation.topicCount || 0) > 0),
+    wikiSidebarPageRows,
+    hasWikiSidebarPageRows: wikiSidebarPageRows.length > 0,
     mainPost: wikiPage.mainPost
   };
 }
@@ -216,23 +163,23 @@ function register(params) {
     const canCreatePage = wikiSection.section.privileges.canCreatePage;
     const sectionContentsIndex = wikiAlphabeticalIndex.buildSectionContentsIndex(
       wikiSection.section.childSections,
-      wikiSection.section.topics
+      []
     );
     const namespaceIndexEntryCount = wikiSection.section.childSections.length
-      + wikiSection.section.topics.length;
+      + (wikiSection.section.topicCount || 0);
 
     res.render("wiki-section", {
       title: `${wikiSection.section.name} | Westgate Wiki`,
       ...sectionTrail,
       section: wikiSection.section,
       hasChildSections: wikiSection.section.childSections.length > 0,
-      hasTopics: wikiSection.section.topics.length > 0,
+      hasTopics: (wikiSection.section.topicCount || 0) > 0,
       wikiIndexNamespaces: sectionContentsIndex.namespaces,
-      wikiIndexPageLetters: sectionContentsIndex.pageLetterGroups,
+      wikiIndexPageLetters: [],
       hasWikiIndexNamespaces: sectionContentsIndex.namespaces.length > 0,
-      hasWikiIndexPageLetters: sectionContentsIndex.pageLetterGroups.length > 0,
+      hasWikiIndexPageLetters: (wikiSection.section.topicCount || 0) > 0,
       hasNamespaceIndexContent: namespaceIndexEntryCount > 0,
-      hasMultipleWikiIndexLetterGroups: sectionContentsIndex.pageLetterGroups.length > 1,
+      hasMultipleWikiIndexLetterGroups: false,
       canCreatePage,
       hasCreateIntent,
       createIntentTitle,
@@ -325,7 +272,7 @@ function register(params) {
       return renderSection(req, res, next, wikiSection);
     }
 
-    const article = await wikiPaths.resolveArticlePath(pathSegments);
+    const article = await wikiPaths.resolveArticlePath(pathSegments, req.uid);
     if (article.status !== "ok") {
       return next();
     }

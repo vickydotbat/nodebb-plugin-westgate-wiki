@@ -8,7 +8,12 @@ const serializer = require("./lib/serializer");
 const topicService = require("./lib/topic-service");
 const wikiLinkAutocomplete = require("./lib/wiki-link-autocomplete");
 const wikiLinks = require("./lib/wiki-links");
+const wikiFootnotes = require("./lib/wiki-footnotes");
 const wikiHtmlParse = require("./lib/wiki-html-parse");
+const wikiDiscussionPlaceholder = require("./lib/wiki-discussion-placeholder");
+const wikiDiscussionSettings = require("./lib/wiki-discussion-settings");
+const wikiNamespaceMainPages = require("./lib/wiki-namespace-main-pages");
+const wikiUserMentions = require("./lib/wiki-user-mentions");
 const wikiService = require("./lib/wiki-service");
 const wikiPaths = require("./lib/wiki-paths");
 const wikiPageValidation = require("./lib/wiki-page-validation");
@@ -18,6 +23,7 @@ const filterCategoriesForum = require("./lib/filter-categories-forum");
 const filterForumFeeds = require("./lib/filter-forum-feeds");
 const filterForumSearch = require("./lib/filter-forum-search");
 const forumExclusionService = require("./lib/forum-exclusion-service");
+const wikiDirectoryController = require("./lib/controllers/wiki-directory");
 
 const plugin = module.exports;
 
@@ -64,9 +70,23 @@ plugin.registerApiRoutes = async function ({ router, middleware }) {
   routeHelpers.setupApiRoute(
     router,
     "put",
+    "/westgate-wiki/discussion",
+    [middleware.ensureLoggedIn, middleware.checkRequired.bind(null, ["tid"])],
+    wikiDiscussionSettings.putDiscussionSettings
+  );
+  routeHelpers.setupApiRoute(
+    router,
+    "put",
     "/westgate-wiki/homepage",
     [middleware.ensureLoggedIn, middleware.checkRequired.bind(null, ["tid"])],
     wikiHomepage.putWikiHomepage
+  );
+  routeHelpers.setupApiRoute(
+    router,
+    "put",
+    "/westgate-wiki/namespace-main-page",
+    [middleware.ensureLoggedIn, middleware.checkRequired.bind(null, ["tid"])],
+    wikiNamespaceMainPages.putNamespaceMainPage
   );
   routeHelpers.setupApiRoute(
     router,
@@ -74,6 +94,13 @@ plugin.registerApiRoutes = async function ({ router, middleware }) {
     "/westgate-wiki/namespace",
     [middleware.ensureLoggedIn],
     wikiNamespaceCreateController.postNamespace
+  );
+  routeHelpers.setupApiRoute(
+    router,
+    "get",
+    "/westgate-wiki/namespace/:cid/pages",
+    [],
+    wikiDirectoryController.getNamespacePages
   );
 };
 
@@ -108,7 +135,11 @@ plugin.addComposerFormatting = async function (payload) {
 };
 
 plugin.transformWikiPostContent = wikiLinks.transformWikiPostContent;
+plugin.transformWikiUserMentions = wikiUserMentions.transformWikiUserMentions;
+plugin.transformWikiFootnotes = wikiFootnotes.transformWikiFootnotes;
 plugin.wikiMarkdownBeforeParse = wikiHtmlParse.markdownBeforeParse;
+plugin.filterWikiDiscussionTopicBuild = wikiDiscussionPlaceholder.filterTopicBuild;
+plugin.filterWikiDiscussionTopicReply = wikiDiscussionSettings.filterTopicReply;
 plugin.clearWikiPostParseCache = cacheService.clearWikiPostParseCache;
 plugin.clearWikiPostEditCache = cacheService.clearWikiPostEditCache;
 plugin.onWikiTopicDelete = wikiTopicPurge.onTopicDelete;
@@ -132,6 +163,17 @@ plugin.filterTopicsGetUnreadTids = filterForumFeeds.filterTopicsGetUnreadTids;
 plugin.filterSearchInContent = filterForumSearch.filterSearchInContent;
 plugin.filterSearchIndexTopics = filterForumSearch.filterSearchIndexTopics;
 plugin.filterSearchIndexPosts = filterForumSearch.filterSearchIndexPosts;
+plugin.onWikiTopicMoved = async function (data) {
+  const wikiDirectory = require("./lib/wiki-directory-service");
+  const fromCid = parseInt(data && data.fromCid, 10);
+  const toCid = parseInt(data && data.toCid, 10);
+  if (Number.isInteger(fromCid) && fromCid > 0) {
+    wikiDirectory.invalidateNamespace(fromCid);
+  }
+  if (Number.isInteger(toCid) && toCid > 0) {
+    wikiDirectory.invalidateNamespace(toCid);
+  }
+};
 plugin.wikiFilterPrivilegesTopicsGet = async function (data) {
   if (!data || data.tid === undefined || data.tid === null) {
     return data;
@@ -151,8 +193,14 @@ plugin.services = {
   serializer,
   topicService,
   wikiLinkAutocomplete,
+  wikiDiscussionPlaceholder,
+  wikiDiscussionSettings,
+  wikiFootnotes,
   wikiLinks,
+  wikiUserMentions,
+  wikiNamespaceMainPages,
   wikiPageValidation,
   wikiPaths,
-  wikiService
+  wikiService,
+  wikiDirectory: require("./lib/wiki-directory-service")
 };

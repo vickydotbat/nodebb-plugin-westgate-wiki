@@ -111,6 +111,12 @@ $(document).ready(function () {
     });
   }
 
+  function maybeInitComposePage() {
+    if (window.westgateWikiInitComposePage) {
+      window.westgateWikiInitComposePage();
+    }
+  }
+
   function handleWikiCreateLinkClick(event) {
     const link = event.target && event.target.closest ? event.target.closest("a") : null;
     const intent = link ? getCreateIntentFromUrl(link.getAttribute("href")) : null;
@@ -124,6 +130,181 @@ $(document).ready(function () {
     pendingAutoCreateHref = intent.href;
     launchWikiCreate(intent);
   }
+
+  let activeFootnotePopover = null;
+  let footnoteCloseTimer = null;
+
+  function getFootnoteRef(target) {
+    return target && target.closest ? target.closest("[data-wiki-footnote-ref]") : null;
+  }
+
+  function isCoarsePointer() {
+    return window.matchMedia && window.matchMedia("(hover: none), (pointer: coarse)").matches;
+  }
+
+  function clearFootnoteCloseTimer() {
+    if (footnoteCloseTimer) {
+      window.clearTimeout(footnoteCloseTimer);
+      footnoteCloseTimer = null;
+    }
+  }
+
+  function closeFootnotePopover() {
+    clearFootnoteCloseTimer();
+    if (activeFootnotePopover && activeFootnotePopover.popover) {
+      activeFootnotePopover.popover.remove();
+    }
+    activeFootnotePopover = null;
+  }
+
+  function scheduleFootnotePopoverClose() {
+    clearFootnoteCloseTimer();
+    footnoteCloseTimer = window.setTimeout(closeFootnotePopover, 120);
+  }
+
+  function positionFootnotePopover(ref, popover) {
+    const rect = ref.getBoundingClientRect();
+    const margin = 12;
+
+    popover.style.left = "0px";
+    popover.style.top = "0px";
+    popover.hidden = false;
+
+    window.requestAnimationFrame(function () {
+      const popoverRect = popover.getBoundingClientRect();
+      const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+      const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
+      const spaceBelow = viewportHeight - rect.bottom;
+      const top = spaceBelow > popoverRect.height + margin ?
+        rect.bottom + 6 :
+        Math.max(margin, rect.top - popoverRect.height - 6);
+      const left = Math.min(
+        Math.max(margin, rect.left + (rect.width / 2) - (popoverRect.width / 2)),
+        Math.max(margin, viewportWidth - popoverRect.width - margin)
+      );
+
+      popover.style.left = `${left}px`;
+      popover.style.top = `${top}px`;
+    });
+  }
+
+  function openFootnotePopover(ref) {
+    const templateId = ref && ref.getAttribute("data-wiki-footnote-template");
+    const template = templateId ? document.getElementById(templateId) : null;
+
+    if (!ref || !template || !template.innerHTML.trim()) {
+      return false;
+    }
+
+    clearFootnoteCloseTimer();
+
+    if (activeFootnotePopover && activeFootnotePopover.ref === ref) {
+      positionFootnotePopover(ref, activeFootnotePopover.popover);
+      return true;
+    }
+
+    closeFootnotePopover();
+
+    const popover = document.createElement("div");
+    popover.className = "wiki-footnote-popover";
+    popover.setAttribute("role", "tooltip");
+    popover.innerHTML = `<div class="wiki-footnote-popover__body">${template.innerHTML}</div>`;
+    popover.hidden = true;
+    document.body.appendChild(popover);
+
+    activeFootnotePopover = {
+      ref: ref,
+      popover: popover
+    };
+
+    positionFootnotePopover(ref, popover);
+    return true;
+  }
+
+  document.addEventListener("mouseover", function (event) {
+    const ref = getFootnoteRef(event.target);
+    if (ref) {
+      openFootnotePopover(ref);
+      return;
+    }
+
+    if (activeFootnotePopover && activeFootnotePopover.popover.contains(event.target)) {
+      clearFootnoteCloseTimer();
+    }
+  }, true);
+
+  document.addEventListener("mouseout", function (event) {
+    if (!activeFootnotePopover) {
+      return;
+    }
+
+    const ref = getFootnoteRef(event.target);
+    const related = event.relatedTarget;
+
+    if (
+      (ref && (ref.contains(related) || activeFootnotePopover.popover.contains(related))) ||
+      (activeFootnotePopover.popover.contains(event.target) &&
+        (activeFootnotePopover.popover.contains(related) || activeFootnotePopover.ref.contains(related)))
+    ) {
+      return;
+    }
+
+    if (ref || activeFootnotePopover.popover.contains(event.target)) {
+      scheduleFootnotePopoverClose();
+    }
+  }, true);
+
+  document.addEventListener("focusin", function (event) {
+    const ref = getFootnoteRef(event.target);
+    if (ref) {
+      openFootnotePopover(ref);
+      return;
+    }
+
+    if (activeFootnotePopover && activeFootnotePopover.popover.contains(event.target)) {
+      clearFootnoteCloseTimer();
+    }
+  }, true);
+
+  document.addEventListener("focusout", function (event) {
+    if (!activeFootnotePopover) {
+      return;
+    }
+
+    const related = event.relatedTarget;
+    if (
+      activeFootnotePopover.ref.contains(related) ||
+      activeFootnotePopover.popover.contains(related)
+    ) {
+      return;
+    }
+
+    scheduleFootnotePopoverClose();
+  }, true);
+
+  document.addEventListener("click", function (event) {
+    const ref = getFootnoteRef(event.target);
+
+    if (ref && isCoarsePointer() && (!activeFootnotePopover || activeFootnotePopover.ref !== ref)) {
+      event.preventDefault();
+      openFootnotePopover(ref);
+      return;
+    }
+
+    if (
+      activeFootnotePopover &&
+      !ref &&
+      !activeFootnotePopover.popover.contains(event.target)
+    ) {
+      closeFootnotePopover();
+    }
+  }, true);
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") {
+      closeFootnotePopover();
+    }
+  });
 
   require(
     ["hooks"],
@@ -182,6 +363,7 @@ $(document).ready(function () {
       markRedLinks();
       maybeOpenCreateFromLocation();
       maybeOpenCreateFromMarkup();
+      maybeInitComposePage();
     });
     },
     function (err) {
@@ -225,6 +407,7 @@ $(document).ready(function () {
   markRedLinks();
   maybeOpenCreateFromLocation();
   maybeOpenCreateFromMarkup();
+  maybeInitComposePage();
 
   function getCsrfToken() {
     if (window.config && window.config.csrf_token) {

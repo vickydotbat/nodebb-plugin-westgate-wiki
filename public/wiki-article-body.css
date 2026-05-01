@@ -19,6 +19,9 @@
  *   --wiki-prose-table-border, --wiki-prose-table-head-color, --wiki-prose-table-hover-bg, --wiki-prose-table-hover-color
  *   --wiki-prose-caption-bg, --wiki-prose-caption-color, --wiki-prose-caption-font-family
  *   --wiki-prose-caption-font-size, --wiki-prose-caption-padding
+ *   --wiki-prose-footnote-border, --wiki-prose-footnote-color, --wiki-prose-footnote-marker-color
+ *   --wiki-prose-footnote-popover-bg, --wiki-prose-footnote-popover-border, --wiki-prose-footnote-popover-shadow
+ *   --wiki-prose-footnote-target-bg
  *   --wiki-prose-image-bg, --wiki-prose-image-border, --wiki-prose-image-padding
  *   --wiki-prose-image-radius, --wiki-prose-image-shadow
  *   --wiki-prose-table-caption-bg, --wiki-prose-table-caption-color (CKEditor table captions)
@@ -37,6 +40,7 @@
  *   --wiki-ck-input-background, --wiki-ck-input-border, --wiki-ck-input-text
  *   --wiki-ck-list-background, --wiki-ck-panel-background, --wiki-ck-panel-border
  *   --wiki-ck-tooltip-background, --wiki-ck-tooltip-text
+ *   --wiki-ck-powered-by-background, --wiki-ck-powered-by-border-color, --wiki-ck-powered-by-text-color
  *
  *   Wiki shell (landing / section / page chrome; see public/wiki.css):
  *   --wiki-chrome-surface-bg, --wiki-chrome-surface-border, --wiki-chrome-radius
@@ -57,6 +61,10 @@
  */
 
 /* --- CKEditor UI: map to theme / Bootstrap / optional --wiki-ck-* --- */
+.westgate-wiki-compose .wiki-compose-form {
+  position: relative;
+}
+
 .westgate-wiki-compose .ck.ck-editor {
   --ck-border-radius: var(--bs-border-radius, 0.5rem);
   --ck-color-base-background: var(--wiki-ck-base-background, var(--bs-tertiary-bg, var(--bs-body-bg, #fff)));
@@ -114,8 +122,8 @@
 
 /*
  * After init, we move div.ck-body-wrapper from document.body into #westgate-wiki-ck-body-sink
- * (see wiki-editor-bundle.js) so the BodyCollection host is not a direct child of <body> and
- * does not pick up full-page / flex layout from the theme.
+ * (see wiki-editor-bundle.js) so the BodyCollection host is contained by the compose card and
+ * does not become a stray body child after ajaxify navigation.
  */
 #westgate-wiki-ck-body-sink {
   position: absolute;
@@ -193,10 +201,22 @@ body:has(#westgate-wiki-compose) .ck.ck-balloon-panel:not(.ck-powered-by-balloon
   --ck-powered-by-line-height: 1.2;
   --ck-powered-by-padding-vertical: 4px;
   --ck-powered-by-padding-horizontal: 8px;
-  --ck-powered-by-text-color: var(--bs-secondary-color, #6c757d);
-  --ck-powered-by-background: var(--wiki-ck-base-background, var(--bs-body-bg, #fff));
-  --ck-powered-by-border-color: var(--bs-border-color, #dee2e6);
+  --ck-powered-by-text-color: var(--wiki-ck-powered-by-text-color, var(--bs-secondary-color, #6c757d));
+  --ck-powered-by-background: var(--wiki-ck-powered-by-background, var(--wiki-ck-base-background, var(--bs-body-bg, #fff)));
+  --ck-powered-by-border-color: var(--wiki-ck-powered-by-border-color, var(--bs-border-color, #dee2e6));
   --ck-powered-by-border-radius: var(--bs-border-radius, 0.5rem);
+}
+
+#westgate-wiki-ck-body-sink .ck.ck-balloon-panel.ck-powered-by-balloon {
+  position: absolute !important;
+  right: 0.75rem !important;
+  bottom: 0.75rem !important;
+  left: auto !important;
+  top: auto !important;
+  width: auto !important;
+  max-width: min(18rem, calc(100% - 1.5rem));
+  z-index: 3;
+  pointer-events: auto;
 }
 
 .westgate-wiki-compose .ck.ck-balloon-panel.ck-powered-by-balloon .ck.ck-powered-by .ck-powered-by__label {
@@ -310,6 +330,106 @@ body:has(#westgate-wiki-compose) .ck.ck-dropdown__panel .ck.ck-list__item .ck-bu
   border: 0;
   border-top: 1px solid var(--wiki-prose-hr-color, var(--bs-border-color, #dee2e6));
   margin: 1.5rem 0;
+}
+
+.wiki-article-prose .wiki-footnote-ref {
+  font-size: 0.75em;
+  font-weight: 600;
+  line-height: 0;
+  vertical-align: super;
+}
+
+.wiki-article-prose .wiki-footnote-link {
+  color: var(--wiki-prose-footnote-marker-color, var(--wiki-prose-link-color, var(--bs-link-color, inherit)));
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.wiki-article-prose .wiki-footnote-link:hover,
+.wiki-article-prose .wiki-footnote-link:focus {
+  color: var(--wiki-prose-link-hover-color, var(--bs-link-hover-color, var(--bs-link-color, inherit)));
+  text-decoration: underline;
+}
+
+.wiki-article-prose .wiki-footnote-template {
+  display: none !important;
+}
+
+.wiki-article-prose .wiki-footnotes {
+  border-top: 1px solid var(--wiki-prose-footnote-border, var(--wiki-prose-hr-color, var(--bs-border-color, #dee2e6)));
+  color: var(--wiki-prose-footnote-color, var(--wiki-prose-caption-color, var(--bs-secondary-color, inherit)));
+  font-size: var(--wiki-prose-footnote-font-size, var(--wiki-prose-caption-font-size, 0.875rem));
+  margin-top: 1.75rem;
+  padding-top: 0.75rem;
+}
+
+.wiki-article-prose .wiki-footnotes__separator {
+  display: none;
+}
+
+.wiki-article-prose .wiki-footnotes__list {
+  margin: 0;
+  padding-left: 1.5rem;
+}
+
+.wiki-article-prose .wiki-footnote-item {
+  scroll-margin-top: var(--wiki-toc-scroll-margin, 5rem);
+  padding-block: 0.2rem;
+}
+
+.wiki-article-prose .wiki-footnote-item:target {
+  background: var(--wiki-prose-footnote-target-bg, rgba(13, 110, 253, 0.08));
+  border-radius: var(--bs-border-radius-sm, 0.25rem);
+}
+
+.wiki-article-prose .wiki-footnote-body > :first-child {
+  margin-top: 0;
+}
+
+.wiki-article-prose .wiki-footnote-body > :last-child {
+  margin-bottom: 0;
+}
+
+.wiki-article-prose .wiki-footnote-backrefs {
+  margin-left: 0.35rem;
+  white-space: nowrap;
+}
+
+.wiki-article-prose .wiki-footnote-backref {
+  color: var(--wiki-prose-footnote-marker-color, var(--wiki-prose-link-color, var(--bs-link-color, inherit)));
+  text-decoration: none;
+}
+
+.wiki-footnote-popover {
+  position: fixed;
+  z-index: 1080;
+  width: max-content;
+  max-width: min(24rem, calc(100vw - 1.5rem));
+  background: var(--wiki-prose-footnote-popover-bg, var(--wiki-chrome-surface-bg, var(--bs-body-bg, #fff)));
+  border: 1px solid var(--wiki-prose-footnote-popover-border, var(--wiki-prose-footnote-border, var(--bs-border-color, #dee2e6)));
+  border-radius: var(--bs-border-radius, 0.5rem);
+  box-shadow: var(--wiki-prose-footnote-popover-shadow, 0 0.75rem 2rem rgba(0, 0, 0, 0.18));
+  color: var(--wiki-prose-footnote-color, var(--wiki-prose-color, var(--bs-body-color, inherit)));
+  font-family: var(--wiki-prose-font-family, var(--bs-body-font-family, inherit));
+  font-size: var(--wiki-prose-footnote-font-size, 0.875rem);
+  line-height: 1.5;
+  padding: 0.65rem 0.75rem;
+}
+
+.wiki-footnote-popover[hidden] {
+  display: none;
+}
+
+.wiki-footnote-popover__body > :first-child {
+  margin-top: 0;
+}
+
+.wiki-footnote-popover__body > :last-child {
+  margin-bottom: 0;
+}
+
+.wiki-footnote-popover a {
+  color: var(--wiki-prose-link-color, var(--bs-link-color, inherit));
 }
 
 .wiki-article-prose :where(ul, ol) {

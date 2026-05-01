@@ -45,7 +45,25 @@ require.main.require = function requireNodebbStub(id) {
     },
     "./src/database": {
       getSortedSetRange: async (key) => state.tidsByCid.get(parseInt(key.match(/^cid:(\d+):tids$/)[1], 10)) || [],
-      getSortedSetRevRange: async (key) => state.tidsByCid.get(parseInt(key.match(/^cid:(\d+):tids$/)[1], 10)) || []
+      getSortedSetRevRange: async (key) => state.tidsByCid.get(parseInt(key.match(/^cid:(\d+):tids$/)[1], 10)) || [],
+      getObjectField: async () => null,
+      getObject: async () => ({})
+    },
+    "./src/controllers/helpers": {},
+    "./src/user": {
+      isAdministrator: async () => false
+    },
+    "./src/privileges": {
+      categories: {
+        get: async () => ({
+          read: true,
+          "topics:read": true,
+          "topics:create": true
+        })
+      },
+      topics: {
+        filterTids: async (priv, tids) => (Array.isArray(tids) ? tids : [])
+      }
     },
     "./src/meta": {
       settings: {
@@ -55,8 +73,30 @@ require.main.require = function requireNodebbStub(id) {
       }
     },
     "./src/slugify": slugify,
+    "./src/utils": {
+      isNumber: function isNumberStub(val) {
+        if (typeof val === "number") {
+          return Number.isFinite(val);
+        }
+        if (typeof val === "string" && val.trim() !== "") {
+          return !Number.isNaN(parseFloat(val));
+        }
+        return false;
+      }
+    },
     "./src/topics": {
       getTopicData: async (tid) => state.topics.get(parseInt(tid, 10)) || null,
+      getTopicsFields: async (tids) => tids.map((tid) => state.topics.get(parseInt(tid, 10))).filter(Boolean),
+      getTopicsFromSet: async (setKey, uid, start, stop) => {
+        const m = setKey.match(/^cid:(\d+):tids$/);
+        const cid = m ? parseInt(m[1], 10) : 0;
+        const tids = (state.tidsByCid.get(cid) || []).slice(start, stop + 1);
+        return tids.map((tid) => state.topics.get(tid)).filter(Boolean);
+      },
+      getTopicField: async (tid, field) => {
+        const t = state.topics.get(parseInt(tid, 10));
+        return t && Object.prototype.hasOwnProperty.call(t, field) ? t[field] : null;
+      }
       getTopicsFields: async (tids) => tids.map((tid) => state.topics.get(parseInt(tid, 10))).filter(Boolean)
     },
     "nconf": {
@@ -119,11 +159,11 @@ function reset(settings, categories, topics) {
   reset(
     { categoryIds: "1" },
     [
-      { cid: 1, name: "Wiki", slug: "1/wiki", parentCid: 0 }
+      { cid: 1, name: "Wiki", slug: "1/wiki", parentCid: 0, topic_count: 2 }
     ],
     [
-      { tid: 10, cid: 1, title: "Acolyte", slug: "10/acolyte" },
-      { tid: 11, cid: 1, title: "Acolyte", slug: "11/acolyte" }
+      { tid: 10, cid: 1, title: "Acolyte", slug: "10/acolyte", deleted: 0, scheduled: 0, postcount: 1 },
+      { tid: 11, cid: 1, title: "Acolyte", slug: "11/acolyte", deleted: 0, scheduled: 0, postcount: 1 }
     ]
   );
   assert.strictEqual((await wikiPaths.resolveArticlePath("acolyte")).status, "page-collision");
