@@ -142,6 +142,11 @@
           <i class="fa fa-fw fa-pencil" aria-hidden="true"></i>
         </a>
         <!-- ENDIF canEditWikiPage -->
+        <!-- IF canWatchWikiArticle -->
+        <button type="button" class="wiki-fab-btn wiki-fab-btn--icon<!-- IF wikiArticleWatched --> active<!-- ENDIF wikiArticleWatched -->" data-wiki-article-watch="1" data-tid="{topic.tid}" data-watching="<!-- IF wikiArticleWatched -->1<!-- ELSE -->0<!-- ENDIF wikiArticleWatched -->" title="<!-- IF wikiArticleWatched -->Stop watching wiki article edits<!-- ELSE -->Watch wiki article edits<!-- ENDIF wikiArticleWatched -->" aria-label="<!-- IF wikiArticleWatched -->Stop watching wiki article edits<!-- ELSE -->Watch wiki article edits<!-- ENDIF wikiArticleWatched -->" aria-pressed="<!-- IF wikiArticleWatched -->true<!-- ELSE -->false<!-- ENDIF wikiArticleWatched -->">
+          <i class="fa fa-fw <!-- IF wikiArticleWatched -->fa-eye<!-- ELSE -->fa-eye-slash<!-- ENDIF wikiArticleWatched -->" aria-hidden="true"></i>
+        </button>
+        <!-- ENDIF canWatchWikiArticle -->
         <!-- IF showWikiDiscussionLink -->
         <a class="wiki-fab-btn wiki-fab-btn--icon" href="{config.relative_path}/topic/{topic.slug}" title="Open the forum discussion thread" aria-label="Open discussion thread">
           <i class="fa fa-fw fa-comments" aria-hidden="true"></i>

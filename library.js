@@ -14,6 +14,8 @@ const wikiDiscussionPlaceholder = require("./lib/wiki-discussion-placeholder");
 const wikiDiscussionSettings = require("./lib/wiki-discussion-settings");
 const wikiNamespaceMainPages = require("./lib/wiki-namespace-main-pages");
 const wikiUserMentions = require("./lib/wiki-user-mentions");
+const wikiMentionNotifications = require("./lib/wiki-mention-notifications");
+const wikiArticleWatch = require("./lib/wiki-article-watch");
 const wikiService = require("./lib/wiki-service");
 const wikiPaths = require("./lib/wiki-paths");
 const wikiPageValidation = require("./lib/wiki-page-validation");
@@ -66,6 +68,20 @@ plugin.registerApiRoutes = async function ({ router, middleware }) {
     "/westgate-wiki/namespace/:cid/search",
     [],
     wikiNamespaceSearch.searchNamespaceTopics
+  );
+  routeHelpers.setupApiRoute(
+    router,
+    "put",
+    "/westgate-wiki/article-watch",
+    [middleware.ensureLoggedIn, middleware.checkRequired.bind(null, ["tid"])],
+    wikiArticleWatch.putArticleWatch
+  );
+  routeHelpers.setupApiRoute(
+    router,
+    "delete",
+    "/westgate-wiki/article-watch",
+    [middleware.ensureLoggedIn, middleware.checkRequired.bind(null, ["tid"])],
+    wikiArticleWatch.deleteArticleWatch
   );
   routeHelpers.setupApiRoute(
     router,
@@ -137,6 +153,11 @@ plugin.addComposerFormatting = async function (payload) {
 plugin.transformWikiPostContent = wikiLinks.transformWikiPostContent;
 plugin.transformWikiUserMentions = wikiUserMentions.transformWikiUserMentions;
 plugin.transformWikiFootnotes = wikiFootnotes.transformWikiFootnotes;
+plugin.filterWikiMentionNotificationsCreate = wikiMentionNotifications.filterNotificationsCreate;
+plugin.handleWikiMentionPostSave = wikiMentionNotifications.handlePostSaveOrEdit;
+plugin.handleWikiMentionPostEdit = wikiMentionNotifications.handlePostSaveOrEdit;
+plugin.handleWikiArticleWatchPostEdit = wikiArticleWatch.handlePostEdit;
+plugin.addWikiArticleWatchNotificationType = wikiArticleWatch.addUserNotificationTypes;
 plugin.wikiMarkdownBeforeParse = wikiHtmlParse.markdownBeforeParse;
 plugin.filterWikiDiscussionTopicBuild = wikiDiscussionPlaceholder.filterTopicBuild;
 plugin.filterWikiDiscussionTopicReply = wikiDiscussionSettings.filterTopicReply;
@@ -197,6 +218,8 @@ plugin.services = {
   wikiDiscussionSettings,
   wikiFootnotes,
   wikiLinks,
+  wikiMentionNotifications,
+  wikiArticleWatch,
   wikiUserMentions,
   wikiNamespaceMainPages,
   wikiPageValidation,

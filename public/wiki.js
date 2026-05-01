@@ -574,6 +574,78 @@ $(document).ready(function () {
     }
   });
 
+  function updateArticleWatchButton(btn, watched) {
+    const icon = btn.querySelector("i");
+    btn.setAttribute("data-watching", watched ? "1" : "0");
+    btn.setAttribute("aria-pressed", watched ? "true" : "false");
+    btn.setAttribute("title", watched ? "Stop watching wiki article edits" : "Watch wiki article edits");
+    btn.setAttribute("aria-label", watched ? "Stop watching wiki article edits" : "Watch wiki article edits");
+    btn.classList.toggle("active", watched);
+    if (icon) {
+      icon.classList.toggle("fa-eye", watched);
+      icon.classList.toggle("fa-eye-slash", !watched);
+    }
+  }
+
+  $(document).on("click", "[data-wiki-article-watch]", async function (event) {
+    const btn = event.currentTarget;
+    const tid = parseInt(btn.getAttribute("data-tid"), 10);
+    const watching = btn.getAttribute("data-watching") === "1";
+
+    if (!Number.isInteger(tid) || tid <= 0) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const rel = getRelativePath();
+    const base = rel.endsWith("/") ? rel.slice(0, -1) : rel;
+    const url = `${base}/api/v3/plugins/westgate-wiki/article-watch?tid=${encodeURIComponent(tid)}`;
+    const csrf = getCsrfToken();
+
+    btn.disabled = true;
+
+    try {
+      const res = await fetch(url, {
+        method: watching ? "DELETE" : "PUT",
+        credentials: "same-origin",
+        headers: {
+          "content-type": "application/json",
+          "x-csrf-token": csrf
+        },
+        body: JSON.stringify({ tid: tid })
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        throw new Error(body && body.status && body.status.message ? body.status.message : res.statusText);
+      }
+
+      const watched = !!(body.response && body.response.watched);
+      updateArticleWatchButton(btn, watched);
+      if (typeof app !== "undefined" && app.alert) {
+        app.alert({
+          type: "success",
+          title: watched ? "Watching wiki article" : "Stopped watching wiki article",
+          message: watched ?
+            "You will be notified when this wiki article is edited." :
+            "You will no longer receive wiki edit notifications for this article."
+        });
+      }
+    } catch (err) {
+      if (typeof app !== "undefined" && app.alert) {
+        app.alert({
+          type: "error",
+          title: "Could not update article watch",
+          message: (err && err.message) || String(err)
+        });
+      } else {
+        window.alert((err && err.message) || String(err));
+      }
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
   $(document).on("click", "[data-wiki-delete-topic]", async function (event) {
     const btn = event.currentTarget;
     const tid = parseInt(btn.getAttribute("data-tid"), 10);

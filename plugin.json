@@ -54,6 +54,14 @@
       "method": "addAdminNavigation"
     },
     {
+      "hook": "filter:user.notificationTypes",
+      "method": "addWikiArticleWatchNotificationType"
+    },
+    {
+      "hook": "filter:notifications.create",
+      "method": "filterWikiMentionNotificationsCreate"
+    },
+    {
       "hook": "filter:topic.build",
       "method": "filterWikiDiscussionTopicBuild"
     },
@@ -70,6 +78,11 @@
       "method": "clearWikiPostParseCache"
     },
     {
+      "hook": "action:post.save",
+      "method": "handleWikiMentionPostSave",
+      "priority": 1
+    },
+    {
       "hook": "filter:topic.post",
       "method": "wikiFilterTopicPost"
     },
@@ -80,6 +93,15 @@
     {
       "hook": "action:post.edit",
       "method": "clearWikiPostEditCache"
+    },
+    {
+      "hook": "action:post.edit",
+      "method": "handleWikiMentionPostEdit",
+      "priority": 1
+    },
+    {
+      "hook": "action:post.edit",
+      "method": "handleWikiArticleWatchPostEdit"
     },
     {
       "hook": "action:topic.delete",
