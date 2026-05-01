@@ -10,6 +10,8 @@ const wikiLinkAutocomplete = require("./lib/wiki-link-autocomplete");
 const wikiLinks = require("./lib/wiki-links");
 const wikiFootnotes = require("./lib/wiki-footnotes");
 const wikiHtmlParse = require("./lib/wiki-html-parse");
+const wikiDiscussionPlaceholder = require("./lib/wiki-discussion-placeholder");
+const wikiDiscussionSettings = require("./lib/wiki-discussion-settings");
 const wikiNamespaceMainPages = require("./lib/wiki-namespace-main-pages");
 const wikiUserMentions = require("./lib/wiki-user-mentions");
 const wikiService = require("./lib/wiki-service");
@@ -68,6 +70,13 @@ plugin.registerApiRoutes = async function ({ router, middleware }) {
   routeHelpers.setupApiRoute(
     router,
     "put",
+    "/westgate-wiki/discussion",
+    [middleware.ensureLoggedIn, middleware.checkRequired.bind(null, ["tid"])],
+    wikiDiscussionSettings.putDiscussionSettings
+  );
+  routeHelpers.setupApiRoute(
+    router,
+    "put",
     "/westgate-wiki/homepage",
     [middleware.ensureLoggedIn, middleware.checkRequired.bind(null, ["tid"])],
     wikiHomepage.putWikiHomepage
@@ -109,6 +118,8 @@ plugin.transformWikiPostContent = wikiLinks.transformWikiPostContent;
 plugin.transformWikiUserMentions = wikiUserMentions.transformWikiUserMentions;
 plugin.transformWikiFootnotes = wikiFootnotes.transformWikiFootnotes;
 plugin.wikiMarkdownBeforeParse = wikiHtmlParse.markdownBeforeParse;
+plugin.filterWikiDiscussionTopicBuild = wikiDiscussionPlaceholder.filterTopicBuild;
+plugin.filterWikiDiscussionTopicReply = wikiDiscussionSettings.filterTopicReply;
 plugin.clearWikiPostParseCache = cacheService.clearWikiPostParseCache;
 plugin.clearWikiPostEditCache = cacheService.clearWikiPostEditCache;
 plugin.onWikiTopicDelete = wikiTopicPurge.onTopicDelete;
@@ -162,6 +173,8 @@ plugin.services = {
   serializer,
   topicService,
   wikiLinkAutocomplete,
+  wikiDiscussionPlaceholder,
+  wikiDiscussionSettings,
   wikiFootnotes,
   wikiLinks,
   wikiUserMentions,

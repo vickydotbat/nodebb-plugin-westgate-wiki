@@ -54,6 +54,14 @@
       "method": "addAdminNavigation"
     },
     {
+      "hook": "filter:topic.build",
+      "method": "filterWikiDiscussionTopicBuild"
+    },
+    {
+      "hook": "filter:topic.reply",
+      "method": "filterWikiDiscussionTopicReply"
+    },
+    {
       "hook": "action:topic.post",
       "method": "clearWikiPostParseCache"
     },

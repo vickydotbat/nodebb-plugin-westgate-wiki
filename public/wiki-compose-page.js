@@ -93,6 +93,7 @@ function initWikiComposePage() {
   const linkInsert = document.getElementById("wiki-compose-link-insert");
   const cancelLink = document.getElementById("wiki-compose-cancel");
   const namespaceMainPageCheckbox = document.getElementById("wiki-compose-namespace-main-page");
+  const discussionDisabledCheckbox = document.getElementById("wiki-compose-discussion-disabled");
 
   let editorInstance = null;
   let destroyStarted = false;
@@ -386,6 +387,36 @@ function initWikiComposePage() {
               }
               const mainMsg = (mainJson && mainJson.status && mainJson.status.message) || mainRes.statusText;
               throw new Error("Page saved, but the namespace main page was not updated: " + mainMsg);
+            }
+          }
+
+          if (
+            isEdit &&
+            payload.discussionSettingsApiUrl &&
+            discussionDisabledCheckbox &&
+            savedTid
+          ) {
+            const discussionRes = await fetch(payload.discussionSettingsApiUrl, {
+              method: "PUT",
+              credentials: "same-origin",
+              headers: {
+                "Content-Type": "application/json",
+                "x-csrf-token": payload.csrfToken
+              },
+              body: JSON.stringify({
+                tid: parseInt(savedTid, 10),
+                disabled: discussionDisabledCheckbox.checked
+              })
+            });
+            if (!discussionRes.ok) {
+              let discussionJson = null;
+              try {
+                discussionJson = await discussionRes.json();
+              } catch (e) {
+                discussionJson = null;
+              }
+              const discussionMsg = (discussionJson && discussionJson.status && discussionJson.status.message) || discussionRes.statusText;
+              throw new Error("Page saved, but the discussion setting was not updated: " + discussionMsg);
             }
           }
 

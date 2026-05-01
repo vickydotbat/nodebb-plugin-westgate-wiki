@@ -1133,6 +1133,25 @@ a[href*="/wiki/"][href*="redlink=1"] {
   text-underline-offset: 0.14em;
 }
 
+.wiki-discussion-placeholder {
+  color: var(--wiki-muted-color, var(--bs-secondary-color, inherit));
+}
+
+.wiki-discussion-placeholder__text {
+  margin: 0;
+}
+
+.wiki-discussion-placeholder__link {
+  font-weight: 600;
+  text-decoration-thickness: from-font;
+  text-underline-offset: 0.14em;
+}
+
+.wiki-discussion-placeholder__notice {
+  font-size: 0.875rem;
+  margin: 0.35rem 0 0;
+}
+
 /* CKEditor editable sizing / chrome: see wiki-article-body.css (loads after CKEditor on compose) */
 
 @media (max-width: 767px) {

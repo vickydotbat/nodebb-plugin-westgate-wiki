@@ -28,6 +28,14 @@
     </div>
     <!-- ENDIF showNamespaceMainPageToggle -->
 
+    <!-- IF showDiscussionToggle -->
+    <div class="form-check mb-3">
+      <input id="wiki-compose-discussion-disabled" class="form-check-input" type="checkbox"<!-- IF discussionDisabled --> checked<!-- ENDIF discussionDisabled --> />
+      <label class="form-check-label" for="wiki-compose-discussion-disabled">Disable forum discussion for this article</label>
+      <p class="small text-muted mb-0">The forum topic will still link back to the wiki article, but new replies will be blocked.</p>
+    </div>
+    <!-- ENDIF showDiscussionToggle -->
+
     <div class="mb-2">
       <label class="form-label">Article body</label>
       <div class="wiki-compose-guide small text-muted mb-2" aria-label="Wiki authoring shortcuts">
