@@ -87,6 +87,26 @@ plugin.addAdminNavigation = async function (header) {
   return header;
 };
 
+plugin.addComposerFormatting = async function (payload) {
+  if (!payload || !Array.isArray(payload.options)) {
+    return payload;
+  }
+
+  payload.options.push({
+    name: "wiki-link",
+    title: "Insert wiki link",
+    className: "fa fa-book",
+    visibility: {
+      desktop: true,
+      mobile: true,
+      main: true,
+      reply: true
+    }
+  });
+
+  return payload;
+};
+
 plugin.transformWikiPostContent = wikiLinks.transformWikiPostContent;
 plugin.wikiMarkdownBeforeParse = wikiHtmlParse.markdownBeforeParse;
 plugin.clearWikiPostParseCache = cacheService.clearWikiPostParseCache;

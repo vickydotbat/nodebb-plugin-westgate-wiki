@@ -233,6 +233,164 @@ $(document).ready(function () {
     return "";
   }
 
+  function getRelativePath() {
+    return (window.config && window.config.relative_path) || "";
+  }
+
+  function setPickerStatus(picker, message) {
+    picker.find("[data-wiki-link-picker-status]").text(message || "");
+  }
+
+  function getComposerTextarea(composerEl) {
+    return $(composerEl).find("textarea.write, textarea").first()[0] || null;
+  }
+
+  function insertIntoComposerTextarea(textarea, text) {
+    if (!textarea || !text) {
+      return;
+    }
+
+    require(
+      ["composer/controls"],
+      function (controls) {
+        controls.insertIntoTextarea(textarea, text);
+      },
+      function () {
+        const start = textarea.selectionStart || 0;
+        const end = textarea.selectionEnd || start;
+        const value = textarea.value || "";
+        textarea.value = value.slice(0, start) + text + value.slice(end);
+        textarea.selectionStart = start + text.length;
+        textarea.selectionEnd = start + text.length;
+        $(textarea).trigger("input").focus();
+      }
+    );
+  }
+
+  function renderWikiLinkPickerResult(select, result) {
+    const option = document.createElement("option");
+    option.value = result.insertText || "";
+    option.textContent = result.type === "namespace" ?
+      `${result.title} namespace` :
+      `${result.titleLeaf || result.title} · ${String(result.namespacePath || "").replace(/^\/wiki\/?/, "") || "wiki"}`;
+    select.appendChild(option);
+  }
+
+  function ensureWikiLinkPicker(composerEl) {
+    const composer = $(composerEl);
+    let picker = composer.find("[data-wiki-link-picker]");
+
+    if (picker.length) {
+      return picker;
+    }
+
+    picker = $(
+      "<div class=\"wiki-forum-link-picker border rounded-1 p-2 mt-1 hidden\" data-wiki-link-picker>" +
+        "<div class=\"input-group input-group-sm mb-2\">" +
+          "<input type=\"search\" class=\"form-control\" data-wiki-link-picker-query placeholder=\"Search wiki pages\" autocomplete=\"off\" />" +
+          "<button type=\"button\" class=\"btn btn-outline-secondary\" data-wiki-link-picker-search>Search</button>" +
+        "</div>" +
+        "<select class=\"form-select form-select-sm mb-2\" size=\"5\" data-wiki-link-picker-results aria-label=\"Matching wiki links\"></select>" +
+        "<div class=\"d-flex gap-2 align-items-center\">" +
+          "<button type=\"button\" class=\"btn btn-primary btn-sm\" data-wiki-link-picker-insert>Insert link</button>" +
+          "<button type=\"button\" class=\"btn btn-link btn-sm\" data-wiki-link-picker-close>Close</button>" +
+          "<span class=\"small text-muted\" data-wiki-link-picker-status aria-live=\"polite\"></span>" +
+        "</div>" +
+      "</div>"
+    );
+
+    const formattingBar = composer.find(".formatting-bar").first();
+    if (formattingBar.length) {
+      formattingBar.after(picker);
+    } else {
+      composer.prepend(picker);
+    }
+
+    async function runSearch() {
+      const query = (picker.find("[data-wiki-link-picker-query]").val() || "").trim();
+      const select = picker.find("[data-wiki-link-picker-results]")[0];
+      select.innerHTML = "";
+
+      if (query.length < 2) {
+        setPickerStatus(picker, "Type at least 2 characters.");
+        return;
+      }
+
+      setPickerStatus(picker, "Searching...");
+
+      try {
+        const params = new URLSearchParams({
+          q: query,
+          context: "forum",
+          scope: "all-wiki",
+          limit: "25"
+        });
+        const res = await fetch(`${getRelativePath()}/api/v3/plugins/westgate-wiki/link-autocomplete?${params.toString()}`, {
+          credentials: "same-origin"
+        });
+        const body = await res.json();
+        if (!res.ok) {
+          throw new Error(body && body.status && body.status.message ? body.status.message : res.statusText);
+        }
+
+        const results = (body.response && body.response.results) || [];
+        results.forEach(function (result) {
+          renderWikiLinkPickerResult(select, result);
+        });
+        setPickerStatus(picker, results.length ? "" : "No wiki matches.");
+      } catch (err) {
+        setPickerStatus(picker, (err && err.message) || String(err));
+      }
+    }
+
+    picker.on("click", "[data-wiki-link-picker-search]", runSearch);
+    picker.on("keydown", "[data-wiki-link-picker-query]", function (event) {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        runSearch();
+      } else if (event.key === "Escape") {
+        picker.addClass("hidden");
+      }
+    });
+    picker.on("click", "[data-wiki-link-picker-insert]", function () {
+      const selected = picker.find("[data-wiki-link-picker-results] option:selected").first();
+      const text = selected.val();
+      if (!text) {
+        setPickerStatus(picker, "Choose a wiki link first.");
+        return;
+      }
+      insertIntoComposerTextarea(getComposerTextarea(composer), text);
+      picker.addClass("hidden");
+    });
+    picker.on("dblclick", "[data-wiki-link-picker-results] option", function () {
+      picker.find("[data-wiki-link-picker-insert]").trigger("click");
+    });
+    picker.on("click", "[data-wiki-link-picker-close]", function () {
+      picker.addClass("hidden");
+    });
+
+    return picker;
+  }
+
+  function openWikiLinkPicker(composerEl) {
+    const picker = ensureWikiLinkPicker(composerEl);
+    picker.toggleClass("hidden");
+    if (!picker.hasClass("hidden")) {
+      picker.find("[data-wiki-link-picker-query]").trigger("focus");
+    }
+  }
+
+  $(document).on("click", ".composer [data-format=\"wiki-link\"]", function (event) {
+    const composerEl = event.currentTarget.closest("[component=\"composer\"], .composer");
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+
+    if (composerEl) {
+      openWikiLinkPicker(composerEl);
+    }
+  });
+
   $(document).on("click", "[data-wiki-delete-topic]", async function (event) {
     const btn = event.currentTarget;
     const tid = parseInt(btn.getAttribute("data-tid"), 10);
@@ -248,7 +406,7 @@ $(document).ready(function () {
       return;
     }
 
-    const rel = (window.config && window.config.relative_path) || "";
+    const rel = getRelativePath();
     const base = rel.endsWith("/") ? rel.slice(0, -1) : rel;
     const url = `${base}/api/v3/topics/${tid}/state`;
     const csrf = getCsrfToken();

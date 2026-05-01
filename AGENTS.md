@@ -70,12 +70,19 @@ Current priority order:
 
 1. Live-verify the new collision diagnostics, title rejection, and autocomplete
    API in a running NodeBB instance after deployment.
+   - Per-namespace duplicate title rejection has been live-checked.
+   - Duplicate page names in different namespaces remain allowed by design;
+     bare `[[Page]]` links may still need enough namespace context if they are
+     ambiguous.
+   - Slash namespace links and colon namespace links are both supported for
+     wiki page targets, e.g. `[[development/guides/Map Creation Guide]]` and
+     `[[development:Map Creation Guide]]`.
+   - Forum composer wiki-link insertion now has a toolbar button backed by the
+     server-side autocomplete API; live browser verification remains pending.
 2. Continue wiki-owned search only through
    `lib/wiki-paths.js`; do not let client code or templates construct
    `/wiki/...` manually.
-3. Add the forum-composer UI integration for the server-side wiki link
-   autocomplete API.
-4. Continue Westgate theme alignment and full live smoke checks.
+3. Continue Westgate theme alignment and full live smoke checks.
 
 Deprecated priority items, completed 2026-05-01:
 
@@ -734,13 +741,15 @@ Exit criteria:
 
 ### Phase 4B: Wiki Link Autocomplete Helper
 
-Status, 2026-05-01: Partially implemented. `lib/wiki-link-autocomplete.js`
+Status, 2026-05-01: Implemented for the shippable authoring helper. `lib/wiki-link-autocomplete.js`
 backs `/api/v3/plugins/westgate-wiki/link-autocomplete`, returns compact page
 and namespace results with canonical `wikiPath` values, respects category read
 privileges, and computes `insertText` for `forum` and `wiki` contexts. The old
 namespace-local compose search now wraps this service, and the wiki compose page
-uses the new endpoint for its insert-link picker. Still open: a polished forum
-composer UI integration and richer keyboard/no-results client behavior.
+uses the new endpoint for its insert-link picker. The normal NodeBB composer now
+gets an `Insert wiki link` toolbar action that opens a small picker and inserts
+canonical Markdown links. Still open: richer keyboard/typeahead behavior and
+live browser verification.
 
 Goal:
 Expand the lightweight autocomplete helper into a reusable link-picker surface
@@ -806,11 +815,11 @@ Tasks:
     - no body snippets
     - no full post HTML
 11. Add client integration only after the API contract is stable. Status:
-    wiki compose integration is done; forum composer integration remains open:
-    - forum composer button or slash/mention-style trigger that opens the wiki
-      link picker
+    wiki compose integration and first-pass forum composer integration are done:
+    - forum composer button opens a wiki link picker and inserts canonical
+      Markdown links
     - wiki composer toolbar action/typeahead that inserts internal wiki links
-    - keyboard navigation, escape-to-close, and no-results states
+    - richer keyboard navigation and typeahead behavior remain follow-up work
 12. Keep UI labels clear so forum authors understand they are linking to the
     wiki, while wiki authors understand they are creating internal page links.
 
@@ -856,7 +865,8 @@ Run these checks before considering clean paths complete:
 11. Create/edit flows redirect to canonical wiki article URLs. Status:
     existing compose redirects are implemented; new title collision preflight
     live verification pending.
-12. Forum composer wiki-link autocomplete inserts canonical wiki URLs.
+12. Forum composer wiki-link autocomplete inserts canonical wiki URLs. Status:
+    implemented; live verification pending.
 13. Wiki composer autocomplete inserts namespace-aware internal wiki links.
     Status: implemented for the compose link picker; live verification pending.
 
@@ -1606,13 +1616,14 @@ Mark items here as work lands in the repository.
 - [x] Move serializers, breadcrumbs, internal links, redlinks, compose
   redirects, sidebar links, and namespace compose search results onto canonical
   wiki paths.
-- [-] Expand the namespace compose search into a reusable wiki link
+- [x] Expand the namespace compose search into a reusable wiki link
   autocomplete helper that supports forum composer canonical links and wiki
   composer internal links.
   - [x] Server-side helper/API exists and supports `forum` and `wiki`
     `insertText`.
   - [x] Namespace-local wiki compose picker uses the helper.
-  - [ ] Forum composer UI integration remains open.
+  - [x] Forum composer toolbar picker uses the helper and inserts canonical
+    Markdown links.
 - [x] Add operational scripts or documented manual checks.
 - [x] Restart the live NodeBB server after deploying the forum/wiki feed
   separation hook changes in `plugin.json`.

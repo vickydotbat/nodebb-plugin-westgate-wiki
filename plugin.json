@@ -43,6 +43,10 @@
       "method": "addAdminNavigation"
     },
     {
+      "hook": "filter:composer.formatting",
+      "method": "addComposerFormatting"
+    },
+    {
       "hook": "action:topic.post",
       "method": "clearWikiPostParseCache"
     },
