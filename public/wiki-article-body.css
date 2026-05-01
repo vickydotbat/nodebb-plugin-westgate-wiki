@@ -19,6 +19,9 @@
  *   --wiki-prose-table-border, --wiki-prose-table-head-color, --wiki-prose-table-hover-bg, --wiki-prose-table-hover-color
  *   --wiki-prose-caption-bg, --wiki-prose-caption-color, --wiki-prose-caption-font-family
  *   --wiki-prose-caption-font-size, --wiki-prose-caption-padding
+ *   --wiki-prose-footnote-border, --wiki-prose-footnote-color, --wiki-prose-footnote-marker-color
+ *   --wiki-prose-footnote-popover-bg, --wiki-prose-footnote-popover-border, --wiki-prose-footnote-popover-shadow
+ *   --wiki-prose-footnote-target-bg
  *   --wiki-prose-image-bg, --wiki-prose-image-border, --wiki-prose-image-padding
  *   --wiki-prose-image-radius, --wiki-prose-image-shadow
  *   --wiki-prose-table-caption-bg, --wiki-prose-table-caption-color (CKEditor table captions)
@@ -327,6 +330,106 @@ body:has(#westgate-wiki-compose) .ck.ck-dropdown__panel .ck.ck-list__item .ck-bu
   border: 0;
   border-top: 1px solid var(--wiki-prose-hr-color, var(--bs-border-color, #dee2e6));
   margin: 1.5rem 0;
+}
+
+.wiki-article-prose .wiki-footnote-ref {
+  font-size: 0.75em;
+  font-weight: 600;
+  line-height: 0;
+  vertical-align: super;
+}
+
+.wiki-article-prose .wiki-footnote-link {
+  color: var(--wiki-prose-footnote-marker-color, var(--wiki-prose-link-color, var(--bs-link-color, inherit)));
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.wiki-article-prose .wiki-footnote-link:hover,
+.wiki-article-prose .wiki-footnote-link:focus {
+  color: var(--wiki-prose-link-hover-color, var(--bs-link-hover-color, var(--bs-link-color, inherit)));
+  text-decoration: underline;
+}
+
+.wiki-article-prose .wiki-footnote-template {
+  display: none !important;
+}
+
+.wiki-article-prose .wiki-footnotes {
+  border-top: 1px solid var(--wiki-prose-footnote-border, var(--wiki-prose-hr-color, var(--bs-border-color, #dee2e6)));
+  color: var(--wiki-prose-footnote-color, var(--wiki-prose-caption-color, var(--bs-secondary-color, inherit)));
+  font-size: var(--wiki-prose-footnote-font-size, var(--wiki-prose-caption-font-size, 0.875rem));
+  margin-top: 1.75rem;
+  padding-top: 0.75rem;
+}
+
+.wiki-article-prose .wiki-footnotes__separator {
+  display: none;
+}
+
+.wiki-article-prose .wiki-footnotes__list {
+  margin: 0;
+  padding-left: 1.5rem;
+}
+
+.wiki-article-prose .wiki-footnote-item {
+  scroll-margin-top: var(--wiki-toc-scroll-margin, 5rem);
+  padding-block: 0.2rem;
+}
+
+.wiki-article-prose .wiki-footnote-item:target {
+  background: var(--wiki-prose-footnote-target-bg, rgba(13, 110, 253, 0.08));
+  border-radius: var(--bs-border-radius-sm, 0.25rem);
+}
+
+.wiki-article-prose .wiki-footnote-body > :first-child {
+  margin-top: 0;
+}
+
+.wiki-article-prose .wiki-footnote-body > :last-child {
+  margin-bottom: 0;
+}
+
+.wiki-article-prose .wiki-footnote-backrefs {
+  margin-left: 0.35rem;
+  white-space: nowrap;
+}
+
+.wiki-article-prose .wiki-footnote-backref {
+  color: var(--wiki-prose-footnote-marker-color, var(--wiki-prose-link-color, var(--bs-link-color, inherit)));
+  text-decoration: none;
+}
+
+.wiki-footnote-popover {
+  position: fixed;
+  z-index: 1080;
+  width: max-content;
+  max-width: min(24rem, calc(100vw - 1.5rem));
+  background: var(--wiki-prose-footnote-popover-bg, var(--wiki-chrome-surface-bg, var(--bs-body-bg, #fff)));
+  border: 1px solid var(--wiki-prose-footnote-popover-border, var(--wiki-prose-footnote-border, var(--bs-border-color, #dee2e6)));
+  border-radius: var(--bs-border-radius, 0.5rem);
+  box-shadow: var(--wiki-prose-footnote-popover-shadow, 0 0.75rem 2rem rgba(0, 0, 0, 0.18));
+  color: var(--wiki-prose-footnote-color, var(--wiki-prose-color, var(--bs-body-color, inherit)));
+  font-family: var(--wiki-prose-font-family, var(--bs-body-font-family, inherit));
+  font-size: var(--wiki-prose-footnote-font-size, 0.875rem);
+  line-height: 1.5;
+  padding: 0.65rem 0.75rem;
+}
+
+.wiki-footnote-popover[hidden] {
+  display: none;
+}
+
+.wiki-footnote-popover__body > :first-child {
+  margin-top: 0;
+}
+
+.wiki-footnote-popover__body > :last-child {
+  margin-bottom: 0;
+}
+
+.wiki-footnote-popover a {
+  color: var(--wiki-prose-link-color, var(--bs-link-color, inherit));
 }
 
 .wiki-article-prose :where(ul, ol) {

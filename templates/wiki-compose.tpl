@@ -30,7 +30,7 @@
 
     <div class="mb-2">
       <label class="form-label">Article body</label>
-      <p class="small text-muted mb-1">The editor saves HTML for the wiki topic. Wiki links like <code>[[Page]]</code>, <code>[[Page|Custom label]]</code>, <code>[[ns:Root/Child]]</code> (namespace index), and namespaced articles <code>[[Namespace/Page]]</code> are turned into links when the page is viewed. You can still import Markdown below and load it into the editor.</p>
+      <p class="small text-muted mb-1">The editor saves HTML for the wiki topic. Wiki links like <code>[[Page]]</code>, <code>[[Page|Custom label]]</code>, <code>[[ns:Root/Child]]</code> (namespace index), and namespaced articles <code>[[Namespace/Page]]</code> are turned into links when the page is viewed. DokuWiki-style footnotes like <code>((footnote text))</code> are collected at the bottom of the article and can include wiki links, HTML links, or Markdown links. You can still import Markdown below and load it into the editor.</p>
       <div id="wiki-compose-editor" class="wiki-compose-editor wiki-article-prose"></div>
       <div id="westgate-wiki-ck-body-sink"></div>
     </div>

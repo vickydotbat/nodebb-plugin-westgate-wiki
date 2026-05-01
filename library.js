@@ -8,6 +8,7 @@ const serializer = require("./lib/serializer");
 const topicService = require("./lib/topic-service");
 const wikiLinkAutocomplete = require("./lib/wiki-link-autocomplete");
 const wikiLinks = require("./lib/wiki-links");
+const wikiFootnotes = require("./lib/wiki-footnotes");
 const wikiHtmlParse = require("./lib/wiki-html-parse");
 const wikiNamespaceMainPages = require("./lib/wiki-namespace-main-pages");
 const wikiService = require("./lib/wiki-service");
@@ -104,6 +105,7 @@ plugin.addAdminNavigation = async function (header) {
 };
 
 plugin.transformWikiPostContent = wikiLinks.transformWikiPostContent;
+plugin.transformWikiFootnotes = wikiFootnotes.transformWikiFootnotes;
 plugin.wikiMarkdownBeforeParse = wikiHtmlParse.markdownBeforeParse;
 plugin.clearWikiPostParseCache = cacheService.clearWikiPostParseCache;
 plugin.clearWikiPostEditCache = cacheService.clearWikiPostEditCache;
@@ -158,6 +160,7 @@ plugin.services = {
   serializer,
   topicService,
   wikiLinkAutocomplete,
+  wikiFootnotes,
   wikiLinks,
   wikiNamespaceMainPages,
   wikiPageValidation,
