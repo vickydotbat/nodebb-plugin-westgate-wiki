@@ -331,11 +331,32 @@ export async function createWikiEditor(element, options) {
       : editor.ui && editor.ui.view && editor.ui.view.editable && editor.ui.view.editable.element;
   if (editableEl) {
     editableEl.classList.add("wiki-article-prose");
+    disableEditableLinkNavigation(editableEl);
   }
 
   reparentCKEditorBodyWrapper(editor);
 
   return editor;
+}
+
+/**
+ * Links inside CKEditor's editable area are content, not navigation controls. NodeBB's
+ * ajaxify click handling can otherwise treat an authoring click as a page transition.
+ * @param {HTMLElement} editableEl
+ */
+function disableEditableLinkNavigation(editableEl) {
+  const blockNavigation = (event) => {
+    const target = event.target;
+    const link = target && typeof target.closest === "function" ? target.closest("a[href]") : null;
+    if (!link || !editableEl.contains(link)) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  editableEl.addEventListener("click", blockNavigation, true);
+  editableEl.addEventListener("auxclick", blockNavigation, true);
 }
 
 /**
