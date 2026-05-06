@@ -32,6 +32,8 @@ const SUPPORTED_TIPTAP_TAGS = new Set([
   "a",
   "blockquote",
   "br",
+  "col",
+  "colgroup",
   "code",
   "em",
   "figcaption",
@@ -365,6 +367,79 @@ function normalizeLegacyPresentationalTags(document, root) {
         }
       }
 
+      renameElement(document, element, targetTag);
+    });
+  });
+}
+
+function moveElementBefore(element, reference) {
+  if (!element || !reference || !reference.parentNode) {
+    return;
+  }
+  reference.parentNode.insertBefore(element, reference);
+}
+
+function normalizeLegacyTableStructures(document, root) {
+  root.querySelectorAll("caption").forEach(function (caption) {
+    const table = caption.closest("table");
+    if (!table) {
+      renameElement(document, caption, "p");
+      return;
+    }
+
+    const paragraph = document.createElement("p");
+    paragraph.className = "wiki-legacy-table-caption";
+    while (caption.firstChild) {
+      paragraph.appendChild(caption.firstChild);
+    }
+    moveElementBefore(paragraph, table);
+    caption.remove();
+  });
+
+  root.querySelectorAll("figure.table").forEach(function (figure) {
+    const table = figure.querySelector(":scope > table");
+    if (!table) {
+      unwrapElement(figure);
+      return;
+    }
+
+    const figcaption = figure.querySelector(":scope > figcaption");
+    if (figcaption) {
+      const paragraph = document.createElement("p");
+      paragraph.className = "wiki-legacy-table-caption";
+      while (figcaption.firstChild) {
+        paragraph.appendChild(figcaption.firstChild);
+      }
+      moveElementBefore(paragraph, figure);
+      figcaption.remove();
+    }
+
+    const align = (figure.getAttribute("align") || "").trim().toLowerCase();
+    if (align && !table.getAttribute("style")) {
+      let alignStyle = "";
+      if (align === "center") {
+        alignStyle = "margin-left: auto; margin-right: auto";
+      } else if (align === "left") {
+        alignStyle = "margin-left: 0; margin-right: auto";
+      } else if (align === "right") {
+        alignStyle = "margin-left: auto; margin-right: 0";
+      }
+      const normalizedAlign = sanitizeStyleAttribute(alignStyle, "table");
+      if (normalizedAlign) {
+        table.setAttribute("style", normalizedAlign);
+      }
+    }
+
+    replaceElement(figure, table);
+  });
+}
+
+function normalizeLegacyListTags(document, root) {
+  [
+    ["dir", "ul"],
+    ["menu", "ul"]
+  ].forEach(function ([sourceTag, targetTag]) {
+    root.querySelectorAll(sourceTag).forEach(function (element) {
       renameElement(document, element, targetTag);
     });
   });
@@ -769,6 +844,8 @@ export function normalizeLegacyHtmlForTiptap(html) {
   });
 
   normalizeLegacyPresentationalTags(doc, root);
+  normalizeLegacyListTags(doc, root);
+  normalizeLegacyTableStructures(doc, root);
   normalizeSupportedFigures(root);
   normalizeStyledSpans(doc, root);
 

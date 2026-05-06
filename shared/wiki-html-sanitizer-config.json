@@ -151,6 +151,12 @@
       ]
     },
     "table": {
+      "margin-left": [
+        "^(?:0|auto)$"
+      ],
+      "margin-right": [
+        "^(?:0|auto)$"
+      ],
       "width": [
         "^(?:\\d+(?:\\.\\d+)?(?:px|%)|auto)$"
       ]

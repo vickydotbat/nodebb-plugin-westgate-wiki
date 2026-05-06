@@ -467,6 +467,18 @@ body:has(#westgate-wiki-compose) .ck.ck-dropdown__panel .ck.ck-list__item .ck-bu
   padding: 0.35rem 0.5rem;
 }
 
+.wiki-article-prose .wiki-legacy-table-caption {
+  background: var(--wiki-prose-table-caption-bg, var(--wiki-prose-caption-bg, var(--bs-secondary-bg, rgba(0, 0, 0, 0.04))));
+  color: var(--wiki-prose-table-caption-color, var(--wiki-prose-caption-color, var(--bs-secondary-color, inherit)));
+  font-size: var(--wiki-prose-caption-font-size, 0.875rem);
+  margin: 1rem 0 0;
+  padding: 0.35rem 0.5rem;
+}
+
+.wiki-article-prose .wiki-legacy-table-caption + table {
+  margin-top: 0;
+}
+
 .wiki-article-prose figure.image > figcaption {
   background: var(--wiki-prose-caption-bg, var(--bs-secondary-bg, rgba(0, 0, 0, 0.04)));
   color: var(--wiki-prose-caption-color, var(--bs-secondary-color, inherit));

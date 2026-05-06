@@ -101,6 +101,12 @@ Current priority order:
      basic normalization set now also covers adjacent legacy tags such as
      `<del>`, `<ins>`, `<kbd>`, `<cite>`, `<abbr>`, `<acronym>`, `<dfn>`, and
      `<address>`.
+   - 2026-05-06 table/list normalization now handles legacy `figure.table`,
+     raw `<caption>`, and old `<dir>`/`<menu>` list markup by converting them
+     into schema-safe table/list structures that the Tiptap path can save
+     without falling straight back to CKEditor. Table captions currently round
+     trip as styled wiki paragraphs placed immediately above the table rather
+     than as native editable table-caption nodes.
    - The remaining editor gap is legacy HTML/CSS round-trip support. Do not
      treat this as a sanitizer-only toggle; changes must preserve content
      safely through the Tiptap schema and save pipeline.

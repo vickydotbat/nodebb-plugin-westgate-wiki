@@ -44,6 +44,15 @@ test("sanitizeWikiHtml preserves semantic span markup for legacy inline formatti
   assert.match(sanitized, /<span class="legacy-accent" style="font-size:1\.2rem;color:#caa55a">Accent<\/span>/);
 });
 
+test("sanitizeWikiHtml preserves safe table alignment styles", function () {
+  const html = '<table style="margin-left: auto; margin-right: 0; position: fixed"><tbody><tr><td>Right</td></tr></tbody></table>';
+  const sanitized = wikiHtmlSanitizer.sanitizeWikiHtml(html);
+
+  assert.match(sanitized, /style="[^"]*margin-left:auto;?[^"]*"/);
+  assert.match(sanitized, /style="[^"]*margin-right:0;?[^"]*"/);
+  assert.doesNotMatch(sanitized, /position:/);
+});
+
 test("hasMeaningfulWikiHtml accepts image-only content", function () {
   const html = '<img src="https://example.com/example.png" alt="Example" />';
   assert.equal(wikiHtmlSanitizer.hasMeaningfulWikiHtml(html), true);
