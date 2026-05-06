@@ -814,7 +814,7 @@ const MediaCell = Node.create({
     ];
   },
   renderHTML() {
-    return ["div", { class: "wiki-media-cell" }, 0];
+    return ["div", { class: "wiki-media-cell", "data-wiki-node": "media-cell" }, 0];
   }
 });
 
@@ -849,7 +849,7 @@ const MediaRow = Node.create({
     ];
   },
   renderHTML() {
-    return ["div", { class: "wiki-media-row" }, 0];
+    return ["div", { class: "wiki-media-row", "data-wiki-node": "media-row" }, 0];
   }
 });
 
@@ -968,7 +968,8 @@ const ImageFigure = Node.create({
     const figureAttrs = mergeAttributes(
       this.options.HTMLAttributes || {},
       {
-        class: figureClass || "image"
+        class: figureClass || "image",
+        "data-wiki-node": "image-figure"
       },
       id ? { id } : {}
     );
@@ -1155,6 +1156,52 @@ function getActiveImageNodeName(editor) {
     return "image";
   }
   return "";
+}
+
+function findNodeSelectionPos(editor, domNode, typeNames) {
+  if (!editor || !domNode) {
+    return null;
+  }
+
+  const names = new Set(typeNames || []);
+  const rootPos = editor.view.posAtDOM(domNode, 0);
+  const clampedPos = Math.max(0, Math.min(rootPos, editor.state.doc.content.size));
+  const directNode = editor.state.doc.nodeAt(clampedPos);
+  if (directNode && names.has(directNode.type.name)) {
+    return clampedPos;
+  }
+
+  const previousNode = clampedPos > 0 ? editor.state.doc.nodeAt(clampedPos - 1) : null;
+  if (previousNode && names.has(previousNode.type.name)) {
+    return clampedPos - 1;
+  }
+
+  const $pos = editor.state.doc.resolve(clampedPos);
+  for (let depth = $pos.depth; depth > 0; depth -= 1) {
+    if (names.has($pos.node(depth).type.name)) {
+      return $pos.before(depth);
+    }
+  }
+
+  return null;
+}
+
+function focusMediaCell(editor, cellElement) {
+  if (!editor || !cellElement) {
+    return false;
+  }
+
+  const rootPos = editor.view.posAtDOM(cellElement, 0);
+  const clampedPos = Math.max(0, Math.min(rootPos, editor.state.doc.content.size));
+  const $pos = editor.state.doc.resolve(clampedPos);
+
+  for (let depth = $pos.depth; depth > 0; depth -= 1) {
+    if ($pos.node(depth).type.name === "mediaCell") {
+      return editor.chain().focus().setTextSelection($pos.start(depth)).run();
+    }
+  }
+
+  return false;
 }
 
 function getImageLayoutClassForNode(nodeName, currentClass, layout) {
@@ -1746,7 +1793,10 @@ export async function createWikiEditor(element, options) {
         defaultProtocol: "https"
       }),
       Image.configure({
-        allowBase64: true
+        allowBase64: true,
+        HTMLAttributes: {
+          "data-wiki-node": "image"
+        }
       }),
       Table.configure({
         resizable: true
@@ -1779,12 +1829,32 @@ export async function createWikiEditor(element, options) {
       handleDOMEvents: {
         click: function (_view, event) {
           const target = event.target;
+          const imageFigure = target && typeof target.closest === "function" ? target.closest('[data-wiki-node="image-figure"]') : null;
+          const imageNode = target && typeof target.closest === "function" ? target.closest('img[data-wiki-node="image"]') : null;
+          const mediaCell = target && typeof target.closest === "function" ? target.closest('[data-wiki-node="media-cell"]') : null;
           const link = target && typeof target.closest === "function" ? target.closest("a[href]") : null;
           if (link && editorMount.contains(link)) {
             event.preventDefault();
             event.stopPropagation();
             return true;
           }
+
+          if (target && target.tagName && target.tagName.toLowerCase() === "img") {
+            const selectionPos = findNodeSelectionPos(editor, imageFigure || imageNode || target, ["imageFigure", "image"]);
+            if (selectionPos != null) {
+              event.preventDefault();
+              event.stopPropagation();
+              editor.chain().focus().setNodeSelection(selectionPos).run();
+              return true;
+            }
+          }
+
+          if (mediaCell && target === mediaCell) {
+            event.preventDefault();
+            event.stopPropagation();
+            return focusMediaCell(editor, mediaCell);
+          }
+
           return false;
         }
       }

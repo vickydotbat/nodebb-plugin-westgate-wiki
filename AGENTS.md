@@ -148,9 +148,12 @@ Current priority order:
        mixed image-plus-text layouts
      - normalization of simple legacy flex/grid media wrappers into those
        plugin-owned row/cell classes before sanitization strips raw layout CSS
+     - visible selection/focus affordances for images and media cells, plus
+       click-to-select behavior on images and click-to-focus behavior on empty
+       media cell chrome
    - Live browser verification is still needed for the new media-row authoring
-     flow, especially cursor behavior, image upload inside cells, and save/edit
-     round-trip on mixed image-plus-text rows.
+     flow, especially image upload inside cells, keyboard navigation between
+     cells, and save/edit round-trip on mixed image-plus-text rows.
    - The remaining editor gap is legacy HTML/CSS round-trip support. Do not
      treat this as a sanitizer-only toggle; changes must preserve content
      safely through the Tiptap schema and save pipeline.
