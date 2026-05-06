@@ -96,6 +96,11 @@ Current priority order:
      such as `<i>`, `<b>`, `<strike>`, `<center>`, `<font>`, `<small>`,
      `<big>`, and `<tt>` onto schema-safe semantic equivalents or sanitized
      styled spans before unsupported-content detection runs.
+   - 2026-05-06 parser hardening fixed the first-pass `figure.image` Tiptap
+     import so captionless legacy figures no longer crash editor init, and the
+     basic normalization set now also covers adjacent legacy tags such as
+     `<del>`, `<ins>`, `<kbd>`, `<cite>`, `<abbr>`, `<acronym>`, `<dfn>`, and
+     `<address>`.
    - The remaining editor gap is legacy HTML/CSS round-trip support. Do not
      treat this as a sanitizer-only toggle; changes must preserve content
      safely through the Tiptap schema and save pipeline.

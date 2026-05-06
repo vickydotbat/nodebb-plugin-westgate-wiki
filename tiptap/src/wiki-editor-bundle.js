@@ -290,10 +290,18 @@ function wrapNodeWithElement(document, node, tagName, attrs) {
 
 function normalizeLegacyPresentationalTags(document, root) {
   [
+    ["abbr", "span"],
+    ["acronym", "span"],
+    ["address", "p"],
     ["b", "strong"],
+    ["cite", "em"],
     ["center", "p"],
+    ["del", "s"],
+    ["dfn", "em"],
     ["font", "span"],
     ["i", "em"],
+    ["ins", "u"],
+    ["kbd", "code"],
     ["small", "span"],
     ["big", "span"],
     ["strike", "s"],
@@ -683,7 +691,9 @@ const ImageFigure = Node.create({
     return [
       {
         tag: "figure.image",
-        contentElement: "figcaption"
+        contentElement: function (element) {
+          return element.querySelector("figcaption") || element.ownerDocument.createElement("div");
+        }
       }
     ];
   },
