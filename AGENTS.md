@@ -92,6 +92,10 @@ Current priority order:
      `div`/`section`/`article` wrappers that only contain inline content are
      normalized into paragraphs so class-based wiki prose styling survives more
      edits.
+   - 2026-05-06 presentational-tag normalization now maps basic legacy HTML
+     such as `<i>`, `<b>`, `<strike>`, `<center>`, `<font>`, `<small>`,
+     `<big>`, and `<tt>` onto schema-safe semantic equivalents or sanitized
+     styled spans before unsupported-content detection runs.
    - The remaining editor gap is legacy HTML/CSS round-trip support. Do not
      treat this as a sanitizer-only toggle; changes must preserve content
      safely through the Tiptap schema and save pipeline.

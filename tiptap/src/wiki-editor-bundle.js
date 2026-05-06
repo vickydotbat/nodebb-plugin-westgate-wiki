@@ -288,6 +288,80 @@ function wrapNodeWithElement(document, node, tagName, attrs) {
   return wrapper;
 }
 
+function normalizeLegacyPresentationalTags(document, root) {
+  [
+    ["b", "strong"],
+    ["center", "p"],
+    ["font", "span"],
+    ["i", "em"],
+    ["small", "span"],
+    ["big", "span"],
+    ["strike", "s"],
+    ["tt", "code"]
+  ].forEach(function ([sourceTag, targetTag]) {
+    root.querySelectorAll(sourceTag).forEach(function (element) {
+      if (sourceTag === "center") {
+        const style = sanitizeStyleAttribute(`text-align: center; ${element.getAttribute("style") || ""}`, targetTag);
+        if (style) {
+          element.setAttribute("style", style);
+        }
+      }
+
+      if (sourceTag === "font") {
+        const styleParts = [];
+        const color = (element.getAttribute("color") || "").trim();
+        const face = (element.getAttribute("face") || "").trim();
+        const size = (element.getAttribute("size") || "").trim();
+
+        if (color) {
+          styleParts.push(`color: ${color}`);
+        }
+        if (face) {
+          styleParts.push(`font-family: ${face}`);
+        }
+        if (size) {
+          const numericSize = parseInt(size, 10);
+          const fontSizeMap = {
+            1: "0.75rem",
+            2: "0.875rem",
+            3: "1rem",
+            4: "1.125rem",
+            5: "1.5rem",
+            6: "1.875rem",
+            7: "2.25rem"
+          };
+          if (Number.isInteger(numericSize) && fontSizeMap[numericSize]) {
+            styleParts.push(`font-size: ${fontSizeMap[numericSize]}`);
+          }
+        }
+
+        if (styleParts.length > 0) {
+          const mergedStyle = sanitizeStyleAttribute(
+            `${element.getAttribute("style") || ""}; ${styleParts.join("; ")}`,
+            "span"
+          );
+          if (mergedStyle) {
+            element.setAttribute("style", mergedStyle);
+          }
+        }
+      }
+
+      if (sourceTag === "small" || sourceTag === "big") {
+        const sizeKeyword = sourceTag === "small" ? "smaller" : "larger";
+        const mergedStyle = sanitizeStyleAttribute(
+          `${element.getAttribute("style") || ""}; font-size: ${sizeKeyword}`,
+          "span"
+        );
+        if (mergedStyle) {
+          element.setAttribute("style", mergedStyle);
+        }
+      }
+
+      renameElement(document, element, targetTag);
+    });
+  });
+}
+
 function isPlainWrapperElement(element) {
   if (!element || !element.tagName) {
     return false;
@@ -684,6 +758,7 @@ export function normalizeLegacyHtmlForTiptap(html) {
     renameElement(doc, element, "h4");
   });
 
+  normalizeLegacyPresentationalTags(doc, root);
   normalizeSupportedFigures(root);
   normalizeStyledSpans(doc, root);
 
