@@ -88,6 +88,25 @@
   height: auto;
 }
 
+.westgate-wiki-compose .wiki-editor__content .wiki-media-row {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  margin: 1rem 0;
+}
+
+.westgate-wiki-compose .wiki-editor__content .wiki-media-cell {
+  min-width: 0;
+}
+
+.westgate-wiki-compose .wiki-editor__content .wiki-media-cell > :first-child {
+  margin-top: 0;
+}
+
+.westgate-wiki-compose .wiki-editor__content .wiki-media-cell > :last-child {
+  margin-bottom: 0;
+}
+
 .westgate-wiki-compose .wiki-editor__meta {
   border-top: 1px solid var(--bs-border-color-translucent, var(--bs-border-color, #dee2e6));
   padding: 0.5rem 0.75rem;

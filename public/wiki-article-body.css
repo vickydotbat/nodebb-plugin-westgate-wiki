@@ -566,6 +566,55 @@ body:has(#westgate-wiki-compose) .ck.ck-dropdown__panel .ck.ck-list__item .ck-bu
   width: fit-content;
 }
 
+.wiki-article-prose img.wiki-image-align-center {
+  display: block;
+  margin: 1rem auto;
+}
+
+.wiki-article-prose img.wiki-image-align-left {
+  display: block;
+  float: left;
+  margin: 0.35em 1.25em 0.75em 0;
+}
+
+.wiki-article-prose img.wiki-image-align-right {
+  display: block;
+  float: right;
+  margin: 0.35em 0 0.75em 1.25em;
+}
+
+.wiki-article-prose img.wiki-image-align-side {
+  display: block;
+  float: right;
+  margin: 0.35em 0 0.75em 1.25em;
+  max-width: min(50%, 26rem);
+}
+
+.wiki-article-prose .wiki-media-row {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  margin: 1rem 0;
+}
+
+.wiki-article-prose .wiki-media-cell {
+  min-width: 0;
+}
+
+.wiki-article-prose .wiki-media-cell > :first-child {
+  margin-top: 0;
+}
+
+.wiki-article-prose .wiki-media-cell > :last-child {
+  margin-bottom: 0;
+}
+
+.wiki-article-prose .wiki-media-cell > figure.image,
+.wiki-article-prose .wiki-media-cell > img {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
 /* Center simple imported image paragraphs without affecting images placed inside custom div/flex layouts. */
 .wiki-article-prose > p:has(> img:only-child),
 .wiki-article-prose > p:has(> a:only-child > img:only-child) {

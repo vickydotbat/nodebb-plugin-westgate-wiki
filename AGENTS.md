@@ -111,6 +111,46 @@ Current priority order:
      container block for legacy `div`, `section`, and `article` wrappers when
      they contain block content, so those wrappers no longer trigger immediate
      fallback after normalization leaves them in place.
+   - Next editor phase: image and media layout tooling.
+     - Current Tiptap support is good enough for importing many legacy image
+       shapes, but authoring control is still weak. Authors need explicit tools
+       for layout, not just passive preservation of old HTML.
+     - Priority layouts to support intentionally:
+       `centered image`, `left-aligned image`, `right-aligned image`,
+       `side image with text wrap`, `two-up image row`, `multi-image gallery
+       row`, and `image next to arbitrary prose or note content`.
+     - Treat `image next to image` and `image next to text` as layout
+       containers, not as ad-hoc inline styles pasted into random wrappers.
+       The editor needs plugin-owned schema support for those containers if the
+       content is expected to round-trip safely.
+     - Prefer a staged rollout:
+       1. expose toolbar commands for the existing single-image alignment
+          classes already supported by render CSS
+       2. add a plugin-owned media row/container node for side-by-side images
+          with bounded class/style options
+       3. add a richer mixed-content layout node only if image-plus-prose
+          layouts remain common after step 2
+     - Do not open up arbitrary Flexbox/Grid authoring through raw style
+       passthrough. If Flexbox-backed layouts are needed, model them as
+       explicit plugin-owned classes/nodes with sanitized attributes.
+     - Keep the server sanitizer, Tiptap import normalization, render CSS, and
+       toolbar affordances aligned. A layout is not supported until it can be
+       imported, edited, saved, and rendered without silent collapse back to a
+       linear block flow.
+     - Table formatting is currently in a healthier state than image layout.
+       Do not regress tables while adding media layout tools.
+   - 2026-05-06 initial image/media layout tooling is now implemented in the
+     Tiptap path:
+     - toolbar controls for single-image positioning (`center`, `left`,
+       `right`, `side`)
+     - plugin-owned `wiki-media-row` / `wiki-media-cell` schema nodes with
+       `2-Up` and `3-Up` insertion commands for side-by-side image or
+       mixed image-plus-text layouts
+     - normalization of simple legacy flex/grid media wrappers into those
+       plugin-owned row/cell classes before sanitization strips raw layout CSS
+   - Live browser verification is still needed for the new media-row authoring
+     flow, especially cursor behavior, image upload inside cells, and save/edit
+     round-trip on mixed image-plus-text rows.
    - The remaining editor gap is legacy HTML/CSS round-trip support. Do not
      treat this as a sanitizer-only toggle; changes must preserve content
      safely through the Tiptap schema and save pipeline.

@@ -77,15 +77,25 @@ const ALLOWED_IMAGE_FIGURE_CLASSES = new Set([
   "image-style-block"
 ]);
 
+const ALLOWED_IMAGE_NODE_CLASSES = new Set([
+  "wiki-image-align-center",
+  "wiki-image-align-left",
+  "wiki-image-align-right",
+  "wiki-image-align-side"
+]);
+
 const PRESERVED_GLOBAL_ATTRIBUTE_TYPES = [
   "blockquote",
   "bulletList",
   "codeBlock",
+  "containerBlock",
   "heading",
   "image",
   "imageFigure",
   "link",
   "listItem",
+  "mediaCell",
+  "mediaRow",
   "orderedList",
   "paragraph",
   "table",
@@ -279,6 +289,16 @@ function normalizeClassTokens(value, allowedSet, requiredToken) {
   return Array.from(new Set(tokens)).join(" ").trim();
 }
 
+function removeClassTokens(value, tokensToRemove) {
+  return String(value || "")
+    .split(/\s+/)
+    .map(function (token) { return token.trim(); })
+    .filter(Boolean)
+    .filter(function (token) { return !tokensToRemove.has(token); })
+    .join(" ")
+    .trim();
+}
+
 function wrapNodeWithElement(document, node, tagName, attrs) {
   const wrapper = document.createElement(tagName);
   Object.entries(attrs || {}).forEach(function ([key, value]) {
@@ -444,6 +464,58 @@ function normalizeLegacyListTags(document, root) {
   ].forEach(function ([sourceTag, targetTag]) {
     root.querySelectorAll(sourceTag).forEach(function (element) {
       renameElement(document, element, targetTag);
+    });
+  });
+}
+
+function elementContainsMedia(element) {
+  if (!element || !element.tagName) {
+    return false;
+  }
+
+  const tagName = element.tagName.toLowerCase();
+  if (tagName === "img") {
+    return true;
+  }
+
+  return !!element.querySelector("img, figure.image");
+}
+
+function normalizeLegacyMediaLayouts(document, root) {
+  root.querySelectorAll("article, section, div").forEach(function (element) {
+    const display = (element.style.display || "").trim().toLowerCase();
+    if (!["flex", "grid", "inline-flex", "inline-grid"].includes(display)) {
+      return;
+    }
+
+    const directChildren = Array.from(element.children || []).filter(function (child) {
+      const tag = child.tagName.toLowerCase();
+      return tag !== "script" && tag !== "style";
+    });
+
+    if (directChildren.length < 2 || directChildren.length > 4) {
+      return;
+    }
+
+    if (!directChildren.some(elementContainsMedia)) {
+      return;
+    }
+
+    element.removeAttribute("style");
+    element.setAttribute("class", "wiki-media-row");
+
+    directChildren.forEach(function (child) {
+      if (child.tagName.toLowerCase() === "img" || isSupportedImageFigure(child)) {
+        const wrapper = document.createElement("div");
+        wrapper.setAttribute("class", "wiki-media-cell");
+        child.parentNode.replaceChild(wrapper, child);
+        wrapper.appendChild(child);
+        return;
+      }
+
+      const currentClass = removeClassTokens(child.getAttribute("class"), new Set(["wiki-media-cell"]));
+      child.setAttribute("class", currentClass ? `${currentClass} wiki-media-cell` : "wiki-media-cell");
+      child.removeAttribute("style");
     });
   });
 }
@@ -730,6 +802,57 @@ const ContainerBlock = Node.create({
   }
 });
 
+const MediaCell = Node.create({
+  name: "mediaCell",
+  content: "block+",
+  defining: true,
+  parseHTML() {
+    return [
+      { tag: "div.wiki-media-cell" },
+      { tag: "section.wiki-media-cell" },
+      { tag: "article.wiki-media-cell" }
+    ];
+  },
+  renderHTML() {
+    return ["div", { class: "wiki-media-cell" }, 0];
+  }
+});
+
+const MediaRow = Node.create({
+  name: "mediaRow",
+  group: "block",
+  content: "mediaCell+",
+  defining: true,
+  addCommands() {
+    return {
+      insertMediaRow:
+        (columns) =>
+        ({ commands }) => {
+          const count = Math.max(2, Math.min(3, parseInt(columns, 10) || 2));
+          return commands.insertContent({
+            type: this.name,
+            content: Array.from({ length: count }).map(function () {
+              return {
+                type: "mediaCell",
+                content: [{ type: "paragraph" }]
+              };
+            })
+          });
+        }
+    };
+  },
+  parseHTML() {
+    return [
+      { tag: "div.wiki-media-row" },
+      { tag: "section.wiki-media-row" },
+      { tag: "article.wiki-media-row" }
+    ];
+  },
+  renderHTML() {
+    return ["div", { class: "wiki-media-row" }, 0];
+  }
+});
+
 function getFigureImageAttrs(element) {
   const image = getFigureImageElement(element);
   const link = getFigureImageLinkElement(element);
@@ -901,6 +1024,7 @@ export function normalizeLegacyHtmlForTiptap(html) {
 
   normalizeLegacyPresentationalTags(doc, root);
   normalizeLegacyListTags(doc, root);
+  normalizeLegacyMediaLayouts(doc, root);
   normalizeLegacyTableStructures(doc, root);
   normalizeSupportedFigures(root);
   normalizeStyledSpans(doc, root);
@@ -1021,6 +1145,78 @@ function createButton(label, title, action) {
     action();
   });
   return button;
+}
+
+function getActiveImageNodeName(editor) {
+  if (editor.isActive("imageFigure")) {
+    return "imageFigure";
+  }
+  if (editor.isActive("image")) {
+    return "image";
+  }
+  return "";
+}
+
+function getImageLayoutClassForNode(nodeName, currentClass, layout) {
+  if (nodeName === "imageFigure") {
+    const retained = removeClassTokens(currentClass, new Set([
+      "image",
+      "image-style-side",
+      "image-style-align-left",
+      "image-style-align-right",
+      "image-style-block"
+    ]));
+    const layoutClass = {
+      center: "image image-style-block",
+      left: "image image-style-align-left",
+      right: "image image-style-align-right",
+      side: "image image-style-side"
+    }[layout] || "image image-style-block";
+    return retained ? `${retained} ${layoutClass}` : layoutClass;
+  }
+
+  const retained = removeClassTokens(currentClass, ALLOWED_IMAGE_NODE_CLASSES);
+  const layoutClass = {
+    center: "wiki-image-align-center",
+    left: "wiki-image-align-left",
+    right: "wiki-image-align-right",
+    side: "wiki-image-align-side"
+  }[layout] || "wiki-image-align-center";
+  return retained ? `${retained} ${layoutClass}` : layoutClass;
+}
+
+function setSelectedImageLayout(editor, layout) {
+  const nodeName = getActiveImageNodeName(editor);
+  if (!nodeName) {
+    return false;
+  }
+
+  const nextClass = getImageLayoutClassForNode(nodeName, editor.getAttributes(nodeName).class || "", layout);
+  return editor.chain().focus().updateAttributes(nodeName, { class: nextClass }).run();
+}
+
+function isImageLayoutActive(editor, layout) {
+  const nodeName = getActiveImageNodeName(editor);
+  if (!nodeName) {
+    return false;
+  }
+
+  const className = String(editor.getAttributes(nodeName).class || "");
+  if (nodeName === "imageFigure") {
+    return {
+      center: className.includes("image-style-block"),
+      left: className.includes("image-style-align-left"),
+      right: className.includes("image-style-align-right"),
+      side: className.includes("image-style-side")
+    }[layout] || false;
+  }
+
+  return {
+    center: className.includes("wiki-image-align-center"),
+    left: className.includes("wiki-image-align-left"),
+    right: className.includes("wiki-image-align-right"),
+    side: className.includes("wiki-image-align-side")
+  }[layout] || false;
 }
 
 function createToolbar(root, editor, uploadImage) {
@@ -1238,6 +1434,70 @@ function createToolbar(root, editor, uploadImage) {
       title: "Upload image",
       action: function () {
         uploadImage();
+      }
+    }
+  ]);
+
+  addGroup([
+    {
+      label: "Img C",
+      title: "Center image",
+      action: function () {
+        setSelectedImageLayout(editor, "center");
+      },
+      applyState: function (button) {
+        button.disabled = !getActiveImageNodeName(editor);
+        button.classList.toggle("active", isImageLayoutActive(editor, "center"));
+      }
+    },
+    {
+      label: "Img L",
+      title: "Align image left",
+      action: function () {
+        setSelectedImageLayout(editor, "left");
+      },
+      applyState: function (button) {
+        button.disabled = !getActiveImageNodeName(editor);
+        button.classList.toggle("active", isImageLayoutActive(editor, "left"));
+      }
+    },
+    {
+      label: "Img R",
+      title: "Align image right",
+      action: function () {
+        setSelectedImageLayout(editor, "right");
+      },
+      applyState: function (button) {
+        button.disabled = !getActiveImageNodeName(editor);
+        button.classList.toggle("active", isImageLayoutActive(editor, "right"));
+      }
+    },
+    {
+      label: "Img Side",
+      title: "Wrap text around image",
+      action: function () {
+        setSelectedImageLayout(editor, "side");
+      },
+      applyState: function (button) {
+        button.disabled = !getActiveImageNodeName(editor);
+        button.classList.toggle("active", isImageLayoutActive(editor, "side"));
+      }
+    }
+  ]);
+
+  addGroup([
+    {
+      label: "2-Up",
+      title: "Insert two-column media row",
+      action: function () {
+        editor.chain().focus().insertMediaRow(2).run();
+      }
+    },
+    {
+      label: "3-Up",
+      title: "Insert three-column media row",
+      action: function () {
+        editor.chain().focus().insertMediaRow(3).run();
       }
     }
   ]);
@@ -1474,6 +1734,8 @@ export async function createWikiEditor(element, options) {
       PreservedNodeAttributes,
       StyledSpan,
       ContainerBlock,
+      MediaCell,
+      MediaRow,
       ImageFigure,
       Underline,
       Highlight,
