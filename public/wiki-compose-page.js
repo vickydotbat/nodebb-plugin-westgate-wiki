@@ -1,8 +1,10 @@
-/* global WikiEditorBundle, ajaxify */
+/* global WestgateWikiEditor, WikiEditorBundle, ajaxify */
 "use strict";
 
 /** Must match `MAX_WIKI_MAIN_BODY_UTF8_BYTES` in lib/wiki-page-validation.js */
 const MAX_WIKI_MAIN_BODY_UTF8_BYTES = 512 * 1024;
+const PRIMARY_EDITOR_KIND = "tiptap";
+const FALLBACK_EDITOR_KIND = "ckeditor";
 
 function utf8ByteLength(str) {
   if (typeof TextEncoder !== "undefined") {
@@ -37,24 +39,131 @@ function cleanupOrphanedCKEditorBodyWrappers() {
   });
 }
 
-function waitForBundle(callback, attempts) {
+function waitForEditorGlobal(kind, attempts) {
   const max = attempts || 80;
-  let n = 0;
-  (function tick() {
-    if (typeof WikiEditorBundle !== "undefined" && WikiEditorBundle.createWikiEditor) {
-      callback();
-      return;
-    }
-    n += 1;
-    if (n >= max) {
-      setStatus(document.getElementById("wiki-compose-status"), "Editor failed to load. Rebuild plugin assets (npm run build:ckeditor) and clear cache.");
-      return;
-    }
-    setTimeout(tick, 50);
-  })();
+  const globalName = kind === PRIMARY_EDITOR_KIND ? "WestgateWikiEditor" : "WikiEditorBundle";
+
+  return new Promise(function (resolve, reject) {
+    let n = 0;
+    (function tick() {
+      const candidate = window[globalName];
+      if (candidate && typeof candidate.createWikiEditor === "function") {
+        resolve(candidate);
+        return;
+      }
+      n += 1;
+      if (n >= max) {
+        reject(new Error(`Editor bundle failed to load (${kind}).`));
+        return;
+      }
+      setTimeout(tick, 50);
+    })();
+  });
 }
 
-function initWikiComposePage() {
+function loadAssetOnce(tagName, attrs, markerAttr) {
+  const existing = document.querySelector(`${tagName}[${markerAttr}]`);
+  if (existing) {
+    return Promise.resolve(existing);
+  }
+
+  return new Promise(function (resolve, reject) {
+    const el = document.createElement(tagName);
+    Object.entries(attrs).forEach(function ([key, value]) {
+      el.setAttribute(key, value);
+    });
+    el.setAttribute(markerAttr, "1");
+    el.addEventListener("load", function () {
+      resolve(el);
+    }, { once: true });
+    el.addEventListener("error", function () {
+      reject(new Error(`Failed to load ${attrs.href || attrs.src}`));
+    }, { once: true });
+    document.head.appendChild(el);
+  });
+}
+
+async function ensureFallbackEditorAssets(payload) {
+  const rel = payload.relativePath || "";
+  const cacheSuffix = payload.cacheBuster ? `?${encodeURIComponent(payload.cacheBuster)}` : "";
+  await loadAssetOnce("link", {
+    rel: "stylesheet",
+    href: `${rel}/westgate-wiki/compose/fallback-editor.css${cacheSuffix}`
+  }, "data-westgate-wiki-fallback-editor-css");
+  await loadAssetOnce("script", {
+    defer: "defer",
+    src: `${rel}/westgate-wiki/compose/fallback-editor.js${cacheSuffix}`
+  }, "data-westgate-wiki-fallback-editor-js");
+}
+
+function normalizeCkEditorHandle(instance) {
+  return {
+    getHTML: function () {
+      return instance.getData();
+    },
+    getJSON: function () {
+      return null;
+    },
+    getMarkdown: function () {
+      return typeof WikiEditorBundle.htmlToMarkdown === "function"
+        ? WikiEditorBundle.htmlToMarkdown(instance.getData())
+        : "";
+    },
+    setHTML: function (html) {
+      instance.setData(html || "");
+    },
+    setMarkdown: function (markdown) {
+      if (typeof WikiEditorBundle.markdownToHtml !== "function") {
+        throw new Error("Markdown import is unavailable in the legacy editor bundle.");
+      }
+      instance.setData(WikiEditorBundle.markdownToHtml(markdown || ""));
+    },
+    insertWikiLink: function (insertText) {
+      const snippet = String(insertText || "");
+      instance.model.change(function (writer) {
+        writer.insertText(snippet, instance.model.document.selection.getFirstPosition());
+      });
+    },
+    focus: function () {
+      if (instance.editing && instance.editing.view) {
+        instance.editing.view.focus();
+      }
+    },
+    destroy: function () {
+      return instance.destroy();
+    }
+  };
+}
+
+async function createEditorHandle(kind, editorEl, payload, initialData) {
+  if (kind === FALLBACK_EDITOR_KIND) {
+    await ensureFallbackEditorAssets(payload);
+  }
+
+  const bundle = await waitForEditorGlobal(kind);
+  const instance = await bundle.createWikiEditor(editorEl, {
+    relativePath: payload.relativePath,
+    csrfToken: payload.csrfToken,
+    initialData: initialData
+  });
+
+  if (kind === FALLBACK_EDITOR_KIND) {
+    return normalizeCkEditorHandle(instance);
+  }
+
+  return instance;
+}
+
+function getRequestedEditorKind() {
+  const params = new URLSearchParams(window.location.search || "");
+  const requested = String(params.get("editor") || "").toLowerCase();
+  if (requested === FALLBACK_EDITOR_KIND) {
+    return FALLBACK_EDITOR_KIND;
+  }
+  return PRIMARY_EDITOR_KIND;
+}
+
+async function initWikiComposePage() {
   const root = document.getElementById("westgate-wiki-compose");
   const dataEl = document.getElementById("westgate-wiki-compose-data");
 
@@ -96,6 +205,7 @@ function initWikiComposePage() {
   const discussionDisabledCheckbox = document.getElementById("wiki-compose-discussion-disabled");
 
   let editorInstance = null;
+  let activeEditorKind = null;
   let destroyStarted = false;
 
   async function destroyWikiEditor() {
@@ -113,7 +223,7 @@ function initWikiComposePage() {
       }
     } catch (err) {
       if (window.console && console.warn) {
-        console.warn("westgate-wiki: CKEditor cleanup failed", err);
+        console.warn("westgate-wiki: editor cleanup failed", err);
       }
     } finally {
       destroyStarted = false;
@@ -172,309 +282,338 @@ function initWikiComposePage() {
     }
   }
 
-  attachLifecycleCleanup();
-
-  waitForBundle(async function () {
-    try {
-      const initialData = payload.mode === "edit" && typeof payload.initialContent === "string"
-        ? payload.initialContent
+  async function initializeEditor() {
+    const initialData = payload.mode === "edit" && typeof payload.initialContent === "string"
+      ? payload.initialContent
+      : "";
+    const requestedKind = getRequestedEditorKind();
+    const tiptapBundle = window.WestgateWikiEditor;
+    const tiptapFallbackReason =
+      requestedKind === PRIMARY_EDITOR_KIND &&
+      tiptapBundle &&
+      typeof tiptapBundle.detectUnsupportedContent === "function"
+        ? tiptapBundle.detectUnsupportedContent(initialData)
         : "";
 
-      editorInstance = await WikiEditorBundle.createWikiEditor(editorEl, {
-        relativePath: payload.relativePath,
-        csrfToken: payload.csrfToken,
-        initialData: initialData
-      });
-    } catch (err) {
-      setStatus(statusEl, (err && err.message) || String(err));
+    if (requestedKind === FALLBACK_EDITOR_KIND) {
+      activeEditorKind = FALLBACK_EDITOR_KIND;
+      editorInstance = await createEditorHandle(FALLBACK_EDITOR_KIND, editorEl, payload, initialData);
+      setStatus(statusEl, "Using legacy CKEditor fallback by request.");
       return;
     }
 
-    if (importBtn && importTa) {
-      importBtn.addEventListener("click", function () {
-        const md = (importTa.value || "").trim();
-        if (!md) {
-          return;
-        }
-        try {
-          const html = WikiEditorBundle.markdownToHtml(md);
-          editorInstance.setData(html);
-          importTa.value = "";
-        } catch (err2) {
-          setStatus(statusEl, (err2 && err2.message) || String(err2));
-        }
-      });
+    if (tiptapFallbackReason) {
+      activeEditorKind = FALLBACK_EDITOR_KIND;
+      editorInstance = await createEditorHandle(FALLBACK_EDITOR_KIND, editorEl, payload, initialData);
+      setStatus(statusEl, `Using legacy CKEditor fallback: ${tiptapFallbackReason}`);
+      return;
     }
 
-    async function runLinkSearch() {
-      const q = (linkSearch && linkSearch.value) || "";
-      linkPick.innerHTML = "";
-      try {
-        const params = new URLSearchParams({
-          q: q,
-          context: "wiki",
-          cid: String(payload.cid),
-          scope: "current-namespace",
-          limit: "25"
-        });
-        const url = payload.linkAutocompleteUrl ?
-          `${payload.linkAutocompleteUrl}?${params.toString()}` :
-          `${payload.namespaceSearchUrl}?q=${encodeURIComponent(q)}`;
-        const res = await fetch(url, { credentials: "same-origin" });
-        const body = await res.json();
-        if (!res.ok) {
-          throw new Error(body && body.status && body.status.message ? body.status.message : res.statusText);
-        }
-        const topics = payload.linkAutocompleteUrl ?
-          ((body.response && body.response.results) || []).filter(function (r) { return r.type === "page"; }) :
-          ((body.response && body.response.topics) || []);
-        topics.forEach(function (t) {
-          const opt = document.createElement("option");
-          opt.value = t.insertText || `[[${t.titleLeaf || t.title}]]`;
-          opt.textContent = t.titleLeaf || t.title;
-          linkPick.appendChild(opt);
-        });
-      } catch (err3) {
-        setStatus(statusEl, (err3 && err3.message) || String(err3));
+    try {
+      activeEditorKind = PRIMARY_EDITOR_KIND;
+      editorInstance = await createEditorHandle(PRIMARY_EDITOR_KIND, editorEl, payload, initialData);
+      setStatus(statusEl, "");
+    } catch (err) {
+      activeEditorKind = FALLBACK_EDITOR_KIND;
+      editorInstance = await createEditorHandle(FALLBACK_EDITOR_KIND, editorEl, payload, initialData);
+      setStatus(statusEl, `Tiptap failed to initialize. Using legacy CKEditor fallback. ${(err && err.message) || String(err)}`);
+    }
+  }
+
+  attachLifecycleCleanup();
+
+  try {
+    await initializeEditor();
+  } catch (err) {
+    setStatus(statusEl, (err && err.message) || String(err));
+    return;
+  }
+
+  if (importBtn && importTa) {
+    importBtn.addEventListener("click", function () {
+      const md = (importTa.value || "").trim();
+      if (!md) {
+        return;
       }
-    }
+      try {
+        editorInstance.setMarkdown(md);
+        importTa.value = "";
+        setStatus(statusEl, activeEditorKind === FALLBACK_EDITOR_KIND ? "Markdown loaded into legacy editor." : "");
+      } catch (err) {
+        setStatus(statusEl, (err && err.message) || String(err));
+      }
+    });
+  }
 
-    if (linkSearchBtn) {
-      linkSearchBtn.addEventListener("click", runLinkSearch);
-    }
-
-    if (linkInsert && editorInstance) {
-      linkInsert.addEventListener("click", function () {
-        const opt = linkPick.selectedOptions && linkPick.selectedOptions[0];
-        const label = opt ? opt.value.trim() : "";
-        if (!label) {
-          return;
-        }
-        const snippet = label;
-        editorInstance.model.change(function (writer) {
-          writer.insertText(snippet, editorInstance.model.document.selection.getFirstPosition());
-        });
+  async function runLinkSearch() {
+    const q = (linkSearch && linkSearch.value) || "";
+    linkPick.innerHTML = "";
+    try {
+      const params = new URLSearchParams({
+        q: q,
+        context: "wiki",
+        cid: String(payload.cid),
+        scope: "current-namespace",
+        limit: "25"
       });
+      const url = payload.linkAutocompleteUrl ?
+        `${payload.linkAutocompleteUrl}?${params.toString()}` :
+        `${payload.namespaceSearchUrl}?q=${encodeURIComponent(q)}`;
+      const res = await fetch(url, { credentials: "same-origin" });
+      const body = await res.json();
+      if (!res.ok) {
+        throw new Error(body && body.status && body.status.message ? body.status.message : res.statusText);
+      }
+      const topics = payload.linkAutocompleteUrl ?
+        ((body.response && body.response.results) || []).filter(function (r) { return r.type === "page"; }) :
+        ((body.response && body.response.topics) || []);
+      topics.forEach(function (t) {
+        const opt = document.createElement("option");
+        opt.value = t.insertText || `[[${t.titleLeaf || t.title}]]`;
+        opt.textContent = t.titleLeaf || t.title;
+        linkPick.appendChild(opt);
+      });
+    } catch (err) {
+      setStatus(statusEl, (err && err.message) || String(err));
     }
+  }
 
-    if (submitBtn) {
-      submitBtn.addEventListener("click", async function () {
-        const title = (titleInput && titleInput.value.trim()) || "";
-        if (!title) {
-          setStatus(statusEl, "Title is required.");
-          return;
-        }
-        const content = (editorInstance.getData() || "").trim();
-        if (!content) {
-          setStatus(statusEl, "Body cannot be empty.");
-          return;
-        }
+  if (linkSearchBtn) {
+    linkSearchBtn.addEventListener("click", runLinkSearch);
+  }
 
-        const bodyBytes = utf8ByteLength(content);
-        if (bodyBytes > MAX_WIKI_MAIN_BODY_UTF8_BYTES) {
-          setStatus(
-            statusEl,
-            "Article body is too large (max " +
-              Math.round(MAX_WIKI_MAIN_BODY_UTF8_BYTES / 1024) +
-              " KiB UTF-8). Shorten the content before submitting."
-          );
-          return;
-        }
+  if (linkInsert) {
+    linkInsert.addEventListener("click", function () {
+      const opt = linkPick.selectedOptions && linkPick.selectedOptions[0];
+      const label = opt ? opt.value.trim() : "";
+      if (!label) {
+        return;
+      }
+      editorInstance.insertWikiLink(label);
+      editorInstance.focus();
+    });
+  }
 
-        submitBtn.disabled = true;
-        const isEdit = payload.mode === "edit" && payload.postEditUrl;
-        setStatus(statusEl, isEdit ? "Saving…" : "Publishing…");
+  if (submitBtn) {
+    submitBtn.addEventListener("click", async function () {
+      const title = (titleInput && titleInput.value.trim()) || "";
+      if (!title) {
+        setStatus(statusEl, "Title is required.");
+        return;
+      }
 
-        try {
-          let res;
-          let body;
+      const content = (editorInstance.getHTML() || "").trim();
+      if (!content) {
+        setStatus(statusEl, "Body cannot be empty.");
+        return;
+      }
 
-          if (payload.pageTitleCheckUrl) {
-            const params = new URLSearchParams({
-              cid: String(payload.cid),
-              title: title
-            });
-            if (payload.mode === "edit" && payload.tid) {
-              params.set("tid", String(payload.tid));
-            }
-            const checkRes = await fetch(`${payload.pageTitleCheckUrl}?${params.toString()}`, {
-              credentials: "same-origin"
-            });
-            const checkBody = await checkRes.json();
-            if (!checkRes.ok) {
-              const msg = (checkBody && checkBody.status && checkBody.status.message) || checkRes.statusText;
-              throw new Error(msg);
-            }
-            if (checkBody && checkBody.response && checkBody.response.ok === false) {
-              throw new Error(checkBody.response.message || "This title cannot be published at a clean wiki URL.");
-            }
+      const bodyBytes = utf8ByteLength(content);
+      if (bodyBytes > MAX_WIKI_MAIN_BODY_UTF8_BYTES) {
+        setStatus(
+          statusEl,
+          "Article body is too large (max " +
+            Math.round(MAX_WIKI_MAIN_BODY_UTF8_BYTES / 1024) +
+            " KiB UTF-8). Shorten the content before submitting."
+        );
+        return;
+      }
+
+      submitBtn.disabled = true;
+      const isEdit = payload.mode === "edit" && payload.postEditUrl;
+      setStatus(statusEl, isEdit ? "Saving…" : "Publishing…");
+
+      try {
+        let res;
+        let body;
+
+        if (payload.pageTitleCheckUrl) {
+          const params = new URLSearchParams({
+            cid: String(payload.cid),
+            title: title
+          });
+          if (payload.mode === "edit" && payload.tid) {
+            params.set("tid", String(payload.tid));
           }
-
-          if (isEdit) {
-            res = await fetch(payload.postEditUrl, {
-              method: "PUT",
-              credentials: "same-origin",
-              headers: {
-                "Content-Type": "application/json",
-                "x-csrf-token": payload.csrfToken
-              },
-              body: JSON.stringify({
-                content: content,
-                title: title
-              })
-            });
-            body = await res.json();
-          } else {
-            res = await fetch(payload.topicsApiUrl, {
-              method: "POST",
-              credentials: "same-origin",
-              headers: {
-                "Content-Type": "application/json",
-                "x-csrf-token": payload.csrfToken
-              },
-              body: JSON.stringify({
-                cid: payload.cid,
-                title: title,
-                content: content,
-                tags: []
-              })
-            });
-            body = await res.json();
-          }
-
-          if (!res.ok) {
-            const msg = (body && body.status && body.status.message) || res.statusText;
+          const checkRes = await fetch(`${payload.pageTitleCheckUrl}?${params.toString()}`, {
+            credentials: "same-origin"
+          });
+          const checkBody = await checkRes.json();
+          if (!checkRes.ok) {
+            const msg = (checkBody && checkBody.status && checkBody.status.message) || checkRes.statusText;
             throw new Error(msg);
           }
-
-          const responsePayload = body.response;
-          let wikiSlug = null;
-          const savedTid = (
-            responsePayload &&
-            (responsePayload.tid || (responsePayload.topic && responsePayload.topic.tid))
-          ) || payload.tid;
-
-          if (isEdit && responsePayload && responsePayload.topic && responsePayload.topic.slug) {
-            wikiSlug = responsePayload.topic.slug;
-          } else if (!isEdit && responsePayload && responsePayload.slug) {
-            wikiSlug = responsePayload.slug;
+          if (checkBody && checkBody.response && checkBody.response.ok === false) {
+            throw new Error(checkBody.response.message || "This title cannot be published at a clean wiki URL.");
           }
-
-          if (
-            payload.canSetNamespaceMainPage &&
-            payload.namespaceMainPageApiUrl &&
-            namespaceMainPageCheckbox &&
-            savedTid
-          ) {
-            const mainRes = await fetch(payload.namespaceMainPageApiUrl, {
-              method: "PUT",
-              credentials: "same-origin",
-              headers: {
-                "Content-Type": "application/json",
-                "x-csrf-token": payload.csrfToken
-              },
-              body: JSON.stringify({
-                tid: parseInt(savedTid, 10),
-                active: namespaceMainPageCheckbox.checked
-              })
-            });
-            if (!mainRes.ok) {
-              let mainJson = null;
-              try {
-                mainJson = await mainRes.json();
-              } catch (e) {
-                mainJson = null;
-              }
-              const mainMsg = (mainJson && mainJson.status && mainJson.status.message) || mainRes.statusText;
-              throw new Error("Page saved, but the namespace main page was not updated: " + mainMsg);
-            }
-          }
-
-          if (
-            isEdit &&
-            payload.discussionSettingsApiUrl &&
-            discussionDisabledCheckbox &&
-            savedTid
-          ) {
-            const discussionRes = await fetch(payload.discussionSettingsApiUrl, {
-              method: "PUT",
-              credentials: "same-origin",
-              headers: {
-                "Content-Type": "application/json",
-                "x-csrf-token": payload.csrfToken
-              },
-              body: JSON.stringify({
-                tid: parseInt(savedTid, 10),
-                disabled: discussionDisabledCheckbox.checked
-              })
-            });
-            if (!discussionRes.ok) {
-              let discussionJson = null;
-              try {
-                discussionJson = await discussionRes.json();
-              } catch (e) {
-                discussionJson = null;
-              }
-              const discussionMsg = (discussionJson && discussionJson.status && discussionJson.status.message) || discussionRes.statusText;
-              throw new Error("Page saved, but the discussion setting was not updated: " + discussionMsg);
-            }
-          }
-
-          let homepageSetOk = false;
-          if (!isEdit && payload.setAsWikiHome && payload.wikiHomepageApiUrl) {
-            const tidVal = savedTid;
-            if (tidVal) {
-              const putRes = await fetch(payload.wikiHomepageApiUrl, {
-                method: "PUT",
-                credentials: "same-origin",
-                headers: {
-                  "Content-Type": "application/json",
-                  "x-csrf-token": payload.csrfToken
-                },
-                body: JSON.stringify({ tid: parseInt(tidVal, 10) })
-              });
-              if (putRes.ok) {
-                homepageSetOk = true;
-              } else {
-                let putJson = null;
-                try {
-                  putJson = await putRes.json();
-                } catch (e) {
-                  putJson = null;
-                }
-                const putMsg = (putJson && putJson.status && putJson.status.message) || putRes.statusText;
-                setStatus(
-                  statusEl,
-                  "Page published, but /wiki was not set as the homepage: " + putMsg + " You can set the topic id in the ACP."
-                );
-              }
-            }
-          }
-
-          if (homepageSetOk) {
-            await leaveComposePage("/wiki");
-            return;
-          }
-
-          const slugLeaf = wikiSlug ? String(wikiSlug).split("/").filter(Boolean).pop() : "";
-          const cleanWikiPath = payload.sectionWikiPath && slugLeaf ? `${payload.sectionWikiPath}/${slugLeaf}` : "";
-
-          if (cleanWikiPath) {
-            await leaveComposePage(cleanWikiPath);
-          } else {
-            throw new Error("Unexpected API response");
-          }
-        } catch (err5) {
-          setStatus(statusEl, (err5 && err5.message) || String(err5));
-          submitBtn.disabled = false;
         }
-      });
-    }
-  });
+
+        if (isEdit) {
+          res = await fetch(payload.postEditUrl, {
+            method: "PUT",
+            credentials: "same-origin",
+            headers: {
+              "Content-Type": "application/json",
+              "x-csrf-token": payload.csrfToken
+            },
+            body: JSON.stringify({
+              content: content,
+              title: title
+            })
+          });
+          body = await res.json();
+        } else {
+          res = await fetch(payload.topicsApiUrl, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+              "Content-Type": "application/json",
+              "x-csrf-token": payload.csrfToken
+            },
+            body: JSON.stringify({
+              cid: payload.cid,
+              title: title,
+              content: content,
+              tags: []
+            })
+          });
+          body = await res.json();
+        }
+
+        if (!res.ok) {
+          const msg = (body && body.status && body.status.message) || res.statusText;
+          throw new Error(msg);
+        }
+
+        const responsePayload = body.response;
+        let wikiSlug = null;
+        const savedTid = (
+          responsePayload &&
+          (responsePayload.tid || (responsePayload.topic && responsePayload.topic.tid))
+        ) || payload.tid;
+
+        if (isEdit && responsePayload && responsePayload.topic && responsePayload.topic.slug) {
+          wikiSlug = responsePayload.topic.slug;
+        } else if (!isEdit && responsePayload && responsePayload.slug) {
+          wikiSlug = responsePayload.slug;
+        }
+
+        if (
+          payload.canSetNamespaceMainPage &&
+          payload.namespaceMainPageApiUrl &&
+          namespaceMainPageCheckbox &&
+          savedTid
+        ) {
+          const mainRes = await fetch(payload.namespaceMainPageApiUrl, {
+            method: "PUT",
+            credentials: "same-origin",
+            headers: {
+              "Content-Type": "application/json",
+              "x-csrf-token": payload.csrfToken
+            },
+            body: JSON.stringify({
+              tid: parseInt(savedTid, 10),
+              active: namespaceMainPageCheckbox.checked
+            })
+          });
+          if (!mainRes.ok) {
+            let mainJson = null;
+            try {
+              mainJson = await mainRes.json();
+            } catch (e) {
+              mainJson = null;
+            }
+            const mainMsg = (mainJson && mainJson.status && mainJson.status.message) || mainRes.statusText;
+            throw new Error("Page saved, but the namespace main page was not updated: " + mainMsg);
+          }
+        }
+
+        if (
+          isEdit &&
+          payload.discussionSettingsApiUrl &&
+          discussionDisabledCheckbox &&
+          savedTid
+        ) {
+          const discussionRes = await fetch(payload.discussionSettingsApiUrl, {
+            method: "PUT",
+            credentials: "same-origin",
+            headers: {
+              "Content-Type": "application/json",
+              "x-csrf-token": payload.csrfToken
+            },
+            body: JSON.stringify({
+              tid: parseInt(savedTid, 10),
+              disabled: discussionDisabledCheckbox.checked
+            })
+          });
+          if (!discussionRes.ok) {
+            let discussionJson = null;
+            try {
+              discussionJson = await discussionRes.json();
+            } catch (e) {
+              discussionJson = null;
+            }
+            const discussionMsg = (discussionJson && discussionJson.status && discussionJson.status.message) || discussionRes.statusText;
+            throw new Error("Page saved, but the discussion setting was not updated: " + discussionMsg);
+          }
+        }
+
+        let homepageSetOk = false;
+        if (!isEdit && payload.setAsWikiHome && payload.wikiHomepageApiUrl) {
+          const tidVal = savedTid;
+          if (tidVal) {
+            const putRes = await fetch(payload.wikiHomepageApiUrl, {
+              method: "PUT",
+              credentials: "same-origin",
+              headers: {
+                "Content-Type": "application/json",
+                "x-csrf-token": payload.csrfToken
+              },
+              body: JSON.stringify({ tid: parseInt(tidVal, 10) })
+            });
+            if (putRes.ok) {
+              homepageSetOk = true;
+            } else {
+              let putJson = null;
+              try {
+                putJson = await putRes.json();
+              } catch (e) {
+                putJson = null;
+              }
+              const putMsg = (putJson && putJson.status && putJson.status.message) || putRes.statusText;
+              setStatus(
+                statusEl,
+                "Page published, but /wiki was not set as the homepage: " + putMsg + " You can set the topic id in the ACP."
+              );
+            }
+          }
+        }
+
+        if (homepageSetOk) {
+          await leaveComposePage("/wiki");
+          return;
+        }
+
+        const slugLeaf = wikiSlug ? String(wikiSlug).split("/").filter(Boolean).pop() : "";
+        const cleanWikiPath = payload.sectionWikiPath && slugLeaf ? `${payload.sectionWikiPath}/${slugLeaf}` : "";
+
+        if (cleanWikiPath) {
+          await leaveComposePage(cleanWikiPath);
+        } else {
+          throw new Error("Unexpected API response");
+        }
+      } catch (err) {
+        setStatus(statusEl, (err && err.message) || String(err));
+        submitBtn.disabled = false;
+      }
+    });
+  }
 }
 
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", initWikiComposePage);
+  document.addEventListener("DOMContentLoaded", function () {
+    initWikiComposePage();
+  });
 } else {
   initWikiComposePage();
 }

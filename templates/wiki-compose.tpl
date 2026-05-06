@@ -89,13 +89,13 @@
 </div>
 
 <!-- IF config.cache-buster -->
-<link rel="stylesheet" href="{config.relative_path}/westgate-wiki/compose/vendor.css?{config.cache-buster}" />
+<link rel="stylesheet" href="{config.relative_path}/westgate-wiki/compose/editor.css?{config.cache-buster}" />
 <link rel="stylesheet" href="{config.relative_path}/westgate-wiki/compose/article-body.css?{config.cache-buster}" />
-<script defer src="{config.relative_path}/westgate-wiki/compose/vendor.js?{config.cache-buster}"></script>
+<script defer src="{config.relative_path}/westgate-wiki/compose/editor.js?{config.cache-buster}"></script>
 <script defer src="{config.relative_path}/westgate-wiki/compose/page.js?{config.cache-buster}"></script>
 <!-- ELSE -->
-<link rel="stylesheet" href="{config.relative_path}/westgate-wiki/compose/vendor.css" />
+<link rel="stylesheet" href="{config.relative_path}/westgate-wiki/compose/editor.css" />
 <link rel="stylesheet" href="{config.relative_path}/westgate-wiki/compose/article-body.css" />
-<script defer src="{config.relative_path}/westgate-wiki/compose/vendor.js"></script>
+<script defer src="{config.relative_path}/westgate-wiki/compose/editor.js"></script>
 <script defer src="{config.relative_path}/westgate-wiki/compose/page.js"></script>
 <!-- ENDIF config.cache-buster -->

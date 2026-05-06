@@ -3,8 +3,10 @@
 ## Purpose
 
 This document is the execution contract for replacing the Westgate Wiki compose
-editor with Tiptap. The goal is full CKEditor deprecation, not a parallel editor
-experiment.
+editor with Tiptap. The goal is Tiptap as the primary wiki editor. CKEditor may
+remain temporarily available as a controlled fallback while the migration is
+being live-hardened, but new feature work should target Tiptap rather than grow
+two editors in parallel.
 
 The current wiki content model stays intact:
 
@@ -52,17 +54,19 @@ places before the work is considered complete.
 
 ## Non-Negotiable Direction
 
-1. CKEditor is deprecated and removed from the plugin.
-2. Tiptap is the only wiki compose editor after the migration.
-3. The plugin uses open-source packages only. Do not use Tiptap Pro UI,
+1. CKEditor is deprecated and must not remain the primary editor.
+2. Tiptap is the default wiki compose editor after the migration.
+3. CKEditor may remain available only as an explicit fallback until live
+   verification proves the migration safe for expected wiki content.
+4. The plugin uses open-source packages only. Do not use Tiptap Pro UI,
    comments, AI, collaboration, or cloud conversion services.
-4. The stored NodeBB post body remains HTML for the first migration release.
-5. Tiptap JSON may be captured as a derived/debug/export format later, but it
+5. The stored NodeBB post body remains HTML for the first migration release.
+6. Tiptap JSON may be captured as a derived/debug/export format later, but it
    must not become the primary stored format until all NodeBB rendering/search
    impacts are deliberately handled.
-6. The wiki path resolver, page title validation, permissions, redlinks,
+7. The wiki path resolver, page title validation, permissions, redlinks,
    mention processing, footnotes, and parser hooks remain authoritative.
-7. Client code and templates must not hand-build wiki paths. Link insertion
+8. Client code and templates must not hand-build wiki paths. Link insertion
    must continue to use `lib/wiki-link-autocomplete.js` through the existing
    API.
 

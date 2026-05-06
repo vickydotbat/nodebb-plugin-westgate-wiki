@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This repository is a NodeBB plugin that adds a Westgate-specific wiki surface on top of forum content. The package is **GPL-3.0-or-later** (CKEditor 5 GPL bundle). Wiki page creation uses **`/wiki/compose/:cid`** with a vendored CKEditor build under `public/vendor/ckeditor5/` (rebuild with `npm run build:ckeditor`).
+This repository is a NodeBB plugin that adds a Westgate-specific wiki surface on top of forum content. The package is **GPL-3.0-or-later**. Wiki page creation uses **`/wiki/compose/:cid`** with a vendored **Tiptap** build under `public/vendor/tiptap/` (rebuild with `npm run build:tiptap` or `npm run build:editors`). The old **CKEditor 5** bundle remains vendored under `public/vendor/ckeditor5/` as a fallback path while the Tiptap migration is live-hardened.
 
 Current design baseline:
 
@@ -56,6 +56,11 @@ The existing implementation already does the following:
 - Exposes a reusable wiki link autocomplete service/API that returns canonical
   wiki paths and server-computed insert text for wiki and forum authoring
   contexts.
+- Uses a plugin-owned Tiptap compose editor as the default wiki authoring
+  surface, with automatic/manual fallback to the legacy CKEditor bundle for
+  unsupported legacy HTML or migration breakage.
+- Sanitizes wiki main-post HTML on both the compose client and server-side save
+  validation so editor swaps do not trust browser HTML.
 
 The implementation now has a working MVP shape. This document tracks remaining
 hardening, verification, and phase-two work so future changes do not invent a

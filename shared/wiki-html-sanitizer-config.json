@@ -1,0 +1,113 @@
+{
+  "allowedTags": [
+    "a",
+    "article",
+    "blockquote",
+    "br",
+    "code",
+    "col",
+    "colgroup",
+    "dd",
+    "div",
+    "dl",
+    "dt",
+    "em",
+    "figcaption",
+    "figure",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "hr",
+    "img",
+    "input",
+    "label",
+    "li",
+    "mark",
+    "ol",
+    "p",
+    "pre",
+    "section",
+    "span",
+    "strong",
+    "sub",
+    "sup",
+    "table",
+    "tbody",
+    "td",
+    "th",
+    "thead",
+    "tr",
+    "u",
+    "ul"
+  ],
+  "allowedAttributes": {
+    "*": [
+      "class",
+      "id",
+      "title",
+      "dir",
+      "lang",
+      "data-*",
+      "aria-*"
+    ],
+    "a": [
+      "href",
+      "name",
+      "target",
+      "rel"
+    ],
+    "img": [
+      "src",
+      "alt",
+      "title",
+      "width",
+      "height"
+    ],
+    "input": [
+      "type",
+      "checked",
+      "disabled"
+    ],
+    "label": [
+      "contenteditable"
+    ],
+    "li": [
+      "data-checked",
+      "data-type"
+    ],
+    "ol": [
+      "start",
+      "reversed"
+    ],
+    "table": [
+      "data-type"
+    ],
+    "td": [
+      "colspan",
+      "rowspan"
+    ],
+    "th": [
+      "colspan",
+      "rowspan",
+      "scope"
+    ],
+    "ul": [
+      "data-type"
+    ]
+  },
+  "allowedSchemes": [
+    "http",
+    "https",
+    "mailto"
+  ],
+  "allowedSchemesByTag": {
+    "img": [
+      "http",
+      "https",
+      "data"
+    ]
+  }
+}
