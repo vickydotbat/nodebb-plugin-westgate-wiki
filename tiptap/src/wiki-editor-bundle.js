@@ -30,11 +30,13 @@ const markdownIt = new MarkdownIt({ html: true, linkify: true, typographer: true
 
 const SUPPORTED_TIPTAP_TAGS = new Set([
   "a",
+  "article",
   "blockquote",
   "br",
   "col",
   "colgroup",
   "code",
+  "div",
   "em",
   "figcaption",
   "figure",
@@ -52,6 +54,7 @@ const SUPPORTED_TIPTAP_TAGS = new Set([
   "p",
   "pre",
   "s",
+  "section",
   "span",
   "strong",
   "sub",
@@ -671,6 +674,59 @@ const StyledSpan = Mark.create({
   },
   renderHTML({ HTMLAttributes }) {
     return ["span", HTMLAttributes, 0];
+  }
+});
+
+const ContainerBlock = Node.create({
+  name: "containerBlock",
+  group: "block",
+  content: "block+",
+  addAttributes() {
+    return {
+      tagName: {
+        default: "div",
+        parseHTML: function (element) {
+          const tagName = String(element.tagName || "").toLowerCase();
+          return ["article", "div", "section"].includes(tagName) ? tagName : "div";
+        }
+      },
+      class: createPreservedAttribute("class"),
+      dir: createPreservedAttribute("dir"),
+      id: createPreservedAttribute("id"),
+      lang: createPreservedAttribute("lang"),
+      style: createPreservedAttribute("style"),
+      title: createPreservedAttribute("title")
+    };
+  },
+  parseHTML() {
+    return [
+      {
+        tag: "article",
+        getAttrs: function (element) {
+          return hasBlockDescendantChildren(element) ? null : false;
+        }
+      },
+      {
+        tag: "div",
+        getAttrs: function (element) {
+          return hasBlockDescendantChildren(element) ? null : false;
+        }
+      },
+      {
+        tag: "section",
+        getAttrs: function (element) {
+          return hasBlockDescendantChildren(element) ? null : false;
+        }
+      }
+    ];
+  },
+  renderHTML({ HTMLAttributes }) {
+    const {
+      tagName,
+      ...rest
+    } = HTMLAttributes;
+    const normalizedTag = ["article", "div", "section"].includes(tagName) ? tagName : "div";
+    return [normalizedTag, rest, 0];
   }
 });
 
@@ -1417,6 +1473,7 @@ export async function createWikiEditor(element, options) {
       }),
       PreservedNodeAttributes,
       StyledSpan,
+      ContainerBlock,
       ImageFigure,
       Underline,
       Highlight,

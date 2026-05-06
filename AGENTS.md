@@ -107,6 +107,10 @@ Current priority order:
      without falling straight back to CKEditor. Table captions currently round
      trip as styled wiki paragraphs placed immediately above the table rather
      than as native editable table-caption nodes.
+   - 2026-05-06 structural wrapper support added a schema-safe Tiptap
+     container block for legacy `div`, `section`, and `article` wrappers when
+     they contain block content, so those wrappers no longer trigger immediate
+     fallback after normalization leaves them in place.
    - The remaining editor gap is legacy HTML/CSS round-trip support. Do not
      treat this as a sanitizer-only toggle; changes must preserve content
      safely through the Tiptap schema and save pipeline.
