@@ -28,6 +28,22 @@ test("sanitizeWikiHtml normalizes blank target links with rel", function () {
   assert.match(sanitized, /rel="noopener noreferrer"/);
 });
 
+test("sanitizeWikiHtml preserves safe inline styles and strips unsafe ones", function () {
+  const html = '<p style="text-align: center; position: fixed; color: rgb(10, 20, 30)">Styled</p>';
+  const sanitized = wikiHtmlSanitizer.sanitizeWikiHtml(html);
+
+  assert.match(sanitized, /style="[^"]*text-align:center;?[^"]*"/);
+  assert.match(sanitized, /style="[^"]*color:rgb\(10, 20, 30\);?[^"]*"/);
+  assert.doesNotMatch(sanitized, /position:/);
+});
+
+test("sanitizeWikiHtml preserves semantic span markup for legacy inline formatting", function () {
+  const html = '<p><span class="legacy-accent" style="font-size: 1.2rem; color: #caa55a">Accent</span></p>';
+  const sanitized = wikiHtmlSanitizer.sanitizeWikiHtml(html);
+
+  assert.match(sanitized, /<span class="legacy-accent" style="font-size:1\.2rem;color:#caa55a">Accent<\/span>/);
+});
+
 test("hasMeaningfulWikiHtml accepts image-only content", function () {
   const html = '<img src="https://example.com/example.png" alt="Example" />';
   assert.equal(wikiHtmlSanitizer.hasMeaningfulWikiHtml(html), true);

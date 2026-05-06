@@ -29,6 +29,7 @@
     "ol",
     "p",
     "pre",
+    "s",
     "section",
     "span",
     "strong",
@@ -47,6 +48,7 @@
     "*": [
       "class",
       "id",
+      "style",
       "title",
       "dir",
       "lang",
@@ -109,5 +111,49 @@
       "https",
       "data"
     ]
+  },
+  "allowedStyles": {
+    "*": {
+      "background-color": [
+        "^(?:#[0-9a-fA-F]{3,8}|(?:rgb|hsl)a?\\([0-9\\s.,%/+-]+\\)|var\\(--[a-zA-Z0-9_-]+\\)|[a-zA-Z]+)$"
+      ],
+      "color": [
+        "^(?:#[0-9a-fA-F]{3,8}|(?:rgb|hsl)a?\\([0-9\\s.,%/+-]+\\)|var\\(--[a-zA-Z0-9_-]+\\)|[a-zA-Z]+)$"
+      ],
+      "font-family": [
+        "^[a-zA-Z0-9 ,\"'_-]+$"
+      ],
+      "font-size": [
+        "^(?:\\d+(?:\\.\\d+)?(?:px|em|rem|%)|smaller|larger)$"
+      ],
+      "font-style": [
+        "^(?:normal|italic|oblique)$"
+      ],
+      "font-weight": [
+        "^(?:normal|bold|bolder|lighter|[1-9]00)$"
+      ],
+      "text-align": [
+        "^(?:left|right|center|justify)$"
+      ],
+      "text-decoration": [
+        "^(?:none|underline|line-through|underline line-through|line-through underline)$"
+      ],
+      "vertical-align": [
+        "^(?:sub|super)$"
+      ]
+    },
+    "img": {
+      "height": [
+        "^(?:\\d+(?:\\.\\d+)?(?:px|%)|auto)$"
+      ],
+      "width": [
+        "^(?:\\d+(?:\\.\\d+)?(?:px|%)|auto)$"
+      ]
+    },
+    "table": {
+      "width": [
+        "^(?:\\d+(?:\\.\\d+)?(?:px|%)|auto)$"
+      ]
+    }
   }
 }

@@ -476,6 +476,14 @@ body:has(#westgate-wiki-compose) .ck.ck-dropdown__panel .ck.ck-list__item .ck-bu
   text-align: center;
 }
 
+.wiki-article-prose figure.image > figcaption > :first-child {
+  margin-top: 0;
+}
+
+.wiki-article-prose figure.image > figcaption > :last-child {
+  margin-bottom: 0;
+}
+
 .wiki-article-prose .media {
   margin: 1rem 0;
 }

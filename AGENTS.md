@@ -80,9 +80,24 @@ Current priority order:
    without weakening sanitization.
    - 2026-05-06 live testing confirmed the standard Tiptap authoring path is
      healthy for normal wiki pages.
+   - 2026-05-06 source/build hardening added a first preserved legacy
+     `figure.image` path in Tiptap. CKEditor-style image figures with
+     captions, linked images, width/height attributes, and the existing
+     alignment classes now stay as figures instead of being flattened during
+     Tiptap import.
+   - 2026-05-06 follow-up hardening expanded preserved legacy inline/block
+     formatting in Tiptap: safe `class`/`style` attributes now survive through
+     the shared sanitizer allowlist, inline `span` formatting is preserved
+     through a Tiptap mark instead of forcing fallback, and non-plain
+     `div`/`section`/`article` wrappers that only contain inline content are
+     normalized into paragraphs so class-based wiki prose styling survives more
+     edits.
    - The remaining editor gap is legacy HTML/CSS round-trip support. Do not
      treat this as a sanitizer-only toggle; changes must preserve content
      safely through the Tiptap schema and save pipeline.
+   - Table/media figures, arbitrary raw HTML embeds, and broader unsupported
+     layout structures still need deliberate follow-up. Keep CKEditor fallback
+     active for unsupported shapes until each one round-trips safely.
    - Prefer small, explicit import/normalization steps first: wrapper tags,
      safe structural markup, then deliberate attribute/style support.
    - Keep CKEditor fallback available until legacy-content editing coverage is

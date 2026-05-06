@@ -5,7 +5,7 @@ import MarkdownIt from "markdown-it";
 import TurndownService from "turndown";
 import { gfm } from "turndown-plugin-gfm";
 
-import { Editor } from "@tiptap/core";
+import { Editor, Extension, Mark, mergeAttributes, Node } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import CharacterCount from "@tiptap/extension-character-count";
 import Highlight from "@tiptap/extension-highlight";
@@ -34,6 +34,8 @@ const SUPPORTED_TIPTAP_TAGS = new Set([
   "br",
   "code",
   "em",
+  "figcaption",
+  "figure",
   "h1",
   "h2",
   "h3",
@@ -47,6 +49,7 @@ const SUPPORTED_TIPTAP_TAGS = new Set([
   "ol",
   "p",
   "pre",
+  "s",
   "span",
   "strong",
   "sub",
@@ -60,6 +63,35 @@ const SUPPORTED_TIPTAP_TAGS = new Set([
   "u",
   "ul"
 ]);
+
+const ALLOWED_IMAGE_FIGURE_CLASSES = new Set([
+  "image",
+  "image-style-side",
+  "image-style-align-left",
+  "image-style-align-right",
+  "image-style-block"
+]);
+
+const PRESERVED_GLOBAL_ATTRIBUTE_TYPES = [
+  "blockquote",
+  "bulletList",
+  "codeBlock",
+  "heading",
+  "image",
+  "imageFigure",
+  "link",
+  "listItem",
+  "orderedList",
+  "paragraph",
+  "table",
+  "tableCell",
+  "tableHeader",
+  "tableRow",
+  "taskItem",
+  "taskList"
+];
+
+const COMPILED_ALLOWED_STYLES = compileAllowedStylesMap(sanitizerConfig.allowedStyles);
 
 function createTurndown() {
   const td = new TurndownService({
@@ -81,6 +113,21 @@ function getAllowedAttributesList() {
     });
   });
   return Array.from(attrs);
+}
+
+function compileAllowedStylesMap(configMap) {
+  return Object.fromEntries(
+    Object.entries(configMap || {}).map(function ([tagName, properties]) {
+      return [
+        tagName,
+        Object.fromEntries(
+          Object.entries(properties || {}).map(function ([propertyName, patterns]) {
+            return [propertyName, (patterns || []).map(function (pattern) { return new RegExp(pattern, "i"); })];
+          })
+        )
+      ];
+    })
+  );
 }
 
 const DOMPURIFY_OPTIONS = {
@@ -132,6 +179,487 @@ function sanitizeAnchorTargets(root) {
   });
 }
 
+function sanitizeStyleAttribute(styleValue, tagName) {
+  const probe = document.createElement("span");
+  probe.setAttribute("style", String(styleValue || ""));
+
+  const allowedForAnyTag = COMPILED_ALLOWED_STYLES["*"] || {};
+  const allowedForTag = COMPILED_ALLOWED_STYLES[String(tagName || "").toLowerCase()] || {};
+  const entries = [];
+
+  for (let i = 0; i < probe.style.length; i += 1) {
+    const propertyName = String(probe.style[i] || "").trim().toLowerCase();
+    if (!propertyName) {
+      continue;
+    }
+
+    const rawValue = probe.style.getPropertyValue(propertyName).trim();
+    const propertyAllowlist = allowedForTag[propertyName] || allowedForAnyTag[propertyName];
+    if (!propertyAllowlist || !rawValue) {
+      continue;
+    }
+
+    const normalizedValue = rawValue.replace(/\s+/g, " ").trim();
+    const allowed = propertyAllowlist.some(function (pattern) {
+      return pattern.test(normalizedValue);
+    });
+    if (allowed) {
+      entries.push(`${propertyName}: ${normalizedValue}`);
+    }
+  }
+
+  return entries.join("; ");
+}
+
+function sanitizeInlineStyles(root) {
+  root.querySelectorAll("[style]").forEach(function (element) {
+    const sanitizedStyle = sanitizeStyleAttribute(element.getAttribute("style"), element.tagName.toLowerCase());
+    if (sanitizedStyle) {
+      element.setAttribute("style", sanitizedStyle);
+    } else {
+      element.removeAttribute("style");
+    }
+  });
+}
+
+function getPreservedCommonAttrs(element) {
+  return {
+    class: element.getAttribute("class") || null,
+    dir: element.getAttribute("dir") || null,
+    id: element.getAttribute("id") || null,
+    lang: element.getAttribute("lang") || null,
+    style: sanitizeStyleAttribute(element.getAttribute("style"), element.tagName.toLowerCase()) || null,
+    title: element.getAttribute("title") || null
+  };
+}
+
+function getMergedAttrsForElement(element) {
+  const attrs = getPreservedCommonAttrs(element);
+  Object.keys(attrs).forEach(function (key) {
+    if (!attrs[key]) {
+      delete attrs[key];
+    }
+  });
+  return attrs;
+}
+
+function hasPreservedAttrs(attrs) {
+  return Object.values(attrs || {}).some(Boolean);
+}
+
+function createPreservedAttribute(attributeName) {
+  return {
+    default: null,
+    parseHTML: function (element) {
+      const attrs = getMergedAttrsForElement(element);
+      return attrs[attributeName] || null;
+    },
+    renderHTML: function (attributes) {
+      return attributes[attributeName] ? { [attributeName]: attributes[attributeName] } : {};
+    }
+  };
+}
+
+function normalizeClassTokens(value, allowedSet, requiredToken) {
+  const tokens = String(value || "")
+    .split(/\s+/)
+    .map(function (token) { return token.trim(); })
+    .filter(Boolean)
+    .filter(function (token) { return allowedSet.has(token); });
+
+  if (requiredToken && !tokens.includes(requiredToken)) {
+    tokens.unshift(requiredToken);
+  }
+
+  return Array.from(new Set(tokens)).join(" ").trim();
+}
+
+function wrapNodeWithElement(document, node, tagName, attrs) {
+  const wrapper = document.createElement(tagName);
+  Object.entries(attrs || {}).forEach(function ([key, value]) {
+    if (value != null && value !== "") {
+      wrapper.setAttribute(key, value);
+    }
+  });
+  if (node.parentNode) {
+    node.parentNode.replaceChild(wrapper, node);
+  }
+  wrapper.appendChild(node);
+  return wrapper;
+}
+
+function isPlainWrapperElement(element) {
+  if (!element || !element.tagName) {
+    return false;
+  }
+
+  if (element.getAttribute("data-root") === "1") {
+    return false;
+  }
+
+  const attrs = element.getAttributeNames().filter(function (name) {
+    return !name.startsWith("data-");
+  });
+
+  if (attrs.length > 0) {
+    return false;
+  }
+
+  return !element.classList || element.classList.length === 0;
+}
+
+function hasBlockDescendantChildren(element) {
+  return Array.from(element.children || []).some(function (child) {
+    const tag = child.tagName.toLowerCase();
+    return [
+      "article",
+      "blockquote",
+      "div",
+      "dl",
+      "figure",
+      "h1",
+      "h2",
+      "h3",
+      "h4",
+      "h5",
+      "h6",
+      "hr",
+      "ol",
+      "p",
+      "pre",
+      "section",
+      "table",
+      "ul"
+    ].includes(tag);
+  });
+}
+
+function normalizeFigureImageClasses(figure) {
+  const normalized = normalizeClassTokens(figure.getAttribute("class"), ALLOWED_IMAGE_FIGURE_CLASSES, "image");
+  if (normalized) {
+    figure.setAttribute("class", normalized);
+  } else {
+    figure.removeAttribute("class");
+  }
+}
+
+function isSupportedImageFigure(figure) {
+  if (!figure || figure.tagName.toLowerCase() !== "figure") {
+    return false;
+  }
+
+  const figureClasses = normalizeClassTokens(figure.getAttribute("class"), ALLOWED_IMAGE_FIGURE_CLASSES, "image");
+  if (!figureClasses.split(/\s+/).includes("image")) {
+    return false;
+  }
+
+  const directChildren = Array.from(figure.children);
+  if (directChildren.length === 0) {
+    return false;
+  }
+
+  const mediaChild = directChildren.find(function (child) {
+    const tag = child.tagName.toLowerCase();
+    if (tag === "img") {
+      return true;
+    }
+    if (tag === "a") {
+      const anchorChildren = Array.from(child.children);
+      return anchorChildren.length === 1 && anchorChildren[0].tagName.toLowerCase() === "img";
+    }
+    return false;
+  });
+
+  if (!mediaChild) {
+    return false;
+  }
+
+  return directChildren.every(function (child) {
+    if (child === mediaChild) {
+      return true;
+    }
+    return child.tagName.toLowerCase() === "figcaption";
+  });
+}
+
+function getFigureImageElement(figure) {
+  if (!figure) {
+    return null;
+  }
+
+  const directImage = Array.from(figure.children).find(function (child) {
+    return child.tagName.toLowerCase() === "img";
+  });
+  if (directImage) {
+    return directImage;
+  }
+
+  const linkedImage = Array.from(figure.children).find(function (child) {
+    if (child.tagName.toLowerCase() !== "a") {
+      return false;
+    }
+    const anchorChildren = Array.from(child.children);
+    return anchorChildren.length === 1 && anchorChildren[0].tagName.toLowerCase() === "img";
+  });
+
+  return linkedImage ? linkedImage.querySelector("img") : null;
+}
+
+function getFigureImageLinkElement(figure) {
+  const image = getFigureImageElement(figure);
+  if (!image || !image.parentElement) {
+    return null;
+  }
+  return image.parentElement.tagName.toLowerCase() === "a" ? image.parentElement : null;
+}
+
+function normalizeSupportedFigures(root) {
+  root.querySelectorAll("figure").forEach(function (figure) {
+    if (!isSupportedImageFigure(figure)) {
+      return;
+    }
+
+    normalizeFigureImageClasses(figure);
+  });
+}
+
+function normalizeStyledSpans(document, root) {
+  root.querySelectorAll("span").forEach(function (element) {
+    const style = element.style || {};
+    const classes = element.getAttribute("class") || "";
+    const attrs = getMergedAttrsForElement(element);
+    const textDecoration = (style.textDecoration || "").trim().toLowerCase();
+    const fontWeight = (style.fontWeight || "").trim().toLowerCase();
+    const fontStyle = (style.fontStyle || "").trim().toLowerCase();
+    const verticalAlign = (style.verticalAlign || "").trim().toLowerCase();
+
+    if (fontWeight === "bold" || /^[5-9]00$/.test(fontWeight)) {
+      wrapNodeWithElement(document, element, "strong", attrs);
+      return;
+    }
+
+    if (fontStyle === "italic") {
+      wrapNodeWithElement(document, element, "em", attrs);
+      return;
+    }
+
+    if (textDecoration.includes("underline")) {
+      wrapNodeWithElement(document, element, "u", attrs);
+      return;
+    }
+
+    if (textDecoration.includes("line-through")) {
+      wrapNodeWithElement(document, element, "s", attrs);
+      return;
+    }
+
+    if (verticalAlign === "super") {
+      wrapNodeWithElement(document, element, "sup", attrs);
+      return;
+    }
+
+    if (verticalAlign === "sub") {
+      wrapNodeWithElement(document, element, "sub", attrs);
+      return;
+    }
+
+    if (!hasPreservedAttrs(attrs) && !classes.trim()) {
+      unwrapElement(element);
+    }
+  });
+}
+
+const PreservedNodeAttributes = Extension.create({
+  name: "preservedNodeAttributes",
+  addGlobalAttributes() {
+    return [
+      {
+        types: PRESERVED_GLOBAL_ATTRIBUTE_TYPES,
+        attributes: {
+          class: createPreservedAttribute("class"),
+          dir: createPreservedAttribute("dir"),
+          id: createPreservedAttribute("id"),
+          lang: createPreservedAttribute("lang"),
+          style: createPreservedAttribute("style"),
+          title: createPreservedAttribute("title")
+        }
+      }
+    ];
+  }
+});
+
+const StyledSpan = Mark.create({
+  name: "styledSpan",
+  inclusive: true,
+  addAttributes() {
+    return {
+      class: createPreservedAttribute("class"),
+      dir: createPreservedAttribute("dir"),
+      id: createPreservedAttribute("id"),
+      lang: createPreservedAttribute("lang"),
+      style: createPreservedAttribute("style"),
+      title: createPreservedAttribute("title")
+    };
+  },
+  parseHTML() {
+    return [
+      {
+        tag: "span",
+        getAttrs: function (element) {
+          const attrs = getMergedAttrsForElement(element);
+          return hasPreservedAttrs(attrs) ? attrs : false;
+        }
+      }
+    ];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["span", HTMLAttributes, 0];
+  }
+});
+
+function getFigureImageAttrs(element) {
+  const image = getFigureImageElement(element);
+  const link = getFigureImageLinkElement(element);
+
+  return {
+    src: image ? image.getAttribute("src") || null : null,
+    alt: image ? image.getAttribute("alt") || null : null,
+    title: image ? image.getAttribute("title") || null : null,
+    width: image ? image.getAttribute("width") || null : null,
+    height: image ? image.getAttribute("height") || null : null,
+    href: link ? link.getAttribute("href") || null : null,
+    target: link ? link.getAttribute("target") || null : null,
+    rel: link ? link.getAttribute("rel") || null : null,
+    class: normalizeClassTokens(element.getAttribute("class"), ALLOWED_IMAGE_FIGURE_CLASSES, "image") || "image",
+    id: element.getAttribute("id") || null
+  };
+}
+
+const ImageFigure = Node.create({
+  name: "imageFigure",
+  group: "block",
+  content: "block*",
+  draggable: true,
+  isolating: true,
+  addAttributes() {
+    return {
+      src: {
+        default: null,
+        parseHTML: function (element) {
+          return getFigureImageAttrs(element).src;
+        }
+      },
+      alt: {
+        default: null,
+        parseHTML: function (element) {
+          return getFigureImageAttrs(element).alt;
+        }
+      },
+      title: {
+        default: null,
+        parseHTML: function (element) {
+          return getFigureImageAttrs(element).title;
+        }
+      },
+      width: {
+        default: null,
+        parseHTML: function (element) {
+          return getFigureImageAttrs(element).width;
+        }
+      },
+      height: {
+        default: null,
+        parseHTML: function (element) {
+          return getFigureImageAttrs(element).height;
+        }
+      },
+      href: {
+        default: null,
+        parseHTML: function (element) {
+          return getFigureImageAttrs(element).href;
+        }
+      },
+      target: {
+        default: null,
+        parseHTML: function (element) {
+          return getFigureImageAttrs(element).target;
+        }
+      },
+      rel: {
+        default: null,
+        parseHTML: function (element) {
+          return getFigureImageAttrs(element).rel;
+        }
+      },
+      class: {
+        default: "image",
+        parseHTML: function (element) {
+          return getFigureImageAttrs(element).class;
+        }
+      },
+      id: {
+        default: null,
+        parseHTML: function (element) {
+          return getFigureImageAttrs(element).id;
+        }
+      }
+    };
+  },
+  parseHTML() {
+    return [
+      {
+        tag: "figure.image",
+        contentElement: "figcaption"
+      }
+    ];
+  },
+  renderHTML({ HTMLAttributes, node }) {
+    const {
+      src,
+      alt,
+      title,
+      width,
+      height,
+      href,
+      target,
+      rel,
+      class: figureClass,
+      id
+    } = HTMLAttributes;
+
+    const figureAttrs = mergeAttributes(
+      this.options.HTMLAttributes || {},
+      {
+        class: figureClass || "image"
+      },
+      id ? { id } : {}
+    );
+    const imageAttrs = { src };
+    if (alt) {
+      imageAttrs.alt = alt;
+    }
+    if (title) {
+      imageAttrs.title = title;
+    }
+    if (width) {
+      imageAttrs.width = width;
+    }
+    if (height) {
+      imageAttrs.height = height;
+    }
+
+    const imageSpec = href
+      ? ["a", mergeAttributes({ href }, target ? { target } : {}, rel ? { rel } : {}), ["img", imageAttrs]]
+      : ["img", imageAttrs];
+
+    if (node.childCount > 0) {
+      return ["figure", figureAttrs, imageSpec, ["figcaption", 0]];
+    }
+
+    return ["figure", figureAttrs, imageSpec];
+  }
+});
+
 export function normalizeLegacyHtmlForTiptap(html) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(`<div data-root="1">${String(html || "")}</div>`, "text/html");
@@ -142,22 +670,35 @@ export function normalizeLegacyHtmlForTiptap(html) {
   }
 
   root.querySelectorAll("article, section, div").forEach(function (element) {
-    if (element.getAttribute("data-root") === "1") {
+    if (isPlainWrapperElement(element)) {
+      unwrapElement(element);
       return;
     }
-    unwrapElement(element);
+
+    if (!hasBlockDescendantChildren(element)) {
+      renameElement(doc, element, "p");
+    }
   });
 
   root.querySelectorAll("h5, h6").forEach(function (element) {
     renameElement(doc, element, "h4");
   });
 
+  normalizeSupportedFigures(root);
+  normalizeStyledSpans(doc, root);
+
   root.querySelectorAll("figcaption").forEach(function (element) {
+    const parentTag = element.parentElement && element.parentElement.tagName ? element.parentElement.tagName.toLowerCase() : "";
+    if (parentTag === "figure" && isSupportedImageFigure(element.parentElement)) {
+      return;
+    }
     renameElement(doc, element, "p");
   });
 
   root.querySelectorAll("figure").forEach(function (element) {
-    unwrapElement(element);
+    if (!isSupportedImageFigure(element)) {
+      unwrapElement(element);
+    }
   });
 
   root.querySelectorAll("dt").forEach(function (element) {
@@ -200,6 +741,7 @@ export function sanitizeHtml(html) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(`<div>${clean}</div>`, "text/html");
   sanitizeAnchorTargets(doc.body);
+  sanitizeInlineStyles(doc.body);
   return doc.body.innerHTML.trim();
 }
 
@@ -231,12 +773,14 @@ export function detectUnsupportedContent(html) {
       return `Legacy HTML uses <${tag}>, which this Tiptap surface does not preserve safely yet.`;
     }
 
-    if (tag === "span") {
-      const attrNames = element.getAttributeNames().filter(function (name) {
-        return !name.startsWith("data-") && name !== "class";
-      });
-      if (attrNames.length > 0 || element.classList.length > 0) {
-        return "Legacy HTML uses inline span markup that Tiptap would normalize or drop.";
+    if (tag === "figure" && !isSupportedImageFigure(element)) {
+      return "Legacy HTML uses a figure layout that this Tiptap surface does not preserve safely yet.";
+    }
+
+    if (tag === "figcaption") {
+      const parent = element.parentElement;
+      if (!parent || !isSupportedImageFigure(parent)) {
+        return "Legacy HTML uses a figcaption layout that this Tiptap surface does not preserve safely yet.";
       }
     }
 
@@ -709,6 +1253,9 @@ export async function createWikiEditor(element, options) {
           levels: [1, 2, 3, 4]
         }
       }),
+      PreservedNodeAttributes,
+      StyledSpan,
+      ImageFigure,
       Underline,
       Highlight,
       Link.configure({
