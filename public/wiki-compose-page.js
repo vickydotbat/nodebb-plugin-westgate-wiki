@@ -25,6 +25,19 @@ function decodePayloadB64(b64) {
 function setStatus(el, text) {
   if (el) {
     el.textContent = text || "";
+    el.classList.remove("text-muted", "text-warning", "text-danger");
+    if (!text) {
+      el.classList.add("text-muted");
+      return;
+    }
+    const level = arguments.length > 2 && arguments[2] ? arguments[2] : "muted";
+    if (level === "warning") {
+      el.classList.add("text-warning");
+    } else if (level === "error") {
+      el.classList.add("text-danger");
+    } else {
+      el.classList.add("text-muted");
+    }
   }
 }
 
@@ -294,6 +307,12 @@ async function initWikiComposePage() {
       typeof tiptapBundle.detectUnsupportedContent === "function"
         ? tiptapBundle.detectUnsupportedContent(initialData)
         : "";
+    const tiptapNormalizationNotice =
+      requestedKind === PRIMARY_EDITOR_KIND &&
+      tiptapBundle &&
+      typeof tiptapBundle.getNormalizationNotice === "function"
+        ? tiptapBundle.getNormalizationNotice(initialData)
+        : "";
 
     if (requestedKind === FALLBACK_EDITOR_KIND) {
       activeEditorKind = FALLBACK_EDITOR_KIND;
@@ -305,18 +324,18 @@ async function initWikiComposePage() {
     if (tiptapFallbackReason) {
       activeEditorKind = FALLBACK_EDITOR_KIND;
       editorInstance = await createEditorHandle(FALLBACK_EDITOR_KIND, editorEl, payload, initialData);
-      setStatus(statusEl, `Using legacy CKEditor fallback: ${tiptapFallbackReason}`);
+      setStatus(statusEl, `Using legacy CKEditor fallback: ${tiptapFallbackReason}`, "warning");
       return;
     }
 
     try {
       activeEditorKind = PRIMARY_EDITOR_KIND;
       editorInstance = await createEditorHandle(PRIMARY_EDITOR_KIND, editorEl, payload, initialData);
-      setStatus(statusEl, "");
+      setStatus(statusEl, tiptapNormalizationNotice, tiptapNormalizationNotice ? "warning" : "muted");
     } catch (err) {
       activeEditorKind = FALLBACK_EDITOR_KIND;
       editorInstance = await createEditorHandle(FALLBACK_EDITOR_KIND, editorEl, payload, initialData);
-      setStatus(statusEl, `Tiptap failed to initialize. Using legacy CKEditor fallback. ${(err && err.message) || String(err)}`);
+      setStatus(statusEl, `Tiptap failed to initialize. Using legacy CKEditor fallback. ${(err && err.message) || String(err)}`, "warning");
     }
   }
 
@@ -325,7 +344,7 @@ async function initWikiComposePage() {
   try {
     await initializeEditor();
   } catch (err) {
-    setStatus(statusEl, (err && err.message) || String(err));
+    setStatus(statusEl, (err && err.message) || String(err), "error");
     return;
   }
 
@@ -340,7 +359,7 @@ async function initWikiComposePage() {
         importTa.value = "";
         setStatus(statusEl, activeEditorKind === FALLBACK_EDITOR_KIND ? "Markdown loaded into legacy editor." : "");
       } catch (err) {
-        setStatus(statusEl, (err && err.message) || String(err));
+        setStatus(statusEl, (err && err.message) || String(err), "error");
       }
     });
   }
@@ -374,7 +393,7 @@ async function initWikiComposePage() {
         linkPick.appendChild(opt);
       });
     } catch (err) {
-      setStatus(statusEl, (err && err.message) || String(err));
+      setStatus(statusEl, (err && err.message) || String(err), "error");
     }
   }
 
@@ -398,13 +417,13 @@ async function initWikiComposePage() {
     submitBtn.addEventListener("click", async function () {
       const title = (titleInput && titleInput.value.trim()) || "";
       if (!title) {
-        setStatus(statusEl, "Title is required.");
+        setStatus(statusEl, "Title is required.", "error");
         return;
       }
 
       const content = (editorInstance.getHTML() || "").trim();
       if (!content) {
-        setStatus(statusEl, "Body cannot be empty.");
+        setStatus(statusEl, "Body cannot be empty.", "error");
         return;
       }
 
@@ -415,6 +434,8 @@ async function initWikiComposePage() {
           "Article body is too large (max " +
             Math.round(MAX_WIKI_MAIN_BODY_UTF8_BYTES / 1024) +
             " KiB UTF-8). Shorten the content before submitting."
+          ,
+          "error"
         );
         return;
       }
@@ -584,6 +605,8 @@ async function initWikiComposePage() {
               setStatus(
                 statusEl,
                 "Page published, but /wiki was not set as the homepage: " + putMsg + " You can set the topic id in the ACP."
+                ,
+                "warning"
               );
             }
           }
@@ -603,7 +626,7 @@ async function initWikiComposePage() {
           throw new Error("Unexpected API response");
         }
       } catch (err) {
-        setStatus(statusEl, (err && err.message) || String(err));
+        setStatus(statusEl, (err && err.message) || String(err), "error");
         submitBtn.disabled = false;
       }
     });

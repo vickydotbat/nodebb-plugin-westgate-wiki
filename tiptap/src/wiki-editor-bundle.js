@@ -181,6 +181,20 @@ export function normalizeLegacyHtmlForTiptap(html) {
   return root.innerHTML.trim();
 }
 
+export function getNormalizationNotice(html) {
+  const raw = String(html || "").trim();
+  if (!raw) {
+    return "";
+  }
+
+  const normalized = normalizeLegacyHtmlForTiptap(raw);
+  if (!normalized || normalized === raw) {
+    return "";
+  }
+
+  return "Legacy HTML was normalized to the supported Tiptap schema. Review formatting before saving.";
+}
+
 export function sanitizeHtml(html) {
   const clean = DOMPurify.sanitize(String(html || ""), DOMPURIFY_OPTIONS);
   const parser = new DOMParser();
@@ -809,5 +823,6 @@ window.WestgateWikiEditor = {
   htmlToMarkdown,
   sanitizeHtml,
   detectUnsupportedContent,
-  normalizeLegacyHtmlForTiptap
+  normalizeLegacyHtmlForTiptap,
+  getNormalizationNotice
 };
