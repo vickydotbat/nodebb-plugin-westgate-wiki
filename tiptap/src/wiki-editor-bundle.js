@@ -89,12 +89,96 @@ const DOMPURIFY_OPTIONS = {
   ALLOW_DATA_ATTR: true
 };
 
+function unwrapElement(element) {
+  const parent = element.parentNode;
+  if (!parent) {
+    return;
+  }
+
+  while (element.firstChild) {
+    parent.insertBefore(element.firstChild, element);
+  }
+
+  parent.removeChild(element);
+}
+
+function replaceElement(element, replacement) {
+  const parent = element.parentNode;
+  if (!parent) {
+    return;
+  }
+
+  parent.replaceChild(replacement, element);
+}
+
+function renameElement(document, element, tagName) {
+  const replacement = document.createElement(tagName);
+  Array.from(element.attributes || []).forEach(function (attr) {
+    replacement.setAttribute(attr.name, attr.value);
+  });
+
+  while (element.firstChild) {
+    replacement.appendChild(element.firstChild);
+  }
+
+  replaceElement(element, replacement);
+}
+
 function sanitizeAnchorTargets(root) {
   root.querySelectorAll("a[href]").forEach(function (link) {
     if (link.getAttribute("target") === "_blank" && !link.getAttribute("rel")) {
       link.setAttribute("rel", "noopener noreferrer");
     }
   });
+}
+
+export function normalizeLegacyHtmlForTiptap(html) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(`<div data-root="1">${String(html || "")}</div>`, "text/html");
+  const root = doc.body.firstElementChild;
+
+  if (!root) {
+    return "";
+  }
+
+  root.querySelectorAll("article, section, div").forEach(function (element) {
+    if (element.getAttribute("data-root") === "1") {
+      return;
+    }
+    unwrapElement(element);
+  });
+
+  root.querySelectorAll("h5, h6").forEach(function (element) {
+    renameElement(doc, element, "h4");
+  });
+
+  root.querySelectorAll("figcaption").forEach(function (element) {
+    renameElement(doc, element, "p");
+  });
+
+  root.querySelectorAll("figure").forEach(function (element) {
+    unwrapElement(element);
+  });
+
+  root.querySelectorAll("dt").forEach(function (element) {
+    const paragraph = doc.createElement("p");
+    const strong = doc.createElement("strong");
+    while (element.firstChild) {
+      strong.appendChild(element.firstChild);
+    }
+    paragraph.appendChild(strong);
+    replaceElement(element, paragraph);
+  });
+
+  root.querySelectorAll("dd").forEach(function (element) {
+    renameElement(doc, element, "p");
+  });
+
+  root.querySelectorAll("dl").forEach(function (element) {
+    unwrapElement(element);
+  });
+
+  return root.innerHTML.trim();
 }
 
 export function sanitizeHtml(html) {
@@ -114,7 +198,7 @@ export function markdownToHtml(markdown) {
 }
 
 export function detectUnsupportedContent(html) {
-  const trimmed = String(html || "").trim();
+  const trimmed = normalizeLegacyHtmlForTiptap(String(html || "")).trim();
   if (!trimmed) {
     return "";
   }
@@ -576,6 +660,7 @@ async function uploadImageFile(relativePath, csrfToken, file) {
 
 export async function createWikiEditor(element, options) {
   const { relativePath, csrfToken, initialData = "" } = options || {};
+  const normalizedInitialData = normalizeLegacyHtmlForTiptap(initialData);
 
   const root = document.createElement("div");
   root.className = "wiki-editor";
@@ -642,7 +727,7 @@ export async function createWikiEditor(element, options) {
         types: ["heading", "paragraph"]
       })
     ],
-    content: sanitizeHtml(initialData),
+    content: sanitizeHtml(normalizedInitialData),
     autofocus: false,
     editable: true,
     editorProps: {
@@ -701,7 +786,7 @@ export async function createWikiEditor(element, options) {
       return htmlToMarkdown(editor.getHTML());
     },
     setHTML: function (html) {
-      editor.commands.setContent(sanitizeHtml(html), false);
+      editor.commands.setContent(sanitizeHtml(normalizeLegacyHtmlForTiptap(html)), false);
     },
     setMarkdown: function (markdown) {
       editor.commands.setContent(markdownToHtml(markdown), false);
@@ -723,5 +808,6 @@ window.WestgateWikiEditor = {
   markdownToHtml,
   htmlToMarkdown,
   sanitizeHtml,
-  detectUnsupportedContent
+  detectUnsupportedContent,
+  normalizeLegacyHtmlForTiptap
 };

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This repository is a NodeBB plugin that adds a Westgate-specific wiki surface on top of forum content. The package is **GPL-3.0-or-later**. Wiki page creation uses **`/wiki/compose/:cid`** with a vendored **Tiptap** build under `public/vendor/tiptap/` (rebuild with `npm run build:tiptap` or `npm run build:editors`). The old **CKEditor 5** bundle remains vendored under `public/vendor/ckeditor5/` as a fallback path while the Tiptap migration is live-hardened.
+This repository is a NodeBB plugin that adds a Westgate-specific wiki surface on top of forum content. The package is **GPL-3.0-or-later**. Wiki page creation uses **`/wiki/compose/:cid`** with a vendored **Tiptap** build under `public/vendor/tiptap/` (rebuild with `npm run build:tiptap` or `npm run build:editors`). The old **CKEditor 5** bundle remains vendored under `public/vendor/ckeditor5/` as a fallback path for legacy HTML that the current Tiptap schema cannot round-trip safely yet.
 
 Current design baseline:
 
@@ -61,6 +61,9 @@ The existing implementation already does the following:
   unsupported legacy HTML or migration breakage.
 - Sanitizes wiki main-post HTML on both the compose client and server-side save
   validation so editor swaps do not trust browser HTML.
+- Live browser verification on 2026-05-06 confirmed the Tiptap compose/edit
+  flow is working for normal page creation, save, and render in the active
+  Westgate deployment.
 
 The implementation now has a working MVP shape. This document tracks remaining
 hardening, verification, and phase-two work so future changes do not invent a
@@ -73,7 +76,18 @@ scratch; extend `lib/wiki-paths.js` and existing callers.
 
 Current priority order:
 
-1. Live-verify the new collision diagnostics, title rejection, and autocomplete
+1. Continue the editor migration by expanding Tiptap-side legacy HTML support
+   without weakening sanitization.
+   - 2026-05-06 live testing confirmed the standard Tiptap authoring path is
+     healthy for normal wiki pages.
+   - The remaining editor gap is legacy HTML/CSS round-trip support. Do not
+     treat this as a sanitizer-only toggle; changes must preserve content
+     safely through the Tiptap schema and save pipeline.
+   - Prefer small, explicit import/normalization steps first: wrapper tags,
+     safe structural markup, then deliberate attribute/style support.
+   - Keep CKEditor fallback available until legacy-content editing coverage is
+     wide enough to remove it intentionally.
+2. Live-verify the new collision diagnostics, title rejection, and autocomplete
    API in a running NodeBB instance after deployment.
    - Per-namespace duplicate title rejection has been live-checked.
    - Duplicate page names in different namespaces remain allowed by design;
@@ -84,10 +98,10 @@ Current priority order:
      `[[development:Map Creation Guide]]`.
    - Forum composer wiki-link insertion now has a toolbar button backed by the
      server-side autocomplete API; live browser verification remains pending.
-2. Continue wiki-owned search only through
+3. Continue wiki-owned search only through
    `lib/wiki-paths.js`; do not let client code or templates construct
    `/wiki/...` manually.
-3. Continue Westgate theme alignment and full live smoke checks.
+4. Continue Westgate theme alignment and full live smoke checks.
 
 Deprecated priority items, completed 2026-05-01:
 
@@ -106,6 +120,11 @@ Deprecated priority items, completed 2026-05-01:
 Architectural rule: search results, redlinks, breadcrumbs, authoring redirects,
 and future aliases must use one source of truth for wiki paths. New wiki-facing
 features must call `lib/wiki-paths.js` or a service that wraps it.
+
+Editor migration rule: changes to Tiptap support must keep the client bundle,
+server sanitizer, and stored HTML contract aligned. Do not claim new HTML/CSS
+support unless the content can be imported, edited, saved, and re-rendered
+without silent data loss.
 
 ## Initialization Objective
 
