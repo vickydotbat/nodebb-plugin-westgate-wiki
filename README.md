@@ -41,7 +41,7 @@ This plugin is distributed under **GPL-3.0-or-later**. The wiki compose flow now
 2. Open `ACP > Plugins > Westgate Wiki`.
 3. Select the categories that should behave as wiki namespaces.
 4. Decide whether descendant categories should automatically count as wiki namespaces.
-5. (Optional) Under **Groups allowed to create wiki namespaces**, choose which NodeBB groups may create **child** namespaces from the wiki. **Administrators** always may; if no groups are selected, only administrators can use **Create child namespace**.
+5. (Optional) Under **Groups allowed to create wiki namespaces**, choose which NodeBB groups may create **child** namespaces from the wiki. **Administrators** always may; if no groups are selected, only administrators can use **Create child namespace**. If you edit the stored list manually, separate group names with commas or newlines, not spaces.
 6. Visit `/wiki`.
 
 ### Creating child namespaces from the wiki

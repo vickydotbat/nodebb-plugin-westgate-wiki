@@ -160,10 +160,10 @@
             class="form-control font-monospace"
             name="wikiNamespaceCreateGroups"
             rows="2"
-            placeholder="Global Moderators, wiki-editors"
+            placeholder="Global Moderators, Wiki Editor"
           >{wikiNamespaceCreateGroups}</textarea>
           <p class="form-text mb-0">
-            Synced from the checkboxes above when you save. You may edit this list manually (comma or newline separated)
+            Synced from the checkboxes above when you save. You may edit this list manually (comma or newline separated; spaces inside group names are preserved)
             if needed.
           </p>
         </div>
