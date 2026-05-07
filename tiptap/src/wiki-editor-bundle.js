@@ -74,14 +74,22 @@ const ALLOWED_IMAGE_FIGURE_CLASSES = new Set([
   "image-style-side",
   "image-style-align-left",
   "image-style-align-right",
-  "image-style-block"
+  "image-style-block",
+  "wiki-image-size-sm",
+  "wiki-image-size-md",
+  "wiki-image-size-lg",
+  "wiki-image-size-full"
 ]);
 
 const ALLOWED_IMAGE_NODE_CLASSES = new Set([
   "wiki-image-align-center",
   "wiki-image-align-left",
   "wiki-image-align-right",
-  "wiki-image-align-side"
+  "wiki-image-align-side",
+  "wiki-image-size-sm",
+  "wiki-image-size-md",
+  "wiki-image-size-lg",
+  "wiki-image-size-full"
 ]);
 
 const PRESERVED_GLOBAL_ATTRIBUTE_TYPES = [
@@ -1266,6 +1274,62 @@ function isImageLayoutActive(editor, layout) {
   }[layout] || false;
 }
 
+function getImageSizeClassForNode(nodeName, currentClass, size) {
+  const sizeClasses = new Set([
+    "wiki-image-size-sm",
+    "wiki-image-size-md",
+    "wiki-image-size-lg",
+    "wiki-image-size-full"
+  ]);
+
+  if (nodeName === "imageFigure") {
+    const hasImageClass = /\bimage\b/.test(currentClass);
+    const retained = removeClassTokens(currentClass, sizeClasses);
+    const sizeClass = {
+      sm: "wiki-image-size-sm",
+      md: "wiki-image-size-md",
+      lg: "wiki-image-size-lg",
+      full: "wiki-image-size-full"
+    }[size] || "";
+    const base = hasImageClass ? retained : `image ${retained}`.trim();
+    return sizeClass ? `${base} ${sizeClass}`.trim() : base.trim();
+  }
+
+  const retained = removeClassTokens(currentClass, sizeClasses);
+  const sizeClass = {
+    sm: "wiki-image-size-sm",
+    md: "wiki-image-size-md",
+    lg: "wiki-image-size-lg",
+    full: "wiki-image-size-full"
+  }[size] || "";
+  return sizeClass ? `${retained} ${sizeClass}`.trim() : retained.trim();
+}
+
+function setSelectedImageSize(editor, size) {
+  const nodeName = getActiveImageNodeName(editor);
+  if (!nodeName) {
+    return false;
+  }
+
+  const nextClass = getImageSizeClassForNode(nodeName, editor.getAttributes(nodeName).class || "", size);
+  return editor.chain().focus().updateAttributes(nodeName, { class: nextClass }).run();
+}
+
+function isImageSizeActive(editor, size) {
+  const nodeName = getActiveImageNodeName(editor);
+  if (!nodeName) {
+    return false;
+  }
+
+  const className = String(editor.getAttributes(nodeName).class || "");
+  return {
+    sm: className.includes("wiki-image-size-sm"),
+    md: className.includes("wiki-image-size-md"),
+    lg: className.includes("wiki-image-size-lg"),
+    full: className.includes("wiki-image-size-full")
+  }[size] || false;
+}
+
 function createToolbar(root, editor, uploadImage) {
   const toolbar = document.createElement("div");
   toolbar.className = "wiki-editor-toolbar";
@@ -1528,6 +1592,53 @@ function createToolbar(root, editor, uploadImage) {
       applyState: function (button) {
         button.disabled = !getActiveImageNodeName(editor);
         button.classList.toggle("active", isImageLayoutActive(editor, "side"));
+      }
+    }
+  ]);
+
+  addGroup([
+    {
+      label: "Img S",
+      title: "Small image size",
+      action: function () {
+        setSelectedImageSize(editor, "sm");
+      },
+      applyState: function (button) {
+        button.disabled = !getActiveImageNodeName(editor);
+        button.classList.toggle("active", isImageSizeActive(editor, "sm"));
+      }
+    },
+    {
+      label: "Img M",
+      title: "Medium image size",
+      action: function () {
+        setSelectedImageSize(editor, "md");
+      },
+      applyState: function (button) {
+        button.disabled = !getActiveImageNodeName(editor);
+        button.classList.toggle("active", isImageSizeActive(editor, "md"));
+      }
+    },
+    {
+      label: "Img L",
+      title: "Large image size",
+      action: function () {
+        setSelectedImageSize(editor, "lg");
+      },
+      applyState: function (button) {
+        button.disabled = !getActiveImageNodeName(editor);
+        button.classList.toggle("active", isImageSizeActive(editor, "lg"));
+      }
+    },
+    {
+      label: "Img Full",
+      title: "Full-width image size",
+      action: function () {
+        setSelectedImageSize(editor, "full");
+      },
+      applyState: function (button) {
+        button.disabled = !getActiveImageNodeName(editor);
+        button.classList.toggle("active", isImageSizeActive(editor, "full"));
       }
     }
   ]);

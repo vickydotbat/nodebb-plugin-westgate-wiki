@@ -571,6 +571,27 @@ body:has(#westgate-wiki-compose) .ck.ck-dropdown__panel .ck.ck-list__item .ck-bu
   margin: 1rem auto;
 }
 
+.wiki-article-prose img.wiki-image-size-sm,
+.wiki-article-prose figure.image.wiki-image-size-sm {
+  max-width: min(12rem, 100%);
+}
+
+.wiki-article-prose img.wiki-image-size-md,
+.wiki-article-prose figure.image.wiki-image-size-md {
+  max-width: min(20rem, 100%);
+}
+
+.wiki-article-prose img.wiki-image-size-lg,
+.wiki-article-prose figure.image.wiki-image-size-lg {
+  max-width: min(30rem, 100%);
+}
+
+.wiki-article-prose img.wiki-image-size-full,
+.wiki-article-prose figure.image.wiki-image-size-full {
+  max-width: 100%;
+  width: 100%;
+}
+
 .wiki-article-prose img.wiki-image-align-left {
   display: block;
   float: left;

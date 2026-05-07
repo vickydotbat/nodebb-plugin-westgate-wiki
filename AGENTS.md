@@ -143,6 +143,8 @@ Current priority order:
      Tiptap path:
      - toolbar controls for single-image positioning (`center`, `left`,
        `right`, `side`)
+     - toolbar controls for image sizing (`small`, `medium`, `large`,
+       `full-width`) backed by explicit plugin-owned classes
      - plugin-owned `wiki-media-row` / `wiki-media-cell` schema nodes with
        `2-Up` and `3-Up` insertion commands for side-by-side image or
        mixed image-plus-text layouts
@@ -154,6 +156,175 @@ Current priority order:
    - Live browser verification is still needed for the new media-row authoring
      flow, especially image upload inside cells, keyboard navigation between
      cells, and save/edit round-trip on mixed image-plus-text rows.
+   - Next image toolkit phase:
+     - Add explicit caption authoring for selected images. Prefer a
+       plugin-owned figure workflow rather than storing captions in unrelated
+       text blocks beside the image.
+     - Add image management actions: replace selected image, remove selected
+       image, and possibly duplicate/move within a media row if the UX stays
+       simple.
+     - Review whether the current size presets are enough or whether bounded
+       width percentages / resize handles are worth adding. Do not expose free
+       arbitrary sizing unless the save/render contract remains predictable.
+     - Keep plain-image and figure-image behavior converging, not diverging.
+       The long-term image toolkit should not force authors to guess which
+       image subtype supports which controls.
+   - Extension architecture roadmap:
+     - The editor is now past the point where a single `wiki-editor-bundle.js`
+       file should keep owning every custom schema decision inline. Future work
+       should treat Tiptap features as an explicit extension layer with clear
+       ownership boundaries.
+     - Guiding rule:
+       - use stock/official Tiptap extensions for generic rich-text primitives
+       - use plugin-owned custom extensions for wiki semantics, migration
+         compatibility, and layout blocks that must obey the plugin sanitizer
+         and route/link model
+     - Stock extensions to keep as first-class primitives:
+       - `StarterKit`
+       - `Image`
+       - `Link`
+       - `Placeholder`
+       - `Table`, `TableRow`, `TableHeader`, `TableCell`
+       - `TaskList`, `TaskItem`
+       - `TextAlign`
+       - `Underline`
+       - `Subscript`
+       - `Superscript`
+       - `Typography`
+       - `CharacterCount`
+     - Plugin-owned extensions that should remain custom because they encode
+       Westgate/wiki-specific structure:
+       - `imageFigure`
+       - `mediaRow`
+       - `mediaCell`
+       - `containerBlock`
+       - preserved-attribute extension(s) for sanitized class/style round-trip
+       - future `wikiInternalLink` node/mark
+       - future `wikiRedlink` node/mark
+       - future `wikiFootnote` node/mark
+       - future callout/admonition/details-style wiki blocks if those become
+         part of the product
+     - Official/stock extensions worth evaluating next, but only when they fit
+       the save/render contract:
+       - image resize support on `Image`
+       - `Mention`
+       - `Details`
+       - `Mathematics`
+       - `DragHandle`
+       - collaboration-related extensions only if the product actually moves
+         toward real-time multi-user editing
+     - Explicit non-goal:
+       - do not solve editor gaps by enabling broad arbitrary HTML/CSS authoring
+         or by relying on unstable experimental figure/layout packages without
+         a plugin-owned compatibility layer
+   - Recommended extension file structure:
+     - Move custom editor schema/tooling into `tiptap/src/extensions/`.
+     - Target structure:
+       - `tiptap/src/extensions/image-figure.js`
+       - `tiptap/src/extensions/media-row.js`
+       - `tiptap/src/extensions/container-block.js`
+       - `tiptap/src/extensions/styled-span.js`
+       - `tiptap/src/extensions/preserved-node-attributes.js`
+       - `tiptap/src/extensions/wiki-internal-link.js`
+       - `tiptap/src/extensions/wiki-footnote.js`
+       - `tiptap/src/extensions/wiki-callout.js`
+     - Support files can then sit beside them:
+       - `tiptap/src/normalization/legacy-html.js`
+       - `tiptap/src/toolbar/media-tools.js`
+       - `tiptap/src/toolbar/image-tools.js`
+       - `tiptap/src/selection/media-selection.js`
+     - Keep the top-level bundle file as assembly/composition code:
+       imports, extension registration order, toolbar registration, upload
+       wiring, and editor boot logic.
+   - Recommended implementation order for the extension layer:
+     - Phase A: Extract what already exists without changing behavior.
+       - Move `imageFigure`, `mediaRow`, `mediaCell`, `containerBlock`,
+         preserved attribute logic, and styled spans into separate extension
+         modules.
+       - Keep commands, parse/render logic, and CSS contracts behaviorally
+         identical during this extraction.
+       - Exit criteria: same saved HTML, same sanitizer contract, same tests,
+         smaller bundle file, easier targeted edits.
+     - Phase B: Add first-class image toolkit behavior on top of extracted
+       modules.
+       - Captions for `imageFigure`
+       - Replace/remove image actions
+       - Decide on bounded resize support vs class-based width presets only
+       - Unify plain-image and figure-image toolbar behavior
+       - Exit criteria: image positioning, sizing, captioning, and replacement
+         behave as one coherent toolkit.
+     - Phase C: Introduce semantic wiki inline extensions.
+       - `wikiInternalLink`
+       - optional `wikiRedlink`
+       - later `wikiFootnote`
+       - Those should integrate with existing autocomplete, path resolution,
+         mention/footnote processing, and saved HTML rules rather than becoming
+         isolated editor-only abstractions.
+     - Phase D: Introduce optional wiki block extensions only if demanded by
+       actual content needs.
+       - callouts/admonitions
+       - collapsible details/spoilers
+       - math blocks/inline equations
+       - drag handles for block layouts once layout complexity is high enough
+   - Decision framework for future extension choices:
+     - Prefer stock extensions when:
+       - the content model is generic
+       - the saved HTML is conventional and stable
+       - the editor feature does not depend on wiki-specific server logic
+     - Prefer plugin-owned extensions when:
+       - the feature depends on wiki path resolution, redlinks, or ACP-driven
+         namespace behavior
+       - the feature needs a constrained class/style contract
+       - migration safety requires plugin-owned import normalization
+       - the rendered structure is a wiki product decision rather than a
+         generic editor primitive
+     - Reject or defer an extension when:
+       - it increases authoring power by producing HTML the sanitizer cannot
+         preserve predictably
+       - it creates a second competing content model for the same wiki feature
+       - it depends on experimental packages without a maintainable fallback
+   - Verification expectations for extension work:
+     - Every new extension should be treated as a full contract change, not
+       just editor UI sugar.
+     - Required verification surfaces:
+       - legacy HTML import into Tiptap
+       - toolbar authoring / command behavior
+       - save pipeline through server sanitizer
+       - reopen/edit round-trip
+       - rendered article output under Westgate theme styles
+       - fallback behavior for unsupported legacy content
+     - Add focused tests where possible for:
+       - sanitizer allowlist alignment
+       - normalization rules
+       - saved class/style contracts
+       - route/link semantics for wiki-specific inline nodes
+   - Recommended medium-term extension candidates for this wiki:
+     - `wikiInternalLink`
+       - strongest recommendation after image toolkit stabilization
+       - should own canonical wiki-target metadata instead of relying purely on
+         text conventions
+     - `wikiFootnote`
+       - strong candidate once inline semantic nodes are introduced
+       - reduces fragile text transform behavior
+     - `Mention`
+       - evaluate if forum-user mention UX becomes limited by plain-text
+         parsing; keep notifications server-owned
+     - `Details`
+       - useful if guides commonly need collapsible sections
+     - `Mathematics`
+       - only if gameplay/mechanics docs actually need equation authoring
+     - `DragHandle`
+       - useful once media rows and other layout blocks are common enough that
+         moving them by cursor alone feels clumsy
+   - Anti-patterns to avoid while expanding extensions:
+     - do not let arbitrary pasted Flexbox/Grid/CSS become the editor's real
+       layout model
+     - do not add overlapping image systems where plain images, figures, and
+       media cells all expose different incompatible toolbars
+     - do not bypass `shared/wiki-html-sanitizer-config.json` when adding new
+       editor features
+     - do not make client-only schema decisions that the server sanitizer or
+       rendered article CSS cannot honor
    - The remaining editor gap is legacy HTML/CSS round-trip support. Do not
      treat this as a sanitizer-only toggle; changes must preserve content
      safely through the Tiptap schema and save pipeline.
