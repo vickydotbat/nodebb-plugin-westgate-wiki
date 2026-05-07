@@ -6,12 +6,18 @@
   border: 1px solid var(--wiki-compose-editable-border-color, var(--bs-border-color, #dee2e6));
   border-radius: var(--bs-border-radius, 0.5rem);
   background: var(--wiki-compose-editable-bg, var(--bs-body-bg, #fff));
-  overflow: clip;
+  overflow: visible;
 }
 
 .westgate-wiki-compose .wiki-editor__toolbar-mount {
   border-bottom: 1px solid var(--wiki-ck-toolbar-border, var(--bs-border-color, #dee2e6));
   background: var(--wiki-ck-toolbar-background, var(--bs-tertiary-bg, #f8f9fa));
+  position: sticky;
+  top: var(--wiki-compose-toolbar-sticky-top, 0.75rem);
+  z-index: 7;
+  max-height: min(42vh, 13rem);
+  overflow-y: auto;
+  scrollbar-gutter: stable both-edges;
 }
 
 .westgate-wiki-compose .wiki-editor-toolbar {
@@ -19,6 +25,21 @@
   flex-wrap: wrap;
   gap: 0.5rem;
   padding: 0.75rem;
+}
+
+.westgate-wiki-compose .wiki-editor__toolbar-mount::after {
+  content: "";
+  position: sticky;
+  display: block;
+  bottom: 0;
+  height: 0.9rem;
+  margin-top: -0.9rem;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    color-mix(in srgb, var(--wiki-ck-toolbar-background, var(--bs-tertiary-bg, #f8f9fa)) 96%, transparent)
+  );
+  pointer-events: none;
 }
 
 .westgate-wiki-compose .wiki-editor-toolbar__group {

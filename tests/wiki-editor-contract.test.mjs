@@ -152,3 +152,22 @@ await test("mediaRow insert command renders bounded two- and three-cell layouts"
   assert.equal(cellCount, 3);
   editor.destroy();
 });
+
+await test("mediaRow two-up html round-trips without containerBlock wrappers manufacturing extra cells", function () {
+  const savedHtml = '<div class="wiki-media-row" data-wiki-node="media-row"><div class="wiki-media-cell" data-wiki-node="media-cell"><img data-wiki-node="image" src="/a.png"></div><div class="wiki-media-cell" data-wiki-node="media-cell"><img data-wiki-node="image" src="/b.png"></div></div>';
+  const firstOpen = createEditor(savedHtml);
+  const firstRender = firstOpen.getHTML();
+
+  assert.equal((firstRender.match(/data-wiki-node="media-row"/g) || []).length, 1);
+  assert.equal((firstRender.match(/data-wiki-node="media-cell"/g) || []).length, 2);
+
+  const reopened = createEditor(sanitizeHtml(firstRender));
+  const secondRender = reopened.getHTML();
+
+  assert.equal((secondRender.match(/data-wiki-node="media-row"/g) || []).length, 1);
+  assert.equal((secondRender.match(/data-wiki-node="media-cell"/g) || []).length, 2);
+  assert.doesNotMatch(secondRender, /<div class="wiki-media-row"><div class="wiki-media-row"/);
+
+  firstOpen.destroy();
+  reopened.destroy();
+});

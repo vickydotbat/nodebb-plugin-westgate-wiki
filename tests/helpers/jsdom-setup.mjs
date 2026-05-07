@@ -22,6 +22,7 @@ export function installJsdomGlobals() {
     Event: { configurable: true, value: window.Event },
     CustomEvent: { configurable: true, value: window.CustomEvent },
     MutationObserver: { configurable: true, value: window.MutationObserver },
+    getComputedStyle: { configurable: true, value: window.getComputedStyle.bind(window) },
     getSelection: { configurable: true, value: window.getSelection.bind(window) },
     requestAnimationFrame: { configurable: true, value: window.requestAnimationFrame.bind(window) },
     cancelAnimationFrame: { configurable: true, value: window.cancelAnimationFrame.bind(window) }

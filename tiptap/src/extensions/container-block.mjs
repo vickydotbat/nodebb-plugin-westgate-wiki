@@ -3,6 +3,15 @@ import { Node } from "@tiptap/core";
 import { hasBlockDescendantChildren } from "../normalization/legacy-html.mjs";
 import { createPreservedAttribute } from "../shared/preserved-attrs.mjs";
 
+function isPluginOwnedStructuredContainer(element) {
+  const classList = element && element.classList;
+  if (!classList) {
+    return false;
+  }
+
+  return classList.contains("wiki-media-row") || classList.contains("wiki-media-cell");
+}
+
 const ContainerBlock = Node.create({
   name: "containerBlock",
   group: "block",
@@ -29,18 +38,27 @@ const ContainerBlock = Node.create({
       {
         tag: "article",
         getAttrs: function (element) {
+          if (isPluginOwnedStructuredContainer(element)) {
+            return false;
+          }
           return hasBlockDescendantChildren(element) ? null : false;
         }
       },
       {
         tag: "div",
         getAttrs: function (element) {
+          if (isPluginOwnedStructuredContainer(element)) {
+            return false;
+          }
           return hasBlockDescendantChildren(element) ? null : false;
         }
       },
       {
         tag: "section",
         getAttrs: function (element) {
+          if (isPluginOwnedStructuredContainer(element)) {
+            return false;
+          }
           return hasBlockDescendantChildren(element) ? null : false;
         }
       }

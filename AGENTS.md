@@ -153,9 +153,20 @@ Current priority order:
      - visible selection/focus affordances for images and media cells, plus
        click-to-select behavior on images and click-to-focus behavior on empty
        media cell chrome
+     - 2026-05-07 compose UX follow-up: long wiki pages now justify explicit
+       toolbar reachability as part of the image/media phase, not just as a
+       polish item. The current Tiptap toolbar should remain reachable while
+       editing lower-page images/layouts; a sticky toolbar is an acceptable
+       interim step, but contextual floating/image-local controls remain part
+       of the forward plan if the sticky approach proves insufficient.
    - Live browser verification is still needed for the new media-row authoring
      flow, especially image upload inside cells, keyboard navigation between
      cells, and save/edit round-trip on mixed image-plus-text rows.
+   - 2026-05-07 regression hardening fixed a media-row reopen/save bug where
+     plugin-owned `wiki-media-row` / `wiki-media-cell` wrappers could be
+     reparsed as generic container blocks, manufacturing extra wrapper columns
+     on round-trip and shifting image placement. Keep plugin-owned layout nodes
+     excluded from generic container parsing.
    - Next image toolkit phase:
      - Add explicit caption authoring for selected images. Prefer a
        plugin-owned figure workflow rather than storing captions in unrelated
