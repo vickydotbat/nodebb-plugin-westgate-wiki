@@ -275,6 +275,19 @@ Current priority order:
       - Reason:
         - current tests cover the server sanitizer better than the client-side
           Tiptap contract; extraction should not proceed on assumption alone
+      - 2026-05-07 implementation status:
+        - initial jsdom-backed client contract tests now exist for
+          normalization, unsupported-content detection, client sanitization,
+          styled-span round-trip, `imageFigure` parse/render, and `mediaRow`
+          command/render behavior
+        - the bundle now imports extracted modules for shared sanitizer
+          contract, legacy HTML normalization, preserved attributes,
+          `containerBlock`, `styledSpan`, `mediaRow` / `mediaCell`,
+          `imageFigure`, and selection/image class helpers
+        - extraction target remains behavior preservation, not a schema/model
+          change; interaction-specific tests are still lighter than the
+          normalization/render contract and should be expanded before later
+          image-toolkit work
     - Phase A: Extract what already exists without changing behavior.
       - Move `imageFigure`, `mediaRow`, `mediaCell`, `containerBlock`,
         preserved attribute logic, styled spans, and normalization helpers into

@@ -125,6 +125,10 @@ npm run build:editors
 npm test
 ```
 
+`npm test` now also runs a jsdom-backed client contract suite for the Tiptap
+editor extraction work, covering normalization, unsupported-content detection,
+client sanitization, and media/image extension round-trip behavior.
+
 The default Tiptap bundle is written to `public/vendor/tiptap/`. The fallback CKEditor bundle is written to `public/vendor/ckeditor5/`. Commit those artifacts or rebuild after dependency upgrades.
 
 From the NodeBB instance:
