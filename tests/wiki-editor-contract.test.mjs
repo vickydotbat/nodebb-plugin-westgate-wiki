@@ -21,7 +21,7 @@ function test(name, fn) {
 
 installJsdomGlobals();
 
-const [{ Editor }, StarterKitModule, ImageModule, PreservedNodeAttributesModule, StyledSpanModule, ContainerBlockModule, MediaRowModule, ImageFigureModule, WikiCalloutModule, SlashCommandModule, WikiLinkModule, toolbarSchemaModule, editorTocModule, linkInteractionsModule, legacyHtmlModule, sanitizerContractModule] = await Promise.all([
+const [{ Editor }, StarterKitModule, ImageModule, PreservedNodeAttributesModule, StyledSpanModule, ContainerBlockModule, MediaRowModule, ImageFigureModule, WikiCalloutModule, SlashCommandModule, WikiLinkModule, WikiEntitiesModule, toolbarSchemaModule, editorTocModule, linkInteractionsModule, legacyHtmlModule, sanitizerContractModule] = await Promise.all([
   import("@tiptap/core"),
   import("@tiptap/starter-kit"),
   import("@tiptap/extension-image"),
@@ -33,6 +33,7 @@ const [{ Editor }, StarterKitModule, ImageModule, PreservedNodeAttributesModule,
   import("../tiptap/src/extensions/wiki-callout.mjs"),
   import("../tiptap/src/extensions/slash-command.mjs"),
   import("../tiptap/src/extensions/wiki-link.mjs"),
+  import("../tiptap/src/extensions/wiki-entities.mjs"),
   import("../tiptap/src/toolbar/toolbar-schema.mjs"),
   import("../tiptap/src/toolbar/editor-toc.mjs"),
   import("../tiptap/src/selection/link-interactions.mjs"),
@@ -50,6 +51,7 @@ const ImageFigure = ImageFigureModule.default;
 const WikiCallout = WikiCalloutModule.default;
 const SlashCommand = SlashCommandModule.default;
 const WikiLink = WikiLinkModule.default;
+const { WikiFootnote, WikiNamespaceLink, WikiPageLink, WikiUserMention } = WikiEntitiesModule;
 const { IMAGE_CONTEXT_BUTTON_IDS, TABLE_CONTEXT_BUTTON_IDS, TOP_TOOLBAR_BUTTON_IDS, TOP_TOOLBAR_GROUPS } = toolbarSchemaModule;
 const { buildHeadingToc, navigateToHeading } = editorTocModule;
 const { installEditorLinkNavigationGuard, selectEditorLink } = linkInteractionsModule;
@@ -83,6 +85,10 @@ function createEditor(content) {
       MediaRow,
       ImageFigure,
       WikiCallout,
+      WikiPageLink,
+      WikiNamespaceLink,
+      WikiUserMention,
+      WikiFootnote,
       WikiLink.configure({
         openOnClick: false,
         autolink: true,
@@ -131,6 +137,22 @@ await test("normalizeLegacyHtmlForTiptap keeps supported image figures and norma
   assert.match(normalized, /<p style="text-align: center">/);
   assert.match(normalized, /<figure class="image image-style-side">/);
   assert.match(normalized, /<span[^>]*style="[^"]*font-size: 1\.5rem[^"]*"[^>]*>Caption<\/span>/);
+});
+
+await test("normalizeLegacyHtmlForTiptap converts legacy wiki inline syntax into entity spans", function () {
+  const normalized = normalizeLegacyHtmlForTiptap(
+    '<p>See [[Guides/Map Creation Guide|Map guide]], [[ns:Guides]], @xtul, and ((Important note)). <code>[[Raw]] @raw ((raw))</code></p>'
+  );
+
+  assert.match(normalized, /data-wiki-entity="page"/);
+  assert.match(normalized, /data-wiki-target="Guides\/Map Creation Guide"/);
+  assert.match(normalized, /data-wiki-entity="namespace"/);
+  assert.match(normalized, /data-wiki-target="Guides"/);
+  assert.match(normalized, /data-wiki-entity="user"/);
+  assert.match(normalized, /data-wiki-username="xtul"/);
+  assert.match(normalized, /data-wiki-entity="footnote"/);
+  assert.match(normalized, /data-wiki-footnote="Important note"/);
+  assert.match(normalized, /<code>\[\[Raw\]\] @raw \(\(raw\)\)<\/code>/);
 });
 
 await test("detectUnsupportedContent rejects unsupported embeds and accepts supported legacy figure content", function () {
@@ -239,6 +261,57 @@ await test("wiki link mark stores regular links as inert spans in the editor con
   assert.doesNotMatch(rendered, /<a\b[^>]*href="https:\/\/google\.com"/);
   editor.commands.setTextSelection(5);
   assert.equal(editor.getAttributes("link").href, "https://google.com");
+
+  editor.destroy();
+});
+
+await test("wiki entity marks and nodes round-trip as inert editor spans", function () {
+  const editor = createEditor('<p>See <span class="wiki-entity wiki-entity--page" data-wiki-entity="page" data-wiki-target="Guides/Map Creation Guide" data-wiki-label="Map guide">Map guide</span>, <span class="wiki-entity wiki-entity--namespace" data-wiki-entity="namespace" data-wiki-target="Guides">Guides</span>, <span class="wiki-entity wiki-entity--user" data-wiki-entity="user" data-wiki-username="xtul" data-wiki-userslug="xtul">@xtul</span>, and <span class="wiki-entity wiki-entity--footnote" data-wiki-entity="footnote" data-wiki-footnote="Important note">[note]</span>.</p>');
+  const rendered = editor.getHTML();
+
+  assert.match(rendered, /data-wiki-entity="page"/);
+  assert.match(rendered, /data-wiki-target="Guides\/Map Creation Guide"/);
+  assert.match(rendered, /data-wiki-entity="namespace"/);
+  assert.match(rendered, /data-wiki-entity="user"/);
+  assert.match(rendered, /data-wiki-entity="footnote"/);
+  assert.match(rendered, /data-wiki-footnote-b64="/);
+  assert.doesNotMatch(rendered, /data-wiki-footnote="Important note"/);
+  assert.doesNotMatch(rendered, /<a\b/);
+
+  editor.destroy();
+});
+
+await test("wiki entity insert commands create page, namespace, user, and footnote entities", function () {
+  const editor = createEditor("<p>Start</p>");
+
+  editor.commands.insertWikiPageLink({ target: "Guides/Map Creation Guide", label: "Map guide" });
+  editor.commands.insertContent(" ");
+  editor.commands.insertWikiNamespaceLink({ target: "Guides", label: "Guides" });
+  editor.commands.insertContent(" ");
+  editor.commands.insertWikiUserMention({ username: "xtul", userslug: "xtul", uid: "1" });
+  editor.commands.insertContent(" ");
+  editor.commands.insertWikiFootnote({ body: "Important note" });
+
+  const rendered = editor.getHTML();
+  assert.match(rendered, /data-wiki-entity="page"[^>]*>Map guide<\/span>/);
+  assert.match(rendered, /data-wiki-entity="namespace"[^>]*>Guides<\/span>/);
+  assert.match(rendered, /data-wiki-entity="user"[^>]*>@xtul<\/span>/);
+  assert.match(rendered, /wiki-entity--user-good/);
+  assert.match(rendered, /spellcheck="false"/);
+  assert.match(rendered, /data-wiki-entity="footnote"[^>]*data-wiki-footnote-b64="[^"]+"[^>]*>\[note\]<\/span>/);
+
+  editor.destroy();
+});
+
+await test("typed wiki user mentions render as unresolved until autocomplete confirms them", function () {
+  const editor = createEditor("<p>Start</p>");
+
+  editor.commands.insertWikiUserMention({ username: "missing", resolved: false });
+
+  const rendered = editor.getHTML();
+  assert.match(rendered, /data-wiki-entity="user"[^>]*>@missing<\/span>/);
+  assert.match(rendered, /data-wiki-resolved="0"/);
+  assert.match(rendered, /wiki-entity--user-bad/);
 
   editor.destroy();
 });
@@ -641,7 +714,7 @@ await test("top toolbar schema excludes contextual image layout and size control
   assert.equal(IMAGE_CONTEXT_BUTTON_IDS.includes("image-align-right"), true);
 });
 
-await test("top toolbar schema keeps only table creation in the always-visible toolbar", function () {
+await test("top toolbar schema keeps wiki entity tools and only table creation in the always-visible toolbar", function () {
   const groupIds = TOP_TOOLBAR_GROUPS.map(function (group) {
     return group.id;
   });
@@ -661,7 +734,7 @@ await test("top toolbar schema keeps only table creation in the always-visible t
   const tables = TOP_TOOLBAR_GROUPS.find(function (group) { return group.id === "tables"; });
 
   assert.deepEqual(history.buttonIds, ["undo", "redo"]);
-  assert.deepEqual(media.buttonIds, ["link", "unlink", "image-upload", "media-row-2", "media-row-3"]);
+  assert.deepEqual(media.buttonIds, ["link", "unlink", "wiki-page-link", "wiki-namespace-link", "wiki-user-mention", "wiki-footnote", "image-upload", "media-row-2", "media-row-3"]);
   assert.deepEqual(tables.buttonIds, ["table-insert"]);
 });
 

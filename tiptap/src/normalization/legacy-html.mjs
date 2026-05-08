@@ -100,6 +100,150 @@ export function moveElementBefore(element, reference) {
   reference.parentNode.insertBefore(element, reference);
 }
 
+function createEntitySpan(document, entityType, text, attrs) {
+  const span = document.createElement("span");
+  span.className = `wiki-entity wiki-entity--${entityType}`;
+  span.setAttribute("data-wiki-entity", entityType);
+  Object.entries(attrs || {}).forEach(function ([key, value]) {
+    if (value) {
+      span.setAttribute(key, value);
+    }
+  });
+  span.textContent = text;
+  return span;
+}
+
+function isProtectedInlineSyntaxParent(node) {
+  const parent = node && node.parentElement;
+  return !!(parent && parent.closest("a, code, pre, script, style, textarea, template, [data-wiki-entity]"));
+}
+
+function appendTextAndEntityParts(document, parent, text, regex, buildEntity) {
+  regex.lastIndex = 0;
+  let cursor = 0;
+  let match;
+  let changed = false;
+  while ((match = regex.exec(text)) !== null) {
+    const before = text.slice(cursor, match.index);
+    if (before) {
+      parent.appendChild(document.createTextNode(before));
+    }
+    parent.appendChild(buildEntity(match));
+    cursor = match.index + match[0].length;
+    changed = true;
+  }
+  if (!changed) {
+    return false;
+  }
+  const rest = text.slice(cursor);
+  if (rest) {
+    parent.appendChild(document.createTextNode(rest));
+  }
+  return true;
+}
+
+function normalizeLegacyWikiInlineSyntax(document, root) {
+  const nodeFilter = document.defaultView && document.defaultView.NodeFilter;
+  const walker = document.createTreeWalker(root, nodeFilter ? nodeFilter.SHOW_TEXT : 4);
+  const nodes = [];
+  let node;
+  while ((node = walker.nextNode())) {
+    if (!isProtectedInlineSyntaxParent(node)) {
+      nodes.push(node);
+    }
+  }
+
+  nodes.forEach(function (textNode) {
+    const text = textNode.nodeValue || "";
+    if (!/(\[\[|@\w|\(\()/.test(text)) {
+      return;
+    }
+
+    const footnotePass = document.createDocumentFragment();
+    const footnoteChanged = appendTextAndEntityParts(
+      document,
+      footnotePass,
+      text,
+      /\(\(([^()[\]](?:[^()]|\([^)]*\))*?)\)\)/g,
+      function (match) {
+        return createEntitySpan(document, "footnote", "[note]", {
+          "data-wiki-footnote": match[1].trim()
+        });
+      }
+    );
+    if (!footnoteChanged) {
+      footnotePass.appendChild(document.createTextNode(text));
+    }
+
+    const wikiPass = document.createDocumentFragment();
+    Array.from(footnotePass.childNodes).forEach(function (part) {
+      if (part.nodeType !== 3) {
+        wikiPass.appendChild(part);
+        return;
+      }
+      const parts = document.createDocumentFragment();
+      const changed = appendTextAndEntityParts(
+        document,
+        parts,
+        part.nodeValue || "",
+        /\[\[([^[\]|]+(?:\/[^[\]|]+)*|ns:[^[\]|]+)(?:\|([^[\]]+))?\]\]/g,
+        function (match) {
+          const rawTarget = match[1].trim();
+          const isNamespace = /^ns:/i.test(rawTarget);
+          const target = isNamespace ? rawTarget.replace(/^ns:/i, "").trim() : rawTarget;
+          const label = (match[2] || target.split("/").pop() || target).trim();
+          return createEntitySpan(document, isNamespace ? "namespace" : "page", label, {
+            "data-wiki-target": target,
+            "data-wiki-label": label
+          });
+        }
+      );
+      if (changed) {
+        while (parts.firstChild) {
+          wikiPass.appendChild(parts.firstChild);
+        }
+      } else {
+        wikiPass.appendChild(part);
+      }
+    });
+
+    const mentionPass = document.createDocumentFragment();
+    Array.from(wikiPass.childNodes).forEach(function (part) {
+      if (part.nodeType !== 3) {
+        mentionPass.appendChild(part);
+        return;
+      }
+      const parts = document.createDocumentFragment();
+      const changed = appendTextAndEntityParts(
+        document,
+        parts,
+        part.nodeValue || "",
+        /(^|[^\w@./:+-])@([A-Za-z0-9][A-Za-z0-9_-]{0,38})(?=$|[^A-Za-z0-9_-])/g,
+        function (match) {
+          const fragment = document.createDocumentFragment();
+          if (match[1]) {
+            fragment.appendChild(document.createTextNode(match[1]));
+          }
+          fragment.appendChild(createEntitySpan(document, "user", `@${match[2]}`, {
+            "data-wiki-username": match[2],
+            "data-wiki-userslug": match[2].toLowerCase()
+          }));
+          return fragment;
+        }
+      );
+      if (changed) {
+        while (parts.firstChild) {
+          mentionPass.appendChild(parts.firstChild);
+        }
+      } else {
+        mentionPass.appendChild(part);
+      }
+    });
+
+    textNode.parentNode.replaceChild(mentionPass, textNode);
+  });
+}
+
 export function isPlainWrapperElement(element) {
   if (!element || !element.tagName) {
     return false;
@@ -506,6 +650,7 @@ export function normalizeLegacyHtmlForTiptap(html) {
   });
 
   normalizeLegacyPresentationalTags(doc, root);
+  normalizeLegacyWikiInlineSyntax(doc, root);
   normalizeLegacyListTags(doc, root);
   normalizeLegacyMediaLayouts(doc, root);
   normalizeLegacyTableStructures(doc, root);

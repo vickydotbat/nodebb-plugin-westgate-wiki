@@ -29,6 +29,7 @@ import PreservedNodeAttributes from "./extensions/preserved-node-attributes.mjs"
 import SlashCommand from "./extensions/slash-command.mjs";
 import StyledSpan from "./extensions/styled-span.mjs";
 import WikiCallout from "./extensions/wiki-callout.mjs";
+import { WikiFootnote, WikiNamespaceLink, WikiPageLink, WikiUserMention } from "./extensions/wiki-entities.mjs";
 import WikiLink from "./extensions/wiki-link.mjs";
 import {
   detectUnsupportedContent,
@@ -92,6 +93,10 @@ const BUTTON_ICONS = {
   superscript: "fa-superscript",
   link: "fa-link",
   unlink: "fa-chain-broken",
+  "wiki-page-link": "fa-book",
+  "wiki-namespace-link": "fa-folder-open",
+  "wiki-user-mention": "fa-user",
+  "wiki-footnote": "fa-sticky-note-o",
   "image-upload": "fa-image",
   "media-row-2": "fa-columns",
   "media-row-3": "fa-th-large",
@@ -164,6 +169,385 @@ function createButton(def) {
     def.action();
   });
   return button;
+}
+
+function getRelativeApiPath(options, path) {
+  return `${(options && options.relativePath) || ""}/api/v3/plugins/westgate-wiki/${path}`;
+}
+
+function optionLabel(result) {
+  if (!result) {
+    return "";
+  }
+  if (result.type === "namespace") {
+    return `${result.title} namespace`;
+  }
+  if (result.userslug || result.username) {
+    return `@${result.username || result.userslug}`;
+  }
+  return `${result.titleLeaf || result.title} · ${String(result.namespacePath || "").replace(/^\/wiki\/?/, "") || "wiki"}`;
+}
+
+async function fetchJson(url) {
+  const res = await fetch(url, { credentials: "same-origin" });
+  const body = await res.json();
+  if (!res.ok) {
+    throw new Error((body && body.status && body.status.message) || res.statusText);
+  }
+  return body.response || body;
+}
+
+function normalizeUsername(value) {
+  return String(value || "").trim().replace(/^@/, "").toLowerCase();
+}
+
+function findExactUserResult(results, username) {
+  const target = normalizeUsername(username);
+  if (!target) {
+    return null;
+  }
+  return (results || []).find(function (result) {
+    return normalizeUsername(result && result.username) === target || normalizeUsername(result && result.userslug) === target;
+  }) || null;
+}
+
+function setUserEntityResolution(element, resolved, result) {
+  if (!element) {
+    return;
+  }
+  element.classList.toggle("wiki-entity--user-good", !!resolved);
+  element.classList.toggle("wiki-entity--user-bad", !resolved);
+  element.classList.remove("wiki-entity--user-pending");
+  element.setAttribute("data-wiki-resolved", resolved ? "1" : "0");
+  element.setAttribute("spellcheck", "false");
+  element.setAttribute("title", resolved ? "Linked forum user" : "Forum user not found");
+  if (resolved && result) {
+    if (result.uid) {
+      element.setAttribute("data-wiki-uid", String(result.uid));
+    }
+    if (result.userslug) {
+      element.setAttribute("data-wiki-userslug", String(result.userslug));
+    }
+  }
+}
+
+function installUserEntityResolution(editorMount, options) {
+  const cache = new Map();
+  let timer = null;
+  let stopped = false;
+
+  async function resolveUsername(username) {
+    const key = normalizeUsername(username);
+    if (!key) {
+      return null;
+    }
+    if (!cache.has(key)) {
+      const params = new URLSearchParams({ q: key, limit: "10" });
+      cache.set(key, fetchJson(`${getRelativeApiPath(options, "user-autocomplete")}?${params.toString()}`)
+        .then(function (response) {
+          return findExactUserResult(response.results || [], key);
+        })
+        .catch(function () {
+          return null;
+        }));
+    }
+    return cache.get(key);
+  }
+
+  function schedule() {
+    window.clearTimeout(timer);
+    timer = window.setTimeout(async function () {
+      if (stopped || !editorMount) {
+        return;
+      }
+      const elements = Array.from(editorMount.querySelectorAll('[data-wiki-entity="user"]'));
+      await Promise.all(elements.map(async function (element) {
+        const username = element.getAttribute("data-wiki-username") || element.textContent || "";
+        const existingResolved = element.getAttribute("data-wiki-resolved") === "1";
+        if (existingResolved && (element.getAttribute("data-wiki-uid") || element.getAttribute("data-wiki-userslug"))) {
+          setUserEntityResolution(element, true);
+          return;
+        }
+        const result = await resolveUsername(username);
+        if (!stopped && editorMount.contains(element)) {
+          setUserEntityResolution(element, !!result, result);
+        }
+      }));
+    }, 220);
+  }
+
+  schedule();
+  return {
+    refresh: schedule,
+    destroy: function () {
+      stopped = true;
+      window.clearTimeout(timer);
+    }
+  };
+}
+
+function decodeBase64Utf8(value) {
+  const source = String(value || "").trim();
+  if (!source) {
+    return "";
+  }
+  try {
+    const binary = window.atob(source);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return new TextDecoder("utf-8").decode(bytes);
+  } catch (err) {
+    return "";
+  }
+}
+
+function openWikiEntityDialog({ editor, type, options, initial, replaceMark }) {
+  const existing = document.querySelector(".wiki-editor-entity-dialog");
+  if (existing) {
+    existing.remove();
+  }
+
+  const dialog = document.createElement("div");
+  dialog.className = "wiki-editor-entity-dialog";
+  dialog.setAttribute("role", "dialog");
+  dialog.setAttribute("aria-modal", "true");
+
+  const title = document.createElement("h2");
+  title.className = "wiki-editor-entity-dialog__title";
+  title.textContent = {
+    page: "Wiki page link",
+    namespace: "Namespace link",
+    user: "Forum user",
+    footnote: "Footnote"
+  }[type] || "Wiki entity";
+  dialog.appendChild(title);
+
+  const form = document.createElement("form");
+  form.className = "wiki-editor-entity-dialog__form";
+  dialog.appendChild(form);
+
+  function addInput(labelText, input) {
+    const label = document.createElement("label");
+    label.className = "wiki-editor-entity-dialog__label";
+    label.textContent = labelText;
+    label.appendChild(input);
+    form.appendChild(label);
+    return input;
+  }
+
+  const searchInput = document.createElement(type === "footnote" ? "textarea" : "input");
+  searchInput.className = "form-control form-control-sm";
+  if (type !== "footnote") {
+    searchInput.type = "search";
+    searchInput.autocomplete = "off";
+  } else {
+    searchInput.rows = 4;
+  }
+  addInput(type === "footnote" ? "Note text" : "Search or target", searchInput);
+  if (initial && initial.search) {
+    searchInput.value = initial.search;
+  }
+
+  let footnoteLinkLabel = null;
+  let footnoteLinkUrl = null;
+  if (type === "footnote") {
+    footnoteLinkLabel = document.createElement("input");
+    footnoteLinkLabel.className = "form-control form-control-sm";
+    footnoteLinkLabel.type = "text";
+    footnoteLinkLabel.autocomplete = "off";
+    addInput("Link label", footnoteLinkLabel);
+
+    footnoteLinkUrl = document.createElement("input");
+    footnoteLinkUrl.className = "form-control form-control-sm";
+    footnoteLinkUrl.type = "url";
+    footnoteLinkUrl.autocomplete = "off";
+    addInput("Link URL", footnoteLinkUrl);
+  }
+
+  const labelInput = type === "page" || type === "namespace" ? document.createElement("input") : null;
+  if (labelInput) {
+    labelInput.className = "form-control form-control-sm";
+    labelInput.type = "text";
+    labelInput.autocomplete = "off";
+    addInput("Label", labelInput);
+    if (initial && initial.label) {
+      labelInput.value = initial.label;
+    }
+  }
+
+  const select = type === "footnote" ? null : document.createElement("select");
+  if (select) {
+    select.className = "form-select form-select-sm";
+    select.size = 6;
+    form.appendChild(select);
+  }
+
+  const status = document.createElement("p");
+  status.className = "wiki-editor-entity-dialog__status small text-muted";
+  status.setAttribute("aria-live", "polite");
+  form.appendChild(status);
+
+  const actions = document.createElement("div");
+  actions.className = "wiki-editor-entity-dialog__actions";
+  const insertBtn = document.createElement("button");
+  insertBtn.type = "submit";
+  insertBtn.className = "btn btn-primary btn-sm";
+  insertBtn.textContent = "Insert";
+  const cancelBtn = document.createElement("button");
+  cancelBtn.type = "button";
+  cancelBtn.className = "btn btn-link btn-sm";
+  cancelBtn.textContent = "Cancel";
+  actions.appendChild(insertBtn);
+  actions.appendChild(cancelBtn);
+  form.appendChild(actions);
+
+  let results = [];
+  async function runSearch() {
+    if (!select || type === "footnote") {
+      return;
+    }
+    const q = searchInput.value.trim();
+    const params = new URLSearchParams({ q, limit: "25" });
+    let url;
+    if (type === "user") {
+      url = `${getRelativeApiPath(options, "user-autocomplete")}?${params.toString()}`;
+    } else {
+      params.set("context", "wiki");
+      params.set("cid", String((options && options.cid) || ""));
+      params.set("scope", type === "namespace" ? "all-wiki" : "current-namespace");
+      url = `${(options && options.linkAutocompleteUrl) || getRelativeApiPath(options, "link-autocomplete")}?${params.toString()}`;
+    }
+    status.textContent = "Searching...";
+    const response = await fetchJson(url);
+    results = (response.results || []).filter(function (result) {
+      return type === "user" ? true : result.type === type;
+    });
+    select.innerHTML = "";
+    results.forEach(function (result, index) {
+      const opt = document.createElement("option");
+      opt.value = String(index);
+      opt.textContent = optionLabel(result);
+      select.appendChild(opt);
+    });
+    status.textContent = results.length ? "" : (
+      type === "page" ? "No exact match. The typed target can be inserted as a redlink." :
+        (type === "user" ? "No matching user. A typed mention will be marked unresolved." : "No matches.")
+    );
+  }
+
+  let searchTimer = null;
+  if (type !== "footnote") {
+    searchInput.addEventListener("input", function () {
+      window.clearTimeout(searchTimer);
+      searchTimer = window.setTimeout(function () {
+        runSearch().catch(function (err) {
+          status.textContent = (err && err.message) || String(err);
+        });
+      }, 180);
+    });
+    select.addEventListener("change", function () {
+      const result = results[parseInt(select.value, 10)];
+      if (labelInput && result) {
+        labelInput.value = result.titleLeaf || result.title || "";
+      }
+    });
+    runSearch().catch(function () {});
+  }
+
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+    const selected = select ? results[parseInt(select.value, 10)] : null;
+    const typed = searchInput.value.trim();
+    const label = labelInput && labelInput.value.trim();
+    if (type === "page") {
+      const target = selected ? String(selected.insertText || "").replace(/^\[\[|\]\]$/g, "").split("|")[0] : typed;
+      if (target) {
+        let chain = editor.chain().focus();
+        if (replaceMark) {
+          chain = chain.extendMarkRange("wikiPageLink").unsetMark("wikiPageLink");
+        }
+        chain.insertWikiPageLink({ target, label: label || (selected && (selected.titleLeaf || selected.title)) || typed }).run();
+      }
+    } else if (type === "namespace") {
+      const target = selected ? String(selected.insertText || "").replace(/^\[\[ns:|\]\]$/g, "").split("|")[0] : typed.replace(/^ns:/i, "");
+      if (target) {
+        let chain = editor.chain().focus();
+        if (replaceMark) {
+          chain = chain.extendMarkRange("wikiNamespaceLink").unsetMark("wikiNamespaceLink");
+        }
+        chain.insertWikiNamespaceLink({ target, label: label || (selected && selected.title) || target }).run();
+      }
+    } else if (type === "user") {
+      const user = selected ?
+        { ...selected, resolved: true } :
+        { username: typed.replace(/^@/, ""), resolved: false };
+      let chain = editor.chain().focus();
+      if (replaceMark) {
+        chain = chain.extendMarkRange("wikiUserMention").unsetMark("wikiUserMention");
+      }
+      chain.insertWikiUserMention(user).run();
+    } else if (type === "footnote") {
+      let body = typed;
+      const linkLabel = footnoteLinkLabel && footnoteLinkLabel.value.trim();
+      const linkUrl = footnoteLinkUrl && footnoteLinkUrl.value.trim();
+      if (linkLabel && linkUrl) {
+        body = `${body}${body ? " " : ""}[${linkLabel}](${linkUrl})`;
+      }
+      let chain = editor.chain().focus();
+      if (replaceMark) {
+        chain = chain.extendMarkRange("wikiFootnote").unsetMark("wikiFootnote");
+      }
+      chain.insertWikiFootnote({ body }).run();
+    }
+    dialog.remove();
+  });
+
+  cancelBtn.addEventListener("click", function () {
+    dialog.remove();
+    editor.commands.focus();
+  });
+
+  document.body.appendChild(dialog);
+  searchInput.focus();
+}
+
+function openWikiEntityDialogForElement(editor, element, options) {
+  const type = element && element.getAttribute("data-wiki-entity");
+  const markNameByType = {
+    page: "wikiPageLink",
+    namespace: "wikiNamespaceLink",
+    user: "wikiUserMention",
+    footnote: "wikiFootnote"
+  };
+  if (!markNameByType[type]) {
+    return false;
+  }
+  try {
+    const pos = editor.view.posAtDOM(element.firstChild || element, 0);
+    editor.chain().focus().setTextSelection(pos).extendMarkRange(markNameByType[type]).run();
+  } catch (err) {
+    return false;
+  }
+  const initial = {
+    search: type === "footnote" ?
+      (
+        decodeBase64Utf8(element.getAttribute("data-wiki-footnote-b64")) ||
+        element.getAttribute("data-wiki-footnote") ||
+        ""
+      ) :
+      (element.getAttribute("data-wiki-target") || element.getAttribute("data-wiki-username") || element.textContent || "").replace(/^@/, ""),
+    label: element.getAttribute("data-wiki-label") || element.textContent || ""
+  };
+  openWikiEntityDialog({
+    editor,
+    type,
+    options,
+    initial,
+    replaceMark: true
+  });
+  return true;
 }
 
 function createToolbar(root, editor, uploadImage) {
@@ -372,7 +756,7 @@ function createToolbar(root, editor, uploadImage) {
   addGroup([
     {
       id: "link",
-      title: "Set link",
+      title: "Set external link",
       action: function () {
         const currentHref = editor.getAttributes("link").href || "";
         const href = window.prompt("Link URL", currentHref || "https://");
@@ -397,6 +781,34 @@ function createToolbar(root, editor, uploadImage) {
       },
       applyState: function (button) {
         button.disabled = !editor.isActive("link");
+      }
+    },
+    {
+      id: "wiki-page-link",
+      title: "Insert wiki page link",
+      action: function () {
+        openWikiEntityDialog({ editor, type: "page", options: root.__wikiEditorOptions || {} });
+      }
+    },
+    {
+      id: "wiki-namespace-link",
+      title: "Insert namespace link",
+      action: function () {
+        openWikiEntityDialog({ editor, type: "namespace", options: root.__wikiEditorOptions || {} });
+      }
+    },
+    {
+      id: "wiki-user-mention",
+      title: "Insert forum user",
+      action: function () {
+        openWikiEntityDialog({ editor, type: "user", options: root.__wikiEditorOptions || {} });
+      }
+    },
+    {
+      id: "wiki-footnote",
+      title: "Insert footnote",
+      action: function () {
+        openWikiEntityDialog({ editor, type: "footnote", options: root.__wikiEditorOptions || {} });
       }
     },
     {
@@ -1109,6 +1521,7 @@ export async function createWikiEditor(element, options) {
 
   const toolbarMount = document.createElement("div");
   toolbarMount.className = "wiki-editor__toolbar-mount";
+  toolbarMount.__wikiEditorOptions = options || {};
   root.appendChild(toolbarMount);
 
   const body = document.createElement("div");
@@ -1193,6 +1606,10 @@ export async function createWikiEditor(element, options) {
       MediaRow,
       ImageFigure,
       WikiCallout,
+      WikiPageLink,
+      WikiNamespaceLink,
+      WikiUserMention,
+      WikiFootnote,
       Underline,
       Highlight,
       WikiLink.configure({
@@ -1249,10 +1666,7 @@ export async function createWikiEditor(element, options) {
 
           event.preventDefault();
           if (event.shiftKey) {
-            const wikiLinkSearch = document.getElementById("wiki-compose-link-search");
-            if (wikiLinkSearch && typeof wikiLinkSearch.focus === "function") {
-              wikiLinkSearch.focus();
-            }
+            openWikiEntityDialog({ editor, type: "page", options: options || {} });
             return true;
           }
 
@@ -1269,6 +1683,7 @@ export async function createWikiEditor(element, options) {
         },
         click: function (_view, event) {
           const target = event.target;
+          const entity = target && typeof target.closest === "function" ? target.closest("[data-wiki-entity]") : null;
           const imageFigure = target && typeof target.closest === "function" ? target.closest('[data-wiki-node="image-figure"]') : null;
           const imageNode = target && typeof target.closest === "function" ? target.closest('img[data-wiki-node="image"]') : null;
           const mediaCell = target && typeof target.closest === "function" ? target.closest('[data-wiki-node="media-cell"]') : null;
@@ -1279,6 +1694,12 @@ export async function createWikiEditor(element, options) {
               return linkContextToolbar;
             }
           }, event)) {
+            return true;
+          }
+
+          if (entity && editorMount.contains(entity) && openWikiEntityDialogForElement(editor, entity, options || {})) {
+            event.preventDefault();
+            event.stopPropagation();
             return true;
           }
 
@@ -1367,6 +1788,11 @@ export async function createWikiEditor(element, options) {
     }
   });
   const editorToc = createEditorToc(body, editorMount, editor);
+  const userEntityResolution = installUserEntityResolution(editorMount, options || {});
+  const refreshUserEntityResolution = function () {
+    userEntityResolution.refresh();
+  };
+  editor.on("update", refreshUserEntityResolution);
 
   return {
     getHTML: function () {
@@ -1395,6 +1821,8 @@ export async function createWikiEditor(element, options) {
     },
     destroy: function () {
       destroyLinkNavigationGuard();
+      editor.off("update", refreshUserEntityResolution);
+      userEntityResolution.destroy();
       topToolbar.destroy();
       imageContextToolbar.destroy();
       tableContextToolbar.destroy();

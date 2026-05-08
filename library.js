@@ -7,6 +7,7 @@ const adminControllers = require("./lib/controllers/admin");
 const serializer = require("./lib/serializer");
 const topicService = require("./lib/topic-service");
 const wikiLinkAutocomplete = require("./lib/wiki-link-autocomplete");
+const wikiUserAutocomplete = require("./lib/wiki-user-autocomplete");
 const wikiLinks = require("./lib/wiki-links");
 const wikiFootnotes = require("./lib/wiki-footnotes");
 const wikiHtmlParse = require("./lib/wiki-html-parse");
@@ -61,6 +62,13 @@ plugin.registerApiRoutes = async function ({ router, middleware }) {
     "/westgate-wiki/link-autocomplete",
     [],
     wikiLinkAutocomplete.apiSearch
+  );
+  routeHelpers.setupApiRoute(
+    router,
+    "get",
+    "/westgate-wiki/user-autocomplete",
+    [],
+    wikiUserAutocomplete.apiSearch
   );
   routeHelpers.setupApiRoute(
     router,

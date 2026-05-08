@@ -50,6 +50,25 @@ test("sanitizeWikiHtml keeps stored inert editor links inert", function () {
   assert.doesNotMatch(sanitized, /<a\b/);
 });
 
+test("sanitizeWikiHtml preserves inert wiki entity spans for editor storage", function () {
+  const html = '<p><span class="wiki-entity wiki-entity--page" data-wiki-entity="page" data-wiki-target="Guides/Page" data-wiki-label="Guide" onclick="alert(1)">Guide</span> <span class="wiki-entity wiki-entity--footnote" data-wiki-entity="footnote" data-wiki-footnote="Note <script>alert(1)</script>">[note]</span></p>';
+  const sanitized = wikiHtmlSanitizer.sanitizeWikiHtml(html);
+
+  assert.match(sanitized, /data-wiki-entity="page"/);
+  assert.match(sanitized, /data-wiki-target="Guides\/Page"/);
+  assert.match(sanitized, /data-wiki-entity="footnote"/);
+  assert.doesNotMatch(sanitized, /onclick/);
+  assert.doesNotMatch(sanitized, /script/);
+});
+
+test("renderReadOnlyWikiHtml leaves wiki entities for parse hooks instead of converting them as links", function () {
+  const html = '<p><span class="wiki-entity wiki-entity--page" data-wiki-entity="page" data-wiki-target="Guides/Page">Guide</span></p>';
+  const rendered = wikiHtmlSanitizer.renderReadOnlyWikiHtml(html);
+
+  assert.match(rendered, /data-wiki-entity="page"/);
+  assert.doesNotMatch(rendered, /<a\b/);
+});
+
 test("renderReadOnlyWikiHtml does not convert unsafe inert editor links", function () {
   const html = '<p>A <span class="wiki-editor-link" data-wiki-link-href="javascript:alert(1)">bad link</span>.</p>';
   const rendered = wikiHtmlSanitizer.renderReadOnlyWikiHtml(html);
@@ -63,6 +82,15 @@ test("renderReadOnlyWikiHtml removes empty task checkbox spacer spans", function
 
   assert.doesNotMatch(rendered, /<span><\/span>/);
   assert.match(rendered, /<label><input type="checkbox" checked disabled(?:="disabled")? \/><\/label>/);
+});
+
+test("renderReadOnlyWikiHtml preserves visible footnote backlink icons", function () {
+  const html = '<section class="wiki-footnotes"><ol><li><span class="wiki-footnote-backrefs"><a class="wiki-footnote-backref" href="#fnt__1"><span class="wiki-footnote-backref-icon" aria-hidden="true">↑</span><span class="visually-hidden">Back to footnote reference</span></a></span></li></ol></section>';
+  const rendered = wikiHtmlSanitizer.renderReadOnlyWikiHtml(html);
+
+  assert.match(rendered, /class="wiki-footnote-backref-icon"/);
+  assert.match(rendered, />↑<\/span>/);
+  assert.match(rendered, /href="#fnt__1"/);
 });
 
 test("sanitizeWikiHtml preserves safe inline styles and strips unsafe ones", function () {
