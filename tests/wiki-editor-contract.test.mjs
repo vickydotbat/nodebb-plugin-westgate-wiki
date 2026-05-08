@@ -782,16 +782,95 @@ await test("top toolbar schema keeps wiki entity tools and only table creation i
     "blocks",
     "callouts",
     "alignment",
-    "tables"
+    "tables",
+    "view"
   ]);
 
   const history = TOP_TOOLBAR_GROUPS.find(function (group) { return group.id === "history"; });
   const media = TOP_TOOLBAR_GROUPS.find(function (group) { return group.id === "links-media"; });
   const tables = TOP_TOOLBAR_GROUPS.find(function (group) { return group.id === "tables"; });
+  const view = TOP_TOOLBAR_GROUPS.find(function (group) { return group.id === "view"; });
 
   assert.deepEqual(history.buttonIds, ["undo", "redo"]);
   assert.deepEqual(media.buttonIds, ["link", "wiki-page-link", "wiki-namespace-link", "wiki-user-mention", "wiki-footnote", "image-upload", "media-row-2", "media-row-3"]);
   assert.deepEqual(tables.buttonIds, ["table-insert"]);
+  assert.deepEqual(view.buttonIds, ["fullscreen-source"]);
+  assert.equal(TOP_TOOLBAR_BUTTON_IDS.includes("fullscreen-source"), true);
+});
+
+await test("fullscreen source mode has guarded editable source synchronization", function () {
+  assert.match(editorBundleSource, /function\s+escapeSourceHtml\s*\(/);
+  assert.match(editorBundleSource, /function\s+formatSourceHtml\s*\(/);
+  assert.match(editorBundleSource, /function\s+normalizeSourceHtmlForEditor\s*\(/);
+  assert.match(editorBundleSource, /function\s+removeSourceWhitespaceTextNodes\s*\(/);
+  assert.match(editorBundleSource, /function\s+plainSourceHeadingText\s*\(/);
+  assert.match(editorBundleSource, /function\s+scrollSourceToHeading\s*\(/);
+  assert.match(editorBundleSource, /function\s+highlightSourceHtml\s*\(/);
+  assert.match(editorBundleSource, /function\s+createFullscreenSourceMode\s*\(/);
+  assert.match(editorBundleSource, /let\s+syncingSource\s*=\s*false/);
+  assert.match(editorBundleSource, /let\s+sourceDirty\s*=\s*false/);
+  assert.match(editorBundleSource, /new DOMParser\(\)\.parseFromString/);
+  assert.match(editorBundleSource, /sourceTextarea\.value\s*=\s*formatSourceHtml\(sanitizeHtml\(editor\.getHTML\(\)\)\)/);
+  assert.match(editorBundleSource, /normalizeSourceHtmlForEditor\(sourceTextarea\.value\)/);
+  assert.match(editorBundleSource, /function\s+applySourceToEditor\s*\(/);
+  assert.match(editorBundleSource, /editor\.commands\.setContent\([^,]+,\s*false\)/);
+  assert.match(editorBundleSource, /sourceApply\.addEventListener\("click",\s*applySourceToEditor\)/);
+  assert.match(editorBundleSource, /sourceTextarea\.addEventListener\("input",\s*function \(\) \{[\s\S]*setSourceDirty\(true\)/);
+  assert.doesNotMatch(editorBundleSource, /sourceTextarea\.addEventListener\("input",\s*function \(\) \{[\s\S]*syncEditorFromSource\(\)/);
+  assert.match(editorBundleSource, /root\.addEventListener\("wiki-editor-toc-navigate",\s*handleTocNavigate\)/);
+  assert.match(editorBundleSource, /root\.removeEventListener\("wiki-editor-toc-navigate",\s*handleTocNavigate\)/);
+  assert.match(editorBundleSource, /sourceTextarea\.scrollTo\(\{[\s\S]*behavior:\s*"smooth"/);
+});
+
+await test("editor ToC navigation dispatches a source sync event", function () {
+  assert.match(editorBundleSource, /new CustomEvent\("wiki-editor-toc-navigate"/);
+  assert.match(editorBundleSource, /detail:\s*\{\s*item/);
+  assert.match(editorBundleSource, /bubbles:\s*true/);
+});
+
+await test("fullscreen source toolbar action is bridged onto the toolbar mount", function () {
+  assert.match(editorBundleSource, /toolbarMount\.__wikiToggleFullscreenSource\s*=/);
+  assert.match(editorBundleSource, /toolbarMount\.__wikiIsFullscreenSourceActive\s*=/);
+});
+
+await test("fullscreen source mode portals above NodeBB page stacking contexts", function () {
+  assert.match(editorBundleSource, /wiki-editor-fullscreen-portal/);
+  assert.match(editorBundleSource, /wiki-editor-fullscreen-actions-portal/);
+  assert.match(editorBundleSource, /querySelector\("\.wiki-compose-actions--floating"\)/);
+  assert.match(editorBundleSource, /document\.body\.appendChild\(portalHost\)/);
+  assert.match(editorBundleSource, /document\.body\.appendChild\(actionsPortalHost\)/);
+  assert.match(editorBundleSource, /placeholder\.parentNode\.insertBefore\(root,\s*placeholder\)/);
+  assert.match(editorBundleSource, /actionsPlaceholder\.parentNode\.insertBefore\(actionsDock,\s*actionsPlaceholder\)/);
+});
+
+await test("fullscreen source highlighting escapes raw source before adding syntax spans", function () {
+  assert.match(editorBundleSource, /escapeSourceHtml\(source\)/);
+  assert.match(editorBundleSource, /\.replace\(/);
+  assert.match(editorBundleSource, /wiki-editor-source-token--tag/);
+  assert.match(editorBundleSource, /wiki-editor-source-token--script/);
+});
+
+await test("fullscreen source mode css supports resize and source hiding", function () {
+  [editorCss, vendoredEditorCss].forEach(function (css) {
+    assert.match(css, /\.wiki-editor-fullscreen-portal\s*{[^}]*z-index:\s*1040/);
+    assert.match(css, /\.wiki-editor-fullscreen-actions-portal\s*{[^}]*z-index:\s*1065/);
+    assert.match(css, /\.wiki-editor-fullscreen-actions-portal\s*>\s*\.wiki-compose-actions--floating\s*{[^}]*pointer-events:\s*auto/);
+    assert.match(css, /\.wiki-editor--fullscreen-source\s*{[^}]*z-index:\s*1040/);
+    assert.match(css, /\.wiki-editor--fullscreen-source\s*{[^}]*background:\s*var\(--bs-body-bg,\s*#fff\)/);
+    assert.match(css, /\.wiki-editor--fullscreen-source\s+\.wiki-editor__fullscreen-editor-panel[^{}]*{[^}]*background:\s*var\(--bs-body-bg,\s*#fff\)/);
+    assert.match(css, /\.wiki-editor--fullscreen-source\s+\.wiki-editor__surface[^{}]*{[^}]*background:\s*var\(--bs-body-bg,\s*#fff\)/);
+    assert.match(css, /\.wiki-editor-fullscreen-source-active\s+\.wiki-compose-actions--floating\s*{[^}]*z-index:\s*1060/);
+    assert.match(css, /\.wiki-editor-fullscreen-source-active\s+\.wiki-compose-actions--floating\s*{[^}]*right:\s*max\(1rem,\s*env\(safe-area-inset-right,\s*0px\)\)/);
+    assert.match(css, /\.wiki-editor-fullscreen-source-active\s+\.wiki-compose-actions--floating\s*{[^}]*justify-content:\s*flex-end/);
+    assert.match(css, /\.wiki-editor--fullscreen-source\s+\.wiki-editor-toc\s*{[^}]*right:\s*0/);
+    assert.match(css, /\.wiki-editor--fullscreen-source\s+\.wiki-editor-toc\s*{[^}]*transform:\s*translate(?:X)?\(calc\(100%\s*-\s*2\.6rem\)\)/);
+    assert.match(css, /--wiki-editor-source-panel-width:\s*clamp\(22rem,\s*38vw,\s*70vw\)/);
+    assert.match(css, /\.wiki-editor__fullscreen-layout\s*{[^}]*grid-template-columns:\s*var\(--wiki-editor-source-panel-current-width/);
+    assert.match(css, /\.wiki-editor--fullscreen-source-hidden\s+\.wiki-editor__fullscreen-source-panel[^{}]*{[^}]*display:\s*none/);
+    assert.match(css, /\.wiki-editor--fullscreen-source-hidden\s+\.wiki-editor__fullscreen-layout\s*{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/);
+    assert.match(css, /\.wiki-editor__fullscreen-resizer\s*{[^}]*cursor:\s*col-resize/);
+    assert.match(css, /\.wiki-editor__fullscreen-source-actions\s*{[^}]*display:\s*flex/);
+  });
 });
 
 await test("contextual table schema exposes row, column, cell merge, and delete tools", function () {

@@ -38,6 +38,11 @@ export const TOP_TOOLBAR_GROUPS = [
     id: "tables",
     label: "Tables",
     buttonIds: ["table-insert"]
+  },
+  {
+    id: "view",
+    label: "View",
+    buttonIds: ["fullscreen-source"]
   }
 ];
 

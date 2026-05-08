@@ -132,7 +132,8 @@ const BUTTON_ICONS = {
   "image-size-sm": "fa-compress",
   "image-size-md": "fa-arrows-h",
   "image-size-lg": "fa-expand",
-  "image-size-full": "fa-arrows-alt"
+  "image-size-full": "fa-arrows-alt",
+  "fullscreen-source": "fa-window-maximize"
 };
 
 function createButton(def) {
@@ -994,6 +995,23 @@ function createToolbar(root, editor, uploadImage) {
     }
   ], "tables");
 
+  addGroup([
+    {
+      id: "fullscreen-source",
+      title: "Toggle fullscreen source editor",
+      action: function () {
+        if (typeof root.__wikiToggleFullscreenSource === "function") {
+          root.__wikiToggleFullscreenSource();
+        }
+      },
+      applyState: function (button) {
+        const active = typeof root.__wikiIsFullscreenSourceActive === "function" && root.__wikiIsFullscreenSourceActive();
+        button.classList.toggle("active", !!active);
+        button.setAttribute("aria-pressed", active ? "true" : "false");
+      }
+    }
+  ], "view");
+
   function syncToolbar() {
     groups.forEach(function (defs) {
       defs.forEach(function (def) {
@@ -1022,6 +1040,7 @@ function createToolbar(root, editor, uploadImage) {
   editor.on("focus", syncToolbar);
   editor.on("blur", syncToolbar);
   window.addEventListener("resize", syncToolbarSeparators);
+  root.addEventListener("wiki-editor-fullscreen-source-change", syncToolbar);
   syncToolbar();
 
   root.appendChild(toolbar);
@@ -1034,6 +1053,7 @@ function createToolbar(root, editor, uploadImage) {
   return {
     destroy: function () {
       window.removeEventListener("resize", syncToolbarSeparators);
+      root.removeEventListener("wiki-editor-fullscreen-source-change", syncToolbar);
     }
   };
 }
@@ -1460,6 +1480,10 @@ function createEditorToc(root, surface, editor) {
         event.preventDefault();
         event.stopPropagation();
         navigateToHeading({ item, surface, editor });
+        root.dispatchEvent(new CustomEvent("wiki-editor-toc-navigate", {
+          detail: { item },
+          bubbles: true
+        }));
       });
       row.appendChild(button);
 
@@ -1499,6 +1523,569 @@ function createEditorToc(root, surface, editor) {
       if (aside.parentNode) {
         aside.parentNode.removeChild(aside);
       }
+    }
+  };
+}
+
+function escapeSourceHtml(source) {
+  return String(source || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function highlightEscapedTag(tag) {
+  return tag.replace(
+    /(&lt;\/?)([a-zA-Z][\w:-]*)([\s\S]*?)(\/?&gt;)/g,
+    function (_source, open, name, attrs, close) {
+      const highlightedAttrs = attrs.replace(
+        /([\w:-]+)(\s*=\s*)(&quot;[^&]*(?:&(?!quot;)[^&]*)*&quot;|'[^']*')/g,
+        '<span class="wiki-editor-source-token wiki-editor-source-token--attr">$1</span>$2<span class="wiki-editor-source-token wiki-editor-source-token--string">$3</span>'
+      );
+      return `<span class="wiki-editor-source-token wiki-editor-source-token--tag">${open}${name}${highlightedAttrs}${close}</span>`;
+    }
+  );
+}
+
+function highlightSourceHtml(source) {
+  const escaped = escapeSourceHtml(source);
+  return escaped
+    .replace(/(&lt;!--[\s\S]*?--&gt;)/g, '<span class="wiki-editor-source-token wiki-editor-source-token--comment">$1</span>')
+    .replace(/(&lt;script\b[\s\S]*?&lt;\/script&gt;)/gi, function (scriptSource) {
+      return `<span class="wiki-editor-source-token wiki-editor-source-token--script">${highlightEscapedTag(scriptSource)}</span>`;
+    })
+    .replace(/(&lt;\/?[a-zA-Z][\w:-]*[\s\S]*?&gt;)/g, highlightEscapedTag)
+    .replace(/(&amp;[a-zA-Z0-9#]+;)/g, '<span class="wiki-editor-source-token wiki-editor-source-token--entity">$1</span>');
+}
+
+const SOURCE_FORMAT_BLOCK_TAGS = new Set([
+  "address",
+  "article",
+  "aside",
+  "blockquote",
+  "div",
+  "figcaption",
+  "figure",
+  "footer",
+  "form",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "header",
+  "hr",
+  "li",
+  "main",
+  "ol",
+  "p",
+  "pre",
+  "section",
+  "table",
+  "tbody",
+  "td",
+  "tfoot",
+  "th",
+  "thead",
+  "tr",
+  "ul"
+]);
+
+const SOURCE_FORMAT_VOID_TAGS = new Set([
+  "area",
+  "base",
+  "br",
+  "col",
+  "embed",
+  "hr",
+  "img",
+  "input",
+  "link",
+  "meta",
+  "param",
+  "source",
+  "track",
+  "wbr"
+]);
+
+function getSourceTagName(token) {
+  const match = /^<\/?\s*([a-zA-Z][\w:-]*)/.exec(token || "");
+  return match ? match[1].toLowerCase() : "";
+}
+
+function isClosingSourceTag(token) {
+  return /^<\//.test(token || "");
+}
+
+function isSelfClosingSourceTag(token, tagName) {
+  return /\/\s*>$/.test(token || "") || SOURCE_FORMAT_VOID_TAGS.has(tagName);
+}
+
+function appendFormattedSourceLine(lines, indent, content) {
+  const text = String(content || "").trim();
+  if (!text) {
+    return;
+  }
+  lines.push(`${"  ".repeat(Math.max(0, indent))}${text}`);
+}
+
+function compactSourceHtml(html) {
+  return String(html || "")
+    .replace(/>\s+</g, "><")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function sourceNodeHtml(node) {
+  if (!node) {
+    return "";
+  }
+  if (node.nodeType === Node.TEXT_NODE) {
+    return String(node.textContent || "").replace(/\s+/g, " ").trim();
+  }
+  if (node.nodeType === Node.COMMENT_NODE) {
+    return `<!--${node.textContent || ""}-->`;
+  }
+  return compactSourceHtml(node.outerHTML || "");
+}
+
+function sourceElementTagName(node) {
+  return node && node.nodeType === Node.ELEMENT_NODE ? node.tagName.toLowerCase() : "";
+}
+
+function isSourceBlockElement(node) {
+  return SOURCE_FORMAT_BLOCK_TAGS.has(sourceElementTagName(node));
+}
+
+function hasSourceBlockChild(node) {
+  return Array.from((node && node.childNodes) || []).some(isSourceBlockElement);
+}
+
+function openingSourceTag(node) {
+  const html = sourceNodeHtml(node);
+  const match = /^<[^>]+>/.exec(html);
+  return match ? match[0] : html;
+}
+
+function closingSourceTag(node) {
+  const tagName = sourceElementTagName(node);
+  return tagName && !SOURCE_FORMAT_VOID_TAGS.has(tagName) ? `</${tagName}>` : "";
+}
+
+function formatSourceNode(node, indent, lines) {
+  if (!node) {
+    return;
+  }
+
+  if (node.nodeType !== Node.ELEMENT_NODE) {
+    appendFormattedSourceLine(lines, indent, sourceNodeHtml(node));
+    return;
+  }
+
+  if (!isSourceBlockElement(node) || !hasSourceBlockChild(node)) {
+    appendFormattedSourceLine(lines, indent, sourceNodeHtml(node));
+    return;
+  }
+
+  appendFormattedSourceLine(lines, indent, openingSourceTag(node));
+  Array.from(node.childNodes).forEach(function (child) {
+    formatSourceNode(child, indent + 1, lines);
+  });
+  appendFormattedSourceLine(lines, indent, closingSourceTag(node));
+}
+
+function formatSourceHtml(html) {
+  const source = String(html || "").trim();
+  if (!source) {
+    return "";
+  }
+  if (typeof DOMParser !== "undefined") {
+    const doc = new DOMParser().parseFromString(`<body>${source}</body>`, "text/html");
+    const lines = [];
+    Array.from(doc.body.childNodes).forEach(function (node) {
+      formatSourceNode(node, 0, lines);
+    });
+    return lines.join("\n");
+  }
+
+  const tokens = compactSourceHtml(source)
+    .match(/<!--[\s\S]*?-->|<script\b[\s\S]*?<\/script\s*>|<style\b[\s\S]*?<\/style\s*>|<\/?[^>]+>|[^<]+/gi) || [];
+  const lines = [];
+  let indent = 0;
+  let currentInline = "";
+
+  function flushInline() {
+    appendFormattedSourceLine(lines, indent, currentInline);
+    currentInline = "";
+  }
+
+  tokens.forEach(function (token) {
+    const trimmed = String(token || "").trim();
+    if (!trimmed) {
+      return;
+    }
+
+    if (!trimmed.startsWith("<")) {
+      currentInline += trimmed;
+      return;
+    }
+
+    if (/^<!--/.test(trimmed) || /^<(script|style)\b/i.test(trimmed)) {
+      flushInline();
+      appendFormattedSourceLine(lines, indent, trimmed);
+      return;
+    }
+
+    const tagName = getSourceTagName(trimmed);
+    const block = SOURCE_FORMAT_BLOCK_TAGS.has(tagName);
+    const closing = isClosingSourceTag(trimmed);
+    const selfClosing = isSelfClosingSourceTag(trimmed, tagName);
+
+    if (!block) {
+      currentInline += trimmed;
+      return;
+    }
+
+    if (closing) {
+      if (currentInline) {
+        currentInline += trimmed;
+        indent = Math.max(0, indent - 1);
+        flushInline();
+      } else {
+        indent = Math.max(0, indent - 1);
+        appendFormattedSourceLine(lines, indent, trimmed);
+      }
+      return;
+    }
+
+    flushInline();
+    appendFormattedSourceLine(lines, indent, trimmed);
+    if (!selfClosing) {
+      indent += 1;
+    }
+  });
+
+  flushInline();
+  return lines.join("\n");
+}
+
+function normalizeSourceHtmlForEditor(source) {
+  const raw = String(source || "").trim();
+  if (!raw) {
+    return "";
+  }
+  if (typeof DOMParser !== "undefined") {
+    const doc = new DOMParser().parseFromString(`<body>${raw}</body>`, "text/html");
+    removeSourceWhitespaceTextNodes(doc.body);
+    return doc.body.innerHTML;
+  }
+  return raw.replace(/>\s+</g, "><");
+}
+
+function removeSourceWhitespaceTextNodes(node) {
+  if (!node || /^(pre|script|style)$/i.test(node.nodeName || "")) {
+    return;
+  }
+  Array.from(node.childNodes || []).forEach(function (child) {
+    if (child.nodeType === Node.TEXT_NODE && !String(child.textContent || "").trim()) {
+      node.removeChild(child);
+      return;
+    }
+    removeSourceWhitespaceTextNodes(child);
+  });
+}
+
+function plainSourceHeadingText(source) {
+  const html = String(source || "");
+  if (!html) {
+    return "";
+  }
+  if (typeof document !== "undefined") {
+    const element = document.createElement("div");
+    element.innerHTML = html;
+    return String(element.textContent || "").replace(/\s+/g, " ").trim();
+  }
+  return html.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+}
+
+function createFullscreenSourceMode(root, editor, sourcePanel, sourceTextarea, sourceHighlight, resizer, layout, onChange) {
+  const sourceToggle = sourcePanel.querySelector("[data-wiki-editor-source-toggle]");
+  const sourceApply = sourcePanel.querySelector("[data-wiki-editor-source-apply]");
+  const sourceShow = layout.querySelector("[data-wiki-editor-source-show]");
+  let fullscreen = false;
+  let sourceHidden = false;
+  let syncingSource = false;
+  let sourceDirty = false;
+  let lastSourcePanelWidth = "clamp(22rem, 38vw, 70vw)";
+  let resizeCleanup = null;
+  let placeholder = null;
+  let portalHost = null;
+  let actionsPlaceholder = null;
+  let actionsPortalHost = null;
+  let actionsDock = null;
+
+  function setSourcePanelWidth(value) {
+    lastSourcePanelWidth = value || lastSourcePanelWidth;
+    root.style.setProperty("--wiki-editor-source-panel-current-width", lastSourcePanelWidth);
+  }
+
+  function syncSourceScroll() {
+    sourceHighlight.scrollTop = sourceTextarea.scrollTop;
+    sourceHighlight.scrollLeft = sourceTextarea.scrollLeft;
+  }
+
+  function renderSourceHighlight() {
+    sourceHighlight.innerHTML = highlightSourceHtml(sourceTextarea.value);
+    syncSourceScroll();
+  }
+
+  function setSourceDirty(dirty) {
+    sourceDirty = !!dirty;
+    sourcePanel.classList.toggle("wiki-editor__fullscreen-source-panel--dirty", sourceDirty);
+    if (sourceApply) {
+      sourceApply.disabled = !sourceDirty;
+    }
+  }
+
+  function syncSourceFromEditor() {
+    if (syncingSource || sourceDirty) {
+      return;
+    }
+    sourceTextarea.value = formatSourceHtml(sanitizeHtml(editor.getHTML()));
+    renderSourceHighlight();
+    setSourceDirty(false);
+  }
+
+  function applySourceToEditor() {
+    if (!sourceDirty) {
+      return;
+    }
+    syncingSource = true;
+    try {
+      const html = sanitizeHtml(normalizeLegacyHtmlForTiptap(normalizeSourceHtmlForEditor(sourceTextarea.value)));
+      editor.commands.setContent(html, false);
+      onChange();
+      setSourceDirty(false);
+    } finally {
+      syncingSource = false;
+      syncSourceFromEditor();
+    }
+  }
+
+  function scrollSourceToHeading(item) {
+    if (!fullscreen || sourceHidden || !item || !item.text) {
+      return;
+    }
+
+    const source = String(sourceTextarea.value || "");
+    const target = String(item.text || "").replace(/\s+/g, " ").trim();
+    if (!source || !target) {
+      return;
+    }
+
+    const headingPattern = /<h[1-6]\b[^>]*>[\s\S]*?<\/h[1-6]>/gi;
+    let match;
+    while ((match = headingPattern.exec(source))) {
+      if (plainSourceHeadingText(match[0]) !== target) {
+        continue;
+      }
+
+      const before = source.slice(0, match.index);
+      const line = before ? before.split("\n").length - 1 : 0;
+      const computedStyle = window.getComputedStyle ? window.getComputedStyle(sourceTextarea) : null;
+      const lineHeight = computedStyle ? parseFloat(computedStyle.lineHeight) : 0;
+      const fontSize = computedStyle ? parseFloat(computedStyle.fontSize) : 0;
+      const rowHeight = lineHeight || (fontSize ? fontSize * 1.45 : 20);
+      const top = Math.max(0, Math.round(line * rowHeight - sourceTextarea.clientHeight * 0.18));
+
+      sourceTextarea.scrollTo({
+        top,
+        behavior: "smooth"
+      });
+      sourceHighlight.scrollTop = top;
+      sourceHighlight.scrollLeft = sourceTextarea.scrollLeft;
+      return;
+    }
+  }
+
+  function handleTocNavigate(event) {
+    scrollSourceToHeading(event && event.detail && event.detail.item);
+  }
+
+  function setSourceHidden(hidden) {
+    sourceHidden = !!hidden;
+    root.classList.toggle("wiki-editor--fullscreen-source-hidden", sourceHidden);
+    if (sourceToggle) {
+      sourceToggle.setAttribute("aria-pressed", sourceHidden ? "true" : "false");
+      sourceToggle.setAttribute("title", sourceHidden ? "Show source panel" : "Hide source panel");
+    }
+    if (sourceShow) {
+      sourceShow.hidden = !sourceHidden;
+    }
+  }
+
+  function enterPortal() {
+    if (portalHost || !root.parentNode) {
+      return;
+    }
+    placeholder = document.createComment("westgate-wiki-editor-fullscreen-placeholder");
+    root.parentNode.insertBefore(placeholder, root);
+    portalHost = document.createElement("div");
+    portalHost.className = "westgate-wiki westgate-wiki-compose wiki-editor-fullscreen-portal";
+    portalHost.appendChild(root);
+    document.body.appendChild(portalHost);
+  }
+
+  function exitPortal() {
+    if (!placeholder || !placeholder.parentNode) {
+      return;
+    }
+    placeholder.parentNode.insertBefore(root, placeholder);
+    placeholder.parentNode.removeChild(placeholder);
+    placeholder = null;
+    if (portalHost && portalHost.parentNode) {
+      portalHost.parentNode.removeChild(portalHost);
+    }
+    portalHost = null;
+  }
+
+  function enterActionsPortal() {
+    if (actionsPortalHost) {
+      return;
+    }
+    actionsDock = document.querySelector(".wiki-compose-actions--floating");
+    if (!actionsDock || !actionsDock.parentNode) {
+      return;
+    }
+    actionsPlaceholder = document.createComment("westgate-wiki-editor-fullscreen-actions-placeholder");
+    actionsDock.parentNode.insertBefore(actionsPlaceholder, actionsDock);
+    actionsPortalHost = document.createElement("div");
+    actionsPortalHost.className = "westgate-wiki westgate-wiki-compose wiki-editor-fullscreen-actions-portal";
+    actionsPortalHost.appendChild(actionsDock);
+    document.body.appendChild(actionsPortalHost);
+  }
+
+  function exitActionsPortal() {
+    if (actionsPlaceholder && actionsPlaceholder.parentNode && actionsDock) {
+      actionsPlaceholder.parentNode.insertBefore(actionsDock, actionsPlaceholder);
+      actionsPlaceholder.parentNode.removeChild(actionsPlaceholder);
+    }
+    actionsPlaceholder = null;
+    actionsDock = null;
+    if (actionsPortalHost && actionsPortalHost.parentNode) {
+      actionsPortalHost.parentNode.removeChild(actionsPortalHost);
+    }
+    actionsPortalHost = null;
+  }
+
+  function setFullscreen(active) {
+    fullscreen = !!active;
+    if (fullscreen) {
+      enterPortal();
+      enterActionsPortal();
+    }
+    root.classList.toggle("wiki-editor--fullscreen-source", fullscreen);
+    document.documentElement.classList.toggle("wiki-editor-fullscreen-source-active", fullscreen);
+    root.dispatchEvent(new CustomEvent("wiki-editor-fullscreen-source-change"));
+    if (fullscreen) {
+      setSourceHidden(sourceHidden);
+      setSourcePanelWidth(lastSourcePanelWidth);
+      syncSourceFromEditor();
+      window.setTimeout(function () {
+        if (sourceHidden) {
+          editor.commands.focus();
+        } else {
+          sourceTextarea.focus();
+        }
+      }, 0);
+    } else {
+      if (sourceShow) {
+        sourceShow.hidden = true;
+      }
+      editor.commands.focus();
+      exitActionsPortal();
+      exitPortal();
+    }
+    root.dispatchEvent(new CustomEvent("wiki-editor-fullscreen-source-change"));
+  }
+
+  function startResize(event) {
+    if (!fullscreen || sourceHidden || window.matchMedia("(max-width: 767.98px)").matches) {
+      return;
+    }
+    event.preventDefault();
+    const layoutRect = layout.getBoundingClientRect();
+
+    function onMove(moveEvent) {
+      const raw = moveEvent.clientX - layoutRect.left;
+      const min = 352;
+      const max = Math.max(min, Math.min(layoutRect.width * 0.7, window.innerWidth * 0.7));
+      const next = Math.max(min, Math.min(raw, max));
+      setSourcePanelWidth(`${Math.round(next)}px`);
+    }
+
+    function onUp() {
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+      document.body.classList.remove("wiki-editor--resizing-source");
+      resizeCleanup = null;
+    }
+
+    resizeCleanup = onUp;
+    document.body.classList.add("wiki-editor--resizing-source");
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+  }
+
+  sourceTextarea.addEventListener("input", function () {
+    renderSourceHighlight();
+    setSourceDirty(true);
+  });
+  sourceTextarea.addEventListener("scroll", syncSourceScroll);
+  if (sourceApply) {
+    sourceApply.addEventListener("click", applySourceToEditor);
+    sourceApply.disabled = true;
+  }
+  root.addEventListener("wiki-editor-toc-navigate", handleTocNavigate);
+  resizer.addEventListener("pointerdown", startResize);
+  if (sourceToggle) {
+    sourceToggle.addEventListener("click", function () {
+      setSourceHidden(!sourceHidden);
+    });
+  }
+  if (sourceShow) {
+    sourceShow.addEventListener("click", function () {
+      setSourceHidden(false);
+      sourceTextarea.focus();
+    });
+    sourceShow.hidden = true;
+  }
+  editor.on("create", syncSourceFromEditor);
+  editor.on("update", syncSourceFromEditor);
+  syncSourceFromEditor();
+
+  root.__wikiToggleFullscreenSource = function () {
+    setFullscreen(!fullscreen);
+  };
+  root.__wikiIsFullscreenSourceActive = function () {
+    return fullscreen;
+  };
+
+  return {
+    destroy: function () {
+      if (resizeCleanup) {
+        resizeCleanup();
+      }
+      editor.off("create", syncSourceFromEditor);
+      editor.off("update", syncSourceFromEditor);
+      root.removeEventListener("wiki-editor-toc-navigate", handleTocNavigate);
+      document.documentElement.classList.remove("wiki-editor-fullscreen-source-active");
+      exitActionsPortal();
+      exitPortal();
+      delete root.__wikiToggleFullscreenSource;
+      delete root.__wikiIsFullscreenSourceActive;
     }
   };
 }
@@ -1544,9 +2131,56 @@ export async function createWikiEditor(element, options) {
   toolbarMount.__wikiEditorOptions = options || {};
   root.appendChild(toolbarMount);
 
+  const fullscreenLayout = document.createElement("div");
+  fullscreenLayout.className = "wiki-editor__fullscreen-layout";
+  root.appendChild(fullscreenLayout);
+
+  const sourcePanel = document.createElement("section");
+  sourcePanel.className = "wiki-editor__fullscreen-source-panel";
+  sourcePanel.setAttribute("aria-label", "HTML source editor");
+  sourcePanel.innerHTML = [
+    '<div class="wiki-editor__fullscreen-source-header">',
+    '<span class="wiki-editor__fullscreen-source-title">Source</span>',
+    '<div class="wiki-editor__fullscreen-source-actions">',
+    '<button type="button" class="btn btn-primary btn-sm wiki-editor__fullscreen-source-apply" data-wiki-editor-source-apply disabled>',
+    "Apply source",
+    "</button>",
+    '<button type="button" class="btn btn-outline-secondary btn-sm wiki-editor__fullscreen-source-toggle" data-wiki-editor-source-toggle title="Hide source panel" aria-pressed="false">',
+    '<i class="fa fa-columns" aria-hidden="true"></i>',
+    "</button>",
+    "</div>",
+    "</div>",
+    '<div class="wiki-editor__fullscreen-source-editor">',
+    '<pre class="wiki-editor__fullscreen-source-highlight" aria-hidden="true"></pre>',
+    '<textarea class="wiki-editor__fullscreen-source-input" spellcheck="false" aria-label="Article HTML source"></textarea>',
+    "</div>"
+  ].join("");
+  fullscreenLayout.appendChild(sourcePanel);
+
+  const sourceResizer = document.createElement("div");
+  sourceResizer.className = "wiki-editor__fullscreen-resizer";
+  sourceResizer.setAttribute("role", "separator");
+  sourceResizer.setAttribute("aria-orientation", "vertical");
+  sourceResizer.setAttribute("aria-label", "Resize source panel");
+  fullscreenLayout.appendChild(sourceResizer);
+
+  const editorColumn = document.createElement("div");
+  editorColumn.className = "wiki-editor__fullscreen-editor-panel";
+  fullscreenLayout.appendChild(editorColumn);
+
+  const sourceShowButton = document.createElement("button");
+  sourceShowButton.type = "button";
+  sourceShowButton.className = "btn btn-outline-secondary btn-sm wiki-editor__fullscreen-source-show";
+  sourceShowButton.setAttribute("data-wiki-editor-source-show", "1");
+  sourceShowButton.setAttribute("title", "Show source panel");
+  sourceShowButton.setAttribute("aria-label", "Show source panel");
+  sourceShowButton.hidden = true;
+  sourceShowButton.innerHTML = '<i class="fa fa-columns" aria-hidden="true"></i>';
+  editorColumn.appendChild(sourceShowButton);
+
   const body = document.createElement("div");
   body.className = "wiki-editor__body";
-  root.appendChild(body);
+  editorColumn.appendChild(body);
 
   const editorMount = document.createElement("div");
   editorMount.className = "wiki-editor__surface wiki-article-prose";
@@ -1554,7 +2188,7 @@ export async function createWikiEditor(element, options) {
 
   const metaRow = document.createElement("div");
   metaRow.className = "wiki-editor__meta small text-muted";
-  root.appendChild(metaRow);
+  editorColumn.appendChild(metaRow);
 
   const uploadInput = document.createElement("input");
   uploadInput.type = "file";
@@ -1796,6 +2430,18 @@ export async function createWikiEditor(element, options) {
     await uploadFiles([file]);
   });
 
+  const fullscreenSourceMode = createFullscreenSourceMode(
+    root,
+    editor,
+    sourcePanel,
+    sourcePanel.querySelector(".wiki-editor__fullscreen-source-input"),
+    sourcePanel.querySelector(".wiki-editor__fullscreen-source-highlight"),
+    sourceResizer,
+    fullscreenLayout,
+    onChange
+  );
+  toolbarMount.__wikiToggleFullscreenSource = root.__wikiToggleFullscreenSource;
+  toolbarMount.__wikiIsFullscreenSourceActive = root.__wikiIsFullscreenSourceActive;
   const topToolbar = createToolbar(toolbarMount, editor, pickAndUploadImage);
   const imageContextToolbar = createImageContextToolbar(editorMount, editor);
   const tableContextToolbar = createTableContextToolbar(editorMount, editor);
@@ -1843,6 +2489,9 @@ export async function createWikiEditor(element, options) {
       destroyLinkNavigationGuard();
       editor.off("update", refreshUserEntityResolution);
       userEntityResolution.destroy();
+      fullscreenSourceMode.destroy();
+      delete toolbarMount.__wikiToggleFullscreenSource;
+      delete toolbarMount.__wikiIsFullscreenSourceActive;
       topToolbar.destroy();
       imageContextToolbar.destroy();
       tableContextToolbar.destroy();

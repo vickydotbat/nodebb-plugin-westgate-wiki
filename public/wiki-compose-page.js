@@ -179,13 +179,16 @@ async function initWikiComposePage() {
 
     if (returnLink) {
       returnLink.addEventListener("click", async function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+
         const href = returnLink.getAttribute("href") || "";
 
         if (!href) {
           return;
         }
 
-        event.preventDefault();
         if (hasUnsavedChanges && !window.confirm("You have unsaved changes. Return to the article anyway?")) {
           return;
         }
