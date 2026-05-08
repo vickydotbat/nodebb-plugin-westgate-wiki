@@ -63,12 +63,18 @@ const wikiPaths = require("../lib/wiki-paths");
   assert.equal(typeof wikiPaths.invalidateNamespaceIndexCache, "function");
   assert.equal(typeof wikiPaths.getCacheMetrics, "function");
   assert.equal(typeof wikiPaths.resetCacheMetrics, "function");
+  assert.equal(typeof wikiPaths.buildNamespacePathFromCategoryList, "function");
 
-  await config.getSettings({ bustCache: true });
+  const settings = await config.getSettings({ bustCache: true });
   wikiPaths.invalidateNamespaceIndexCache();
   wikiPaths.resetCacheMetrics();
 
   assert.strictEqual(await wikiPaths.getNamespacePath(2), "/wiki/guides");
+  assert.strictEqual(
+    wikiPaths.buildNamespacePathFromCategoryList(state.categories.get(2), [...state.categories.values()], settings),
+    "/wiki/guides",
+    "shared namespace path helper should match cached path behavior"
+  );
   assert.strictEqual((await wikiPaths.resolveNamespacePath("guides")).cid, 2);
   assert.strictEqual(await wikiPaths.getArticlePath(10), "/wiki/guides/map-creation-guide");
 

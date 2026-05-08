@@ -1,0 +1,107 @@
+"use strict";
+
+const assert = require("node:assert/strict");
+
+const state = {
+  settings: { categoryIds: "", includeChildCategories: "0" },
+  categories: new Map(),
+  topics: new Map()
+};
+
+const originalMainRequire = require.main.require.bind(require.main);
+
+function slugify(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+require.main.require = function requireNodebbStub(id) {
+  const stubs = {
+    "./src/categories": {
+      getCategoryData: async (cid) => state.categories.get(parseInt(cid, 10)) || null,
+      getChildrenCids: async () => []
+    },
+    "./src/controllers/helpers": {},
+    "./src/database": {
+      getSortedSetRevRange: async () => [],
+      getSortedSetRange: async () => [],
+      getObjectField: async () => null,
+      getObject: async () => ({})
+    },
+    "./src/meta": {
+      settings: {
+        get: async () => state.settings,
+        setOnEmpty: async () => {},
+        set: async () => {}
+      }
+    },
+    "./src/privileges": {
+      categories: {
+        get: async () => ({ read: true, "topics:read": true }),
+        isAdminOrMod: async () => false
+      },
+      topics: {
+        filterTids: async (privilege, tids) => tids,
+        get: async () => ({ "topics:read": true, view_deleted: false, view_scheduled: false })
+      }
+    },
+    "./src/slugify": slugify,
+    "./src/topics": {
+      getTopicData: async (tid) => state.topics.get(parseInt(tid, 10)) || null,
+      getTopicsFields: async () => []
+    },
+    "./src/user": {
+      isAdministrator: async () => false,
+      isGlobalModerator: async () => false
+    },
+    "./src/utils": {
+      isNumber: (value) => String(value || "").trim() !== "" && !Number.isNaN(parseFloat(value))
+    }
+  };
+
+  return stubs[id] || originalMainRequire(id);
+};
+
+const config = require("../lib/config");
+const wikiPaths = require("../lib/wiki-paths");
+const wikiDirectory = require("../lib/wiki-directory-service");
+
+(async () => {
+  wikiDirectory.invalidateAllWikiCaches();
+  wikiDirectory.resetCacheMetrics();
+  config.invalidateSettingsCache();
+  wikiPaths.invalidateNamespaceIndexCache({ skipSettingsInvalidation: true });
+
+  const count = wikiDirectory.SUMMARY_CACHE_MAX_ENTRIES + 5;
+  const categories = [];
+  for (let cid = 1; cid <= count; cid += 1) {
+    categories.push({ cid, name: `Section ${cid}`, slug: `${cid}/section-${cid}`, parentCid: 0, topic_count: 0 });
+  }
+  state.categories = new Map(categories.map((category) => [category.cid, category]));
+  state.settings = { categoryIds: categories.map((category) => category.cid).join(","), includeChildCategories: "0" };
+
+  for (let cid = 1; cid <= count; cid += 1) {
+    await wikiDirectory.getOrderedSummaries(cid, cid, false);
+  }
+
+  let metrics = wikiDirectory.getCacheMetrics();
+  assert.strictEqual(metrics.summaries.size, wikiDirectory.SUMMARY_CACHE_MAX_ENTRIES, "summary cache should be capped");
+
+  const expiredCount = wikiDirectory.pruneExpiredCaches(Date.now() + wikiDirectory.CACHE_TTL_MS + 1);
+  assert(expiredCount >= wikiDirectory.SUMMARY_CACHE_MAX_ENTRIES, "expired summary entries should be pruned");
+  metrics = wikiDirectory.getCacheMetrics();
+  assert.strictEqual(metrics.summaries.size, 0, "expired summary cache entries should not linger");
+
+  await wikiDirectory.getAllTopicSlugRows(1);
+  assert.strictEqual(wikiDirectory.getCacheMetrics().slugScans.size, 1, "slug scan cache size should be reported");
+  wikiDirectory.pruneExpiredCaches(Date.now() + wikiDirectory.CACHE_TTL_MS + 1);
+  assert.strictEqual(wikiDirectory.getCacheMetrics().slugScans.size, 0, "expired slug scan entries should be pruned");
+
+  console.log("wiki cache bounds tests passed");
+})().catch((err) => {
+  console.error(err);
+  process.exitCode = 1;
+});
