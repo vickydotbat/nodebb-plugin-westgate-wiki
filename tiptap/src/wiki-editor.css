@@ -509,9 +509,9 @@
 }
 
 .westgate-wiki-compose .wiki-editor__content .wiki-entity--user {
-  border: 1px solid color-mix(in srgb, var(--bs-secondary-color, #6c757d) 35%, transparent);
-  background: color-mix(in srgb, var(--bs-secondary, #6c757d) 12%, transparent);
-  color: var(--bs-body-color, #212529);
+  border: 1px solid color-mix(in srgb, var(--wiki-prose-entity-border, var(--bs-secondary-color, #adb5bd)) 45%, transparent);
+  background: color-mix(in srgb, var(--wiki-prose-entity-bg, var(--bs-secondary-color, #adb5bd)) 18%, transparent);
+  color: var(--wiki-prose-entity-color, var(--wiki-prose-color, var(--bs-body-color, inherit)));
 }
 
 .westgate-wiki-compose .wiki-editor__content .wiki-entity--user::after {
@@ -522,9 +522,9 @@
 }
 
 .westgate-wiki-compose .wiki-editor__content .wiki-entity--user-good {
-  border-color: color-mix(in srgb, var(--bs-success, #198754) 65%, transparent);
-  background: color-mix(in srgb, var(--bs-success, #198754) 16%, transparent);
-  color: var(--bs-success-text-emphasis, #0f5132);
+  border-color: color-mix(in srgb, var(--wiki-prose-user-good-color, #8fdc9a) 68%, transparent);
+  background: color-mix(in srgb, var(--wiki-prose-user-good-color, #8fdc9a) 18%, transparent);
+  color: var(--wiki-prose-user-good-color, #8fdc9a);
 }
 
 .westgate-wiki-compose .wiki-editor__content .wiki-entity--user-good::after {
@@ -532,9 +532,9 @@
 }
 
 .westgate-wiki-compose .wiki-editor__content .wiki-entity--user-bad {
-  border-color: color-mix(in srgb, var(--bs-danger, #dc3545) 68%, transparent);
-  background: color-mix(in srgb, var(--bs-danger, #dc3545) 15%, transparent);
-  color: var(--bs-danger-text-emphasis, #842029);
+  border-color: color-mix(in srgb, var(--wiki-prose-user-bad-color, #ff8b8b) 70%, transparent);
+  background: color-mix(in srgb, var(--wiki-prose-user-bad-color, #ff8b8b) 17%, transparent);
+  color: var(--wiki-prose-user-bad-color, #ff8b8b);
   text-decoration: underline;
   text-decoration-style: dotted;
   text-decoration-color: currentColor;
@@ -546,25 +546,35 @@
 }
 
 .westgate-wiki-compose .wiki-editor__content .wiki-entity--footnote {
-  background: color-mix(in srgb, var(--bs-warning, #ffc107) 18%, transparent);
-  color: var(--bs-warning-text-emphasis, #664d03);
+  background: color-mix(in srgb, var(--wiki-prose-footnote-marker-color, #f2cf63) 22%, transparent);
+  color: var(--wiki-prose-footnote-marker-color, #f2cf63);
   font-size: 0.86em;
   vertical-align: super;
 }
 
-.wiki-editor-entity-dialog {
+.wiki-editor-entity-dialog-shell {
   position: fixed;
+  inset: 0;
   z-index: 1055;
-  top: 15vh;
-  left: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.62);
+  padding: 1rem;
+  animation: wiki-editor-dialog-backdrop-in 0.16s ease-out;
+}
+
+.wiki-editor-entity-dialog {
+  position: relative;
   width: min(32rem, calc(100vw - 2rem));
-  transform: translateX(-50%);
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
   border: 1px solid var(--wiki-editor-toolbar-border, var(--bs-border-color, #dee2e6));
   border-radius: var(--bs-border-radius, 0.5rem);
   background: var(--bs-body-bg, #fff);
   box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, 0.25);
   color: var(--bs-body-color, #212529);
   padding: 1rem;
+  animation: wiki-editor-dialog-in 0.18s ease-out;
 }
 
 .wiki-editor-entity-dialog__title {
@@ -593,6 +603,31 @@
   display: flex;
   gap: 0.5rem;
   justify-content: flex-end;
+}
+
+.wiki-editor-entity-dialog__actions .btn-link {
+  color: var(--wiki-chrome-link-color, var(--bs-link-color, #0d6efd));
+  text-decoration: none;
+}
+
+.wiki-editor-entity-dialog__actions .btn-link:hover,
+.wiki-editor-entity-dialog__actions .btn-link:focus {
+  background: color-mix(in srgb, var(--wiki-chrome-link-color, var(--bs-link-color, #0d6efd)) 14%, transparent);
+  color: var(--wiki-chrome-link-hover-color, var(--bs-link-hover-color, var(--wiki-chrome-link-color, var(--bs-link-color, #0d6efd))));
+  text-decoration: none;
+}
+
+@keyframes wiki-editor-dialog-backdrop-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes wiki-editor-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.35rem) scale(0.98);
+  }
 }
 
 .westgate-wiki-compose .wiki-editor__content table.ProseMirror-selectednode,

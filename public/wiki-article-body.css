@@ -110,6 +110,51 @@
   cursor: pointer;
 }
 
+.wiki-article-prose mark {
+  background: var(--wiki-prose-highlight-bg, #f2cf63);
+  border-radius: var(--bs-border-radius-sm, 0.25rem);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  color: var(--wiki-prose-highlight-color, #241a05);
+  padding: 0.02em 0.16em;
+}
+
+.wiki-article-prose .wiki-entity {
+  border-radius: var(--bs-border-radius-sm, 0.25rem);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  padding: 0.05rem 0.2rem;
+}
+
+.wiki-article-prose .wiki-entity--user {
+  border: 1px solid color-mix(in srgb, var(--wiki-prose-entity-border, var(--bs-secondary-color, #adb5bd)) 45%, transparent);
+  background: color-mix(in srgb, var(--wiki-prose-entity-bg, var(--bs-secondary-color, #adb5bd)) 18%, transparent);
+  color: var(--wiki-prose-entity-color, var(--wiki-prose-color, var(--bs-body-color, inherit)));
+}
+
+.wiki-article-prose .wiki-entity--user-good {
+  border-color: color-mix(in srgb, var(--wiki-prose-user-good-color, #8fdc9a) 68%, transparent);
+  background: color-mix(in srgb, var(--wiki-prose-user-good-color, #8fdc9a) 18%, transparent);
+  color: var(--wiki-prose-user-good-color, #8fdc9a);
+}
+
+.wiki-article-prose .wiki-entity--user-bad {
+  border-color: color-mix(in srgb, var(--wiki-prose-user-bad-color, #ff8b8b) 70%, transparent);
+  background: color-mix(in srgb, var(--wiki-prose-user-bad-color, #ff8b8b) 17%, transparent);
+  color: var(--wiki-prose-user-bad-color, #ff8b8b);
+  text-decoration: underline;
+  text-decoration-color: currentColor;
+  text-decoration-style: dotted;
+  text-underline-offset: 0.18em;
+}
+
+.wiki-article-prose .wiki-entity--footnote {
+  background: color-mix(in srgb, var(--wiki-prose-footnote-marker-color, #f2cf63) 22%, transparent);
+  color: var(--wiki-prose-footnote-marker-color, #f2cf63);
+  font-size: 0.86em;
+  vertical-align: super;
+}
+
 .wiki-article-prose blockquote {
   background: var(--wiki-prose-blockquote-bg, var(--bs-secondary-bg, rgba(0, 0, 0, 0.04)));
   border-left: 3px solid var(--wiki-prose-blockquote-border, var(--bs-border-color, #dee2e6));

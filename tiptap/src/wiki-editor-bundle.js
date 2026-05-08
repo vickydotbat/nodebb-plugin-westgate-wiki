@@ -308,15 +308,19 @@ function decodeBase64Utf8(value) {
 }
 
 function openWikiEntityDialog({ editor, type, options, initial, replaceMark }) {
-  const existing = document.querySelector(".wiki-editor-entity-dialog");
+  const existing = document.querySelector(".wiki-editor-entity-dialog-shell");
   if (existing) {
     existing.remove();
   }
+
+  const shell = document.createElement("div");
+  shell.className = "wiki-editor-entity-dialog-shell";
 
   const dialog = document.createElement("div");
   dialog.className = "wiki-editor-entity-dialog";
   dialog.setAttribute("role", "dialog");
   dialog.setAttribute("aria-modal", "true");
+  shell.appendChild(dialog);
 
   const title = document.createElement("h2");
   title.className = "wiki-editor-entity-dialog__title";
@@ -408,6 +412,19 @@ function openWikiEntityDialog({ editor, type, options, initial, replaceMark }) {
   form.appendChild(actions);
 
   let results = [];
+  function closeDialog() {
+    shell.remove();
+    document.removeEventListener("keydown", handleDialogKeydown);
+  }
+
+  function handleDialogKeydown(event) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeDialog();
+      editor.commands.focus();
+    }
+  }
+
   async function runSearch() {
     if (!select || type === "footnote") {
       return;
@@ -505,15 +522,23 @@ function openWikiEntityDialog({ editor, type, options, initial, replaceMark }) {
       }
       chain.insertWikiFootnote({ body }).run();
     }
-    dialog.remove();
+    closeDialog();
   });
 
   cancelBtn.addEventListener("click", function () {
-    dialog.remove();
+    closeDialog();
     editor.commands.focus();
   });
 
-  document.body.appendChild(dialog);
+  shell.addEventListener("mousedown", function (event) {
+    if (event.target === shell) {
+      event.preventDefault();
+      closeDialog();
+      editor.commands.focus();
+    }
+  });
+  document.addEventListener("keydown", handleDialogKeydown);
+  document.body.appendChild(shell);
   searchInput.focus();
 }
 
