@@ -49,6 +49,13 @@ function reset({ settings, categories, topics, readableCids, readableTids }) {
   };
   setCategories(categories || [], readableCids);
   setTopics(topics || [], readableTids);
+  try {
+    require("../lib/config").invalidateSettingsCache();
+    require("../lib/wiki-paths").invalidateNamespaceIndexCache({ skipSettingsInvalidation: true });
+    require("../lib/wiki-directory-service").invalidateAllWikiCaches();
+  } catch (e) {
+    // Modules may not be loaded yet during test bootstrap.
+  }
 }
 
 require.main.require = function requireNodebbStub(id) {
@@ -66,7 +73,9 @@ require.main.require = function requireNodebbStub(id) {
     },
     "./src/database": {
       getSortedSetRange: async (key) => state.tidsByCid.get(parseInt(key.match(/^cid:(\d+):tids$/)[1], 10)) || [],
-      getSortedSetRevRange: async (key) => state.tidsByCid.get(parseInt(key.match(/^cid:(\d+):tids$/)[1], 10)) || []
+      getSortedSetRevRange: async (key) => state.tidsByCid.get(parseInt(key.match(/^cid:(\d+):tids$/)[1], 10)) || [],
+      getObjectField: async () => null,
+      getObject: async () => ({})
     },
     "./src/meta": {
       settings: {
@@ -100,6 +109,10 @@ require.main.require = function requireNodebbStub(id) {
       getTopicsFields: async (tids) => (Array.isArray(tids) ? tids : [])
         .map((tid) => state.topics.get(parseInt(tid, 10)))
         .filter(Boolean)
+    },
+    "./src/user": {
+      isAdministrator: async () => false,
+      isGlobalModerator: async () => false
     },
     "./src/utils": {
       isNumber: (value) => {

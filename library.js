@@ -246,8 +246,35 @@ plugin.wikiFilterPrivilegesTopicsGet = async function (data) {
   }
   return data;
 };
+
+function getWikiCacheMetrics() {
+  const wikiDirectory = require("./lib/wiki-directory-service");
+  return {
+    config: typeof config.getCacheMetrics === "function" ? config.getCacheMetrics() : {},
+    wikiPaths: typeof wikiPaths.getCacheMetrics === "function" ? wikiPaths.getCacheMetrics() : {},
+    wikiDirectory: typeof wikiDirectory.getCacheMetrics === "function" ? wikiDirectory.getCacheMetrics() : {}
+  };
+}
+
+function resetWikiCacheMetrics() {
+  const wikiDirectory = require("./lib/wiki-directory-service");
+  if (typeof config.resetCacheMetrics === "function") {
+    config.resetCacheMetrics();
+  }
+  if (typeof wikiPaths.resetCacheMetrics === "function") {
+    wikiPaths.resetCacheMetrics();
+  }
+  if (typeof wikiDirectory.resetCacheMetrics === "function") {
+    wikiDirectory.resetCacheMetrics();
+  }
+}
+
 plugin.services = {
   cacheService,
+  cacheMetrics: {
+    get: getWikiCacheMetrics,
+    reset: resetWikiCacheMetrics
+  },
   config,
   forumExclusionService,
   serializer,
