@@ -11,6 +11,14 @@
   const BODY = ".card-body";
   const ATTR_ROOT = "data-wiki-article-toc-root";
   const ATTR_MOUNT = "data-wiki-article-toc";
+  const DRAWER_ATTR = "data-wiki-article-drawer";
+  const DRAWER_TOGGLE_ATTR = "data-wiki-drawer-toggle";
+  const DRAWER_CLOSE_ATTR = "data-wiki-drawer-close";
+  const DRAWER_TARGET_ATTR = "data-wiki-drawer-target";
+  const DRAWER_BACKDROP_ATTR = "data-wiki-drawer-backdrop";
+  const DRAWER_OPEN_CLASS = "wiki-article-drawer--open";
+  const MODAL_OPEN_CLASS = "wiki-article-drawer-modal-open";
+  let drawersGlobalBound = false;
 
   function textToSlug(s) {
     var t = String(s || "")
@@ -138,6 +146,136 @@
     });
   }
 
+  function isSmallDrawerViewport() {
+    return typeof window.matchMedia === "function" &&
+      window.matchMedia("(max-width: 1199.98px)").matches;
+  }
+
+  function getArticleDrawersRoot() {
+    return document.querySelector("[data-wiki-article-drawers]");
+  }
+
+  function getDrawer(name) {
+    if (!name) {
+      return null;
+    }
+    return document.querySelector("[" + DRAWER_ATTR + "=\"" + name + "\"]");
+  }
+
+  function getDrawerTarget(control) {
+    return control && control.getAttribute(DRAWER_TARGET_ATTR);
+  }
+
+  function getDrawerToggles(name) {
+    if (!name) {
+      return [];
+    }
+    return [].slice.call(document.querySelectorAll(
+      "[" + DRAWER_TOGGLE_ATTR + "][" + DRAWER_TARGET_ATTR + "=\"" + name + "\"]"
+    ));
+  }
+
+  function syncBackdrop() {
+    const anyOpen = !!document.querySelector("." + DRAWER_OPEN_CLASS);
+    const backdrop = document.querySelector("[" + DRAWER_BACKDROP_ATTR + "]");
+    const showBackdrop = anyOpen && isSmallDrawerViewport();
+
+    if (backdrop) {
+      if (showBackdrop) {
+        backdrop.removeAttribute("hidden");
+        backdrop.setAttribute("aria-hidden", "false");
+      } else {
+        backdrop.setAttribute("hidden", "");
+        backdrop.setAttribute("aria-hidden", "true");
+      }
+    }
+
+    document.documentElement.classList.toggle(MODAL_OPEN_CLASS, showBackdrop);
+  }
+
+  function setDrawerOpen(drawer, open) {
+    if (!drawer) {
+      return;
+    }
+
+    const name = drawer.getAttribute(DRAWER_ATTR);
+
+    if (open) {
+      [].slice.call(document.querySelectorAll("[" + DRAWER_ATTR + "]")).forEach(function (other) {
+        if (other !== drawer) {
+          setDrawerOpen(other, false);
+        }
+      });
+    }
+
+    drawer.classList.toggle(DRAWER_OPEN_CLASS, !!open);
+    getDrawerToggles(name).forEach(function (toggle) {
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+    syncBackdrop();
+  }
+
+  function closeArticleDrawers() {
+    [].slice.call(document.querySelectorAll("[" + DRAWER_ATTR + "]")).forEach(function (drawer) {
+      setDrawerOpen(drawer, false);
+    });
+    syncBackdrop();
+  }
+
+  function initArticleDrawers() {
+    const root = getArticleDrawersRoot();
+    if (!root || root.dataset.wikiArticleDrawersReady === "1") {
+      return;
+    }
+    root.dataset.wikiArticleDrawersReady = "1";
+
+    root.addEventListener("click", function onDrawerClick(ev) {
+      const toggle = ev.target && ev.target.closest
+        ? ev.target.closest("[" + DRAWER_TOGGLE_ATTR + "]")
+        : null;
+      const close = ev.target && ev.target.closest
+        ? ev.target.closest("[" + DRAWER_CLOSE_ATTR + "]")
+        : null;
+      const backdrop = ev.target && ev.target.closest
+        ? ev.target.closest("[" + DRAWER_BACKDROP_ATTR + "]")
+        : null;
+      const drawerLink = ev.target && ev.target.closest
+        ? ev.target.closest("[" + DRAWER_ATTR + "] a")
+        : null;
+
+      if (toggle && root.contains(toggle)) {
+        const drawer = getDrawer(getDrawerTarget(toggle));
+        if (drawer) {
+          ev.preventDefault();
+          setDrawerOpen(drawer, !drawer.classList.contains(DRAWER_OPEN_CLASS));
+        }
+        return;
+      }
+
+      if ((close && root.contains(close)) || backdrop) {
+        ev.preventDefault();
+        closeArticleDrawers();
+        return;
+      }
+
+      if (drawerLink && isSmallDrawerViewport()) {
+        closeArticleDrawers();
+      }
+    });
+
+    if (!drawersGlobalBound) {
+      drawersGlobalBound = true;
+      document.addEventListener("keydown", function onDrawerKeydown(ev) {
+        if (ev.key === "Escape") {
+          closeArticleDrawers();
+        }
+      });
+      window.addEventListener("resize", syncBackdrop);
+    }
+
+    syncBackdrop();
+  }
+
   function collapseTocOnSmallScreens() {
     if (typeof window.matchMedia !== "function" || !window.matchMedia("(max-width: 767px)").matches) {
       return;
@@ -166,13 +304,19 @@
     const truncated = rawAll.length > MAX_TOC_HEADINGS;
     const raw = truncated ? rawAll.slice(0, MAX_TOC_HEADINGS) : rawAll;
 
-    const mount = document.querySelector("[" + ATTR_MOUNT + "]");
-    const wrap = document.querySelector("[" + ATTR_ROOT + "]");
+    const drawersRoot = getArticleDrawersRoot();
+    const mount = drawersRoot ?
+      drawersRoot.querySelector("[" + ATTR_MOUNT + "]") :
+      document.querySelector("[" + ATTR_MOUNT + "]");
+    const wrap = drawersRoot ?
+      drawersRoot.querySelector("[" + ATTR_ROOT + "]") :
+      document.querySelector("[" + ATTR_ROOT + "]");
 
     raw.forEach((h) => h.classList.remove("wiki-article-toc__heading"));
 
     if (!mount || !raw.length) {
       if (wrap) {
+        setDrawerOpen(wrap, false);
         wrap.setAttribute("hidden", "");
         wrap.setAttribute("aria-hidden", "true");
       }
@@ -204,6 +348,7 @@
     }
     bindTocSmoothScroll(mount);
     collapseTocOnSmallScreens();
+    syncBackdrop();
   }
 
   function scheduleBindAjaxify() {
@@ -217,6 +362,7 @@
             setTimeout(function () {
               try {
                 run();
+                initArticleDrawers();
               } catch (eRun) {
                 if (console && console.error) {
                   console.error("wiki-article-toc:run", eRun);
@@ -242,6 +388,7 @@
   function start() {
     try {
       run();
+      initArticleDrawers();
     } catch (e) {
       if (console && console.error) {
         console.error("wiki-article-toc:init", e);

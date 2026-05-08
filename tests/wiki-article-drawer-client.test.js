@@ -1,0 +1,111 @@
+"use strict";
+
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const { JSDOM } = require("jsdom");
+
+function test(name, fn) {
+  try {
+    fn();
+    process.stdout.write(`ok - ${name}\n`);
+  } catch (err) {
+    process.stderr.write(`not ok - ${name}\n`);
+    throw err;
+  }
+}
+
+const script = fs.readFileSync(path.join(__dirname, "..", "public/wiki-article-toc.js"), "utf8");
+
+function createDom(articleBody) {
+  const dom = new JSDOM(`<!doctype html><html><body>
+    <div class="wiki-page-shell-with-transform" style="transform: translateZ(0);">
+      <div class="westgate-wiki">
+        <article class="wiki-page-content wiki-article-prose card">
+          <div class="card-body">${articleBody}</div>
+        </article>
+        <div class="wiki-article-drawers" data-wiki-article-drawers>
+          <aside class="wiki-article-drawer wiki-article-drawer--nav" id="wiki-article-drawer-nav" data-wiki-article-drawer="nav">
+            <button type="button" id="wiki-article-drawer-nav-toggle" data-wiki-drawer-toggle data-wiki-drawer-target="nav" aria-controls="wiki-article-drawer-nav" aria-expanded="false">Pages</button>
+            <div class="wiki-article-drawer__panel"><a href="/wiki/example">Example</a></div>
+          </aside>
+          <aside class="wiki-article-drawer wiki-article-drawer--toc wiki-article-toc" id="wiki-article-drawer-toc" data-wiki-article-drawer="toc" data-wiki-article-toc-root hidden>
+            <button type="button" id="wiki-article-drawer-toc-toggle" data-wiki-drawer-toggle data-wiki-drawer-target="toc" aria-controls="wiki-article-drawer-toc" aria-expanded="false">Contents</button>
+            <nav data-wiki-article-toc></nav>
+          </aside>
+          <button type="button" data-wiki-drawer-backdrop hidden></button>
+        </div>
+      </div>
+    </div>
+  </body></html>`, {
+    pretendToBeVisual: true,
+    runScripts: "outside-only",
+    url: "https://example.test/wiki/example"
+  });
+
+  dom.window.matchMedia = function (query) {
+    return {
+      matches: query.indexOf("1199.98px") !== -1,
+      media: query,
+      addEventListener: function () {},
+      removeEventListener: function () {},
+      addListener: function () {},
+      removeListener: function () {},
+      dispatchEvent: function () { return false; }
+    };
+  };
+  Object.defineProperty(dom.window, "innerWidth", { configurable: true, value: 1024 });
+  dom.window.HTMLElement.prototype.scrollIntoView = function () {};
+  dom.window.jQuery = function () {
+    return {
+      on: function () {}
+    };
+  };
+  dom.window.jQuery.fn = {};
+  dom.window.console = console;
+
+  dom.window.eval(script);
+  dom.window.document.dispatchEvent(new dom.window.Event("DOMContentLoaded", { bubbles: true }));
+  return dom;
+}
+
+test("drawer root stays inside the wiki shell without article-bound viewport variables", function () {
+  const dom = createDom("<h2>Alpha section</h2><p>Text</p>");
+  const root = dom.window.document.querySelector("[data-wiki-article-drawers]");
+  const shell = dom.window.document.querySelector(".wiki-page-shell-with-transform");
+
+  assert.notEqual(root.parentNode, dom.window.document.body);
+  assert.equal(shell.querySelector("[data-wiki-article-drawers]"), root);
+  assert.equal(root.style.getPropertyValue("--wiki-article-drawer-viewport-left"), "");
+  assert.equal(root.style.getPropertyValue("--wiki-article-drawer-viewport-right"), "");
+});
+
+test("drawer toggles update open state, aria, backdrop, and Escape close", function () {
+  const dom = createDom("<h2>Alpha section</h2><p>Text</p>");
+  const { document, KeyboardEvent } = dom.window;
+  const navDrawer = document.getElementById("wiki-article-drawer-nav");
+  const navToggle = document.getElementById("wiki-article-drawer-nav-toggle");
+  const backdrop = document.querySelector("[data-wiki-drawer-backdrop]");
+
+  assert.equal(document.getElementById("wiki-article-drawer-toc").hasAttribute("hidden"), false);
+
+  navToggle.click();
+  assert.equal(navDrawer.classList.contains("wiki-article-drawer--open"), true);
+  assert.equal(navToggle.getAttribute("aria-expanded"), "true");
+  assert.equal(backdrop.hasAttribute("hidden"), false);
+  assert.equal(document.documentElement.classList.contains("wiki-article-drawer-modal-open"), true);
+
+  document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  assert.equal(navDrawer.classList.contains("wiki-article-drawer--open"), false);
+  assert.equal(navToggle.getAttribute("aria-expanded"), "false");
+  assert.equal(backdrop.hasAttribute("hidden"), true);
+  assert.equal(document.documentElement.classList.contains("wiki-article-drawer-modal-open"), false);
+});
+
+test("ToC drawer stays hidden when the article has no headings", function () {
+  const dom = createDom("<p>Text without headings</p>");
+  const tocDrawer = dom.window.document.getElementById("wiki-article-drawer-toc");
+
+  assert.equal(tocDrawer.hasAttribute("hidden"), true);
+  assert.equal(tocDrawer.getAttribute("aria-hidden"), "true");
+});
