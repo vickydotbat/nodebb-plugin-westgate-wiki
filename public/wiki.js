@@ -117,6 +117,174 @@ $(document).ready(function () {
     }
   }
 
+  const codeHighlightKeywords = {
+    bash: [
+      "case", "do", "done", "elif", "else", "esac", "fi", "for", "function",
+      "if", "in", "local", "return", "select", "then", "until", "while"
+    ],
+    powershell: [
+      "begin", "break", "catch", "class", "continue", "data", "do", "dynamicparam",
+      "else", "elseif", "end", "exit", "filter", "finally", "for", "foreach",
+      "from", "function", "if", "in", "param", "process", "return", "switch",
+      "throw", "trap", "try", "until", "using", "while"
+    ],
+    csharp: [
+      "abstract", "as", "base", "bool", "break", "byte", "case", "catch",
+      "char", "checked", "class", "const", "continue", "decimal", "default",
+      "delegate", "do", "double", "else", "enum", "event", "explicit", "extern",
+      "false", "finally", "fixed", "float", "for", "foreach", "goto", "if",
+      "implicit", "in", "int", "interface", "internal", "is", "lock", "long",
+      "namespace", "new", "null", "object", "operator", "out", "override",
+      "params", "private", "protected", "public", "readonly", "ref", "return",
+      "sbyte", "sealed", "short", "sizeof", "stackalloc", "static", "string",
+      "struct", "switch", "this", "throw", "true", "try", "typeof", "uint",
+      "ulong", "unchecked", "unsafe", "ushort", "using", "virtual", "void",
+      "volatile", "while"
+    ]
+  };
+
+  function normalizeCodeLanguage(value) {
+    const key = String(value || "").trim().toLowerCase();
+    if (key === "sh" || key === "shell") {
+      return "bash";
+    }
+    if (key === "pwsh" || key === "ps1") {
+      return "powershell";
+    }
+    if (key === "cs" || key === "c#") {
+      return "csharp";
+    }
+    return codeHighlightKeywords[key] ? key : "";
+  }
+
+  function getCodeLanguage(code) {
+    const classNames = Array.from((code && code.classList) || []);
+    const languageClass = classNames.find(function (className) {
+      return className.indexOf("language-") === 0;
+    });
+    return normalizeCodeLanguage(languageClass ? languageClass.slice("language-".length) : "");
+  }
+
+  function readQuotedCodeToken(text, start) {
+    const quote = text[start];
+    let index = start + 1;
+    while (index < text.length) {
+      if (text[index] === "\\") {
+        index += 2;
+        continue;
+      }
+      if (text[index] === quote) {
+        return index + 1;
+      }
+      index += 1;
+    }
+    return text.length;
+  }
+
+  function tokenizeHighlightedCode(text, language) {
+    const keywords = new Set(codeHighlightKeywords[language] || []);
+    const wordPattern = language === "powershell" ? /-?[A-Za-z_][\w-]*/y : /[A-Za-z_]\w*/y;
+    const tokens = [];
+    let index = 0;
+    while (index < text.length) {
+      const char = text[index];
+      const next = text[index + 1];
+      let end;
+      let match;
+
+      if (char === "\"" || char === "'") {
+        end = readQuotedCodeToken(text, index);
+        tokens.push({ from: index, to: end, type: "string" });
+        index = end;
+        continue;
+      }
+      if (language === "csharp" && char === "/" && next === "/") {
+        end = text.indexOf("\n", index);
+        end = end === -1 ? text.length : end;
+        tokens.push({ from: index, to: end, type: "comment" });
+        index = end;
+        continue;
+      }
+      if (language === "csharp" && char === "/" && next === "*") {
+        end = text.indexOf("*/", index + 2);
+        end = end === -1 ? text.length : end + 2;
+        tokens.push({ from: index, to: end, type: "comment" });
+        index = end;
+        continue;
+      }
+      if ((language === "bash" || language === "powershell") && char === "#") {
+        end = text.indexOf("\n", index);
+        end = end === -1 ? text.length : end;
+        tokens.push({ from: index, to: end, type: "comment" });
+        index = end;
+        continue;
+      }
+      if ((language === "bash" || language === "powershell") && char === "$") {
+        match = /^\$[{]?[A-Za-z_][\w:.-]*[}]?/.exec(text.slice(index));
+        if (match) {
+          tokens.push({ from: index, to: index + match[0].length, type: "variable" });
+          index += match[0].length;
+          continue;
+        }
+      }
+      if (/\d/.test(char)) {
+        match = /^\d+(?:\.\d+)?/.exec(text.slice(index));
+        if (match) {
+          tokens.push({ from: index, to: index + match[0].length, type: "number" });
+          index += match[0].length;
+          continue;
+        }
+      }
+
+      wordPattern.lastIndex = index;
+      match = wordPattern.exec(text);
+      if (match) {
+        if (keywords.has(match[0].replace(/^-/, "").toLowerCase())) {
+          tokens.push({ from: index, to: index + match[0].length, type: "keyword" });
+        }
+        index += match[0].length;
+        continue;
+      }
+
+      index += 1;
+    }
+    return tokens;
+  }
+
+  function highlightCodeElement(code, language) {
+    const text = code.textContent || "";
+    const tokens = tokenizeHighlightedCode(text, language);
+    const fragment = document.createDocumentFragment();
+    let cursor = 0;
+    tokens.forEach(function (token) {
+      if (token.from > cursor) {
+        fragment.appendChild(document.createTextNode(text.slice(cursor, token.from)));
+      }
+      const span = document.createElement("span");
+      span.className = `wiki-code-token wiki-code-token--${token.type}`;
+      span.textContent = text.slice(token.from, token.to);
+      fragment.appendChild(span);
+      cursor = token.to;
+    });
+    if (cursor < text.length) {
+      fragment.appendChild(document.createTextNode(text.slice(cursor)));
+    }
+    code.replaceChildren(fragment);
+    code.setAttribute("data-wiki-code-highlighted", "1");
+  }
+
+  function highlightReadOnlyWikiCodeBlocks() {
+    document.querySelectorAll('.wiki-article-prose pre code[class*="language-"]').forEach(function (code) {
+      if (code.getAttribute("data-wiki-code-highlighted") === "1" || code.closest(".wiki-editor__content")) {
+        return;
+      }
+      const language = getCodeLanguage(code);
+      if (language) {
+        highlightCodeElement(code, language);
+      }
+    });
+  }
+
   function handleWikiCreateLinkClick(event) {
     const link = event.target && event.target.closest ? event.target.closest("a") : null;
     const intent = link ? getCreateIntentFromUrl(link.getAttribute("href")) : null;
@@ -364,6 +532,7 @@ $(document).ready(function () {
       maybeOpenCreateFromLocation();
       maybeOpenCreateFromMarkup();
       maybeInitComposePage();
+      highlightReadOnlyWikiCodeBlocks();
     });
     },
     function (err) {
@@ -408,6 +577,7 @@ $(document).ready(function () {
   maybeOpenCreateFromLocation();
   maybeOpenCreateFromMarkup();
   maybeInitComposePage();
+  highlightReadOnlyWikiCodeBlocks();
 
   function getCsrfToken() {
     if (window.config && window.config.csrf_token) {

@@ -419,6 +419,36 @@
   display: none;
 }
 
+.westgate-wiki-compose .wiki-editor-code-language-tools {
+  max-width: min(14rem, calc(100% - 1rem));
+}
+
+.westgate-wiki-compose .wiki-editor-code-language-select {
+  min-width: 11rem;
+}
+
+.westgate-wiki-compose .wiki-editor__content .wiki-code-token--keyword {
+  color: var(--wiki-code-token-keyword, #c084fc);
+  font-weight: 600;
+}
+
+.westgate-wiki-compose .wiki-editor__content .wiki-code-token--string {
+  color: var(--wiki-code-token-string, #86efac);
+}
+
+.westgate-wiki-compose .wiki-editor__content .wiki-code-token--comment {
+  color: var(--wiki-code-token-comment, #94a3b8);
+  font-style: italic;
+}
+
+.westgate-wiki-compose .wiki-editor__content .wiki-code-token--number {
+  color: var(--wiki-code-token-number, #fbbf24);
+}
+
+.westgate-wiki-compose .wiki-editor__content .wiki-code-token--variable {
+  color: var(--wiki-code-token-variable, #67e8f9);
+}
+
 .westgate-wiki-compose .wiki-editor__body {
   position: relative;
 }

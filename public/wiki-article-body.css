@@ -148,6 +148,28 @@
   color: inherit;
 }
 
+.wiki-article-prose pre code .wiki-code-token--keyword {
+  color: var(--wiki-code-token-keyword, #c084fc);
+  font-weight: 600;
+}
+
+.wiki-article-prose pre code .wiki-code-token--string {
+  color: var(--wiki-code-token-string, #86efac);
+}
+
+.wiki-article-prose pre code .wiki-code-token--comment {
+  color: var(--wiki-code-token-comment, #94a3b8);
+  font-style: italic;
+}
+
+.wiki-article-prose pre code .wiki-code-token--number {
+  color: var(--wiki-code-token-number, #fbbf24);
+}
+
+.wiki-article-prose pre code .wiki-code-token--variable {
+  color: var(--wiki-code-token-variable, #67e8f9);
+}
+
 .wiki-article-prose hr {
   border: 0;
   border-top: 1px solid var(--wiki-prose-hr-color, var(--bs-border-color, #dee2e6));

@@ -21,7 +21,7 @@ function test(name, fn) {
 
 installJsdomGlobals();
 
-const [{ Editor }, StarterKitModule, ImageModule, PreservedNodeAttributesModule, StyledSpanModule, ContainerBlockModule, MediaRowModule, ImageFigureModule, WikiCalloutModule, SlashCommandModule, WikiLinkModule, WikiEntitiesModule, toolbarSchemaModule, editorTocModule, linkInteractionsModule, legacyHtmlModule, sanitizerContractModule] = await Promise.all([
+const [{ Editor }, StarterKitModule, ImageModule, PreservedNodeAttributesModule, StyledSpanModule, ContainerBlockModule, MediaRowModule, ImageFigureModule, WikiCalloutModule, SlashCommandModule, WikiCodeBlockModule, WikiLinkModule, WikiEntitiesModule, toolbarSchemaModule, editorTocModule, linkInteractionsModule, legacyHtmlModule, sanitizerContractModule] = await Promise.all([
   import("@tiptap/core"),
   import("@tiptap/starter-kit"),
   import("@tiptap/extension-image"),
@@ -32,6 +32,7 @@ const [{ Editor }, StarterKitModule, ImageModule, PreservedNodeAttributesModule,
   import("../tiptap/src/extensions/image-figure.mjs"),
   import("../tiptap/src/extensions/wiki-callout.mjs"),
   import("../tiptap/src/extensions/slash-command.mjs"),
+  import("../tiptap/src/extensions/wiki-code-block.mjs"),
   import("../tiptap/src/extensions/wiki-link.mjs"),
   import("../tiptap/src/extensions/wiki-entities.mjs"),
   import("../tiptap/src/toolbar/toolbar-schema.mjs"),
@@ -50,6 +51,7 @@ const { MediaCell, MediaRow } = MediaRowModule;
 const ImageFigure = ImageFigureModule.default;
 const WikiCallout = WikiCalloutModule.default;
 const SlashCommand = SlashCommandModule.default;
+const WikiCodeBlock = WikiCodeBlockModule.default;
 const WikiLink = WikiLinkModule.default;
 const { WikiFootnote, WikiNamespaceLink, WikiPageLink, WikiUserMention } = WikiEntitiesModule;
 const { IMAGE_CONTEXT_BUTTON_IDS, TABLE_CONTEXT_BUTTON_IDS, TOP_TOOLBAR_BUTTON_IDS, TOP_TOOLBAR_GROUPS } = toolbarSchemaModule;
@@ -62,6 +64,7 @@ const {
 } = legacyHtmlModule;
 const { sanitizeHtml } = sanitizerContractModule;
 const articleBodyCss = readFileSync(new URL("../public/wiki-article-body.css", import.meta.url), "utf8");
+const wikiJsSource = readFileSync(new URL("../public/wiki.js", import.meta.url), "utf8");
 const editorCss = readFileSync(new URL("../tiptap/src/wiki-editor.css", import.meta.url), "utf8");
 const vendoredEditorCss = readFileSync(new URL("../public/vendor/tiptap/wiki-tiptap.css", import.meta.url), "utf8");
 const editorBundleSource = readFileSync(new URL("../tiptap/src/wiki-editor-bundle.js", import.meta.url), "utf8");
@@ -74,6 +77,7 @@ function createEditor(content) {
     element: mount,
     extensions: [
       StarterKit.configure({
+        codeBlock: false,
         link: false,
         heading: {
           levels: [1, 2, 3, 4]
@@ -86,6 +90,7 @@ function createEditor(content) {
       MediaRow,
       ImageFigure,
       WikiCallout,
+      WikiCodeBlock,
       WikiPageLink,
       WikiNamespaceLink,
       WikiUserMention,
@@ -760,6 +765,58 @@ await test("slash command extension exposes keyboard-selectable command state", 
   editor.destroy();
 });
 
+await test("wiki code block preserves only supported syntax language classes", function () {
+  const editor = createEditor([
+    '<pre><code class="language-bash">echo "$HOME"</code></pre>',
+    '<pre><code class="language-javascript">console.log("nope")</code></pre>'
+  ].join(""));
+
+  const json = editor.getJSON();
+  assert.equal(json.content[0].attrs.language, "bash");
+  assert.equal(json.content[1].attrs.language, null);
+
+  const rendered = editor.getHTML();
+  assert.match(rendered, /<code class="language-bash">echo "\$HOME"<\/code>/);
+  assert.doesNotMatch(rendered, /language-javascript/);
+  editor.destroy();
+});
+
+await test("wiki code block language command updates the active code block", function () {
+  const editor = createEditor('<pre><code>Get-ChildItem</code></pre>');
+
+  editor.commands.setTextSelection(3);
+  assert.equal(editor.commands.setCodeBlockLanguage("powershell"), true);
+  assert.equal(editor.getJSON().content[0].attrs.language, "powershell");
+  assert.match(editor.getHTML(), /<code class="language-powershell">Get-ChildItem<\/code>/);
+
+  assert.equal(editor.commands.setCodeBlockLanguage("c#"), true);
+  assert.equal(editor.getJSON().content[0].attrs.language, "csharp");
+  assert.match(editor.getHTML(), /<code class="language-csharp">Get-ChildItem<\/code>/);
+
+  assert.equal(editor.commands.setCodeBlockLanguage("javascript"), true);
+  assert.equal(editor.getJSON().content[0].attrs.language, null);
+  assert.doesNotMatch(editor.getHTML(), /language-javascript|language-csharp/);
+  editor.destroy();
+});
+
+await test("wiki code block language applies editor syntax token decorations", function () {
+  const editor = createEditor('<pre><code class="language-csharp">public static void Main() { return 0; }</code></pre>');
+
+  assert.equal(editor.view.dom.querySelectorAll(".wiki-code-token--keyword").length >= 4, true);
+  assert.equal(editor.view.dom.querySelectorAll(".wiki-code-token--number").length, 1);
+  assert.match(editor.getHTML(), /<code class="language-csharp">public static void Main\(\) \{ return 0; \}<\/code>/);
+  assert.doesNotMatch(editor.getHTML(), /wiki-code-token/);
+  editor.destroy();
+});
+
+await test("read-only wiki pages apply syntax token highlighting to language code blocks", function () {
+  assert.match(wikiJsSource, /function\s+highlightReadOnlyWikiCodeBlocks\s*\(/);
+  assert.match(wikiJsSource, /wiki-code-token wiki-code-token--/);
+  assert.match(wikiJsSource, /querySelectorAll\('\.wiki-article-prose pre code\[class\*="language-"\]'\)/);
+  assert.match(wikiJsSource, /highlightReadOnlyWikiCodeBlocks\(\)/);
+  assert.match(articleBodyCss, /\.wiki-article-prose\s+pre\s+code\s+\.wiki-code-token--keyword/);
+});
+
 await test("top toolbar schema excludes contextual image layout and size controls", function () {
   IMAGE_CONTEXT_BUTTON_IDS.forEach(function (id) {
     assert.equal(TOP_TOOLBAR_BUTTON_IDS.includes(id), false);
@@ -831,6 +888,13 @@ await test("editor ToC navigation dispatches a source sync event", function () {
 await test("fullscreen source toolbar action is bridged onto the toolbar mount", function () {
   assert.match(editorBundleSource, /toolbarMount\.__wikiToggleFullscreenSource\s*=/);
   assert.match(editorBundleSource, /toolbarMount\.__wikiIsFullscreenSourceActive\s*=/);
+});
+
+await test("code block syntax dropdown is contextual to active code blocks", function () {
+  assert.match(editorBundleSource, /function\s+createCodeBlockLanguageToolbar\s*\(/);
+  assert.match(editorBundleSource, /wiki-editor-code-language-tools/);
+  assert.match(editorBundleSource, /setCodeBlockLanguage\(select\.value\)/);
+  assert.match(editorBundleSource, /editor\.isActive\("codeBlock"\)/);
 });
 
 await test("fullscreen source mode portals above NodeBB page stacking contexts", function () {

@@ -29,6 +29,7 @@ import PreservedNodeAttributes from "./extensions/preserved-node-attributes.mjs"
 import SlashCommand from "./extensions/slash-command.mjs";
 import StyledSpan from "./extensions/styled-span.mjs";
 import WikiCallout from "./extensions/wiki-callout.mjs";
+import WikiCodeBlock, { CODE_BLOCK_LANGUAGE_OPTIONS } from "./extensions/wiki-code-block.mjs";
 import { WikiFootnote, WikiNamespaceLink, WikiPageLink, WikiUserMention } from "./extensions/wiki-entities.mjs";
 import WikiLink from "./extensions/wiki-link.mjs";
 import {
@@ -1313,6 +1314,17 @@ function getActiveTableElement(editor, surface) {
   return table && surface.contains(table) ? table : null;
 }
 
+function getActiveCodeBlockElement(editor, surface) {
+  const { $from } = editor.state.selection;
+  for (let depth = $from.depth; depth > 0; depth -= 1) {
+    if ($from.node(depth).type.name === "codeBlock") {
+      const element = editor.view.nodeDOM($from.before(depth));
+      return element && surface.contains(element) ? element : null;
+    }
+  }
+  return null;
+}
+
 function positionContextPanel(panel, targetEl, surface) {
   const surfaceRect = surface.getBoundingClientRect();
   const targetRect = targetEl.getBoundingClientRect();
@@ -1321,6 +1333,59 @@ function positionContextPanel(panel, targetEl, surface) {
   const top = Math.max(8, targetRect.top - surfaceRect.top - panel.offsetHeight - 8);
   panel.style.left = `${left}px`;
   panel.style.top = `${top}px`;
+}
+
+function createCodeBlockLanguageToolbar(surface, editor) {
+  const panel = document.createElement("div");
+  panel.className = "wiki-editor-context-tools wiki-editor-code-language-tools";
+  panel.setAttribute("aria-label", "Code block syntax");
+  panel.hidden = true;
+
+  const select = document.createElement("select");
+  select.className = "form-select form-select-sm wiki-editor-code-language-select";
+  select.setAttribute("aria-label", "Code block syntax");
+  CODE_BLOCK_LANGUAGE_OPTIONS.forEach(function (language) {
+    const option = document.createElement("option");
+    option.value = language.value;
+    option.textContent = language.label;
+    select.appendChild(option);
+  });
+  panel.appendChild(select);
+
+  select.addEventListener("mousedown", function (event) {
+    event.stopPropagation();
+  });
+  select.addEventListener("change", function () {
+    editor.chain().focus().setCodeBlockLanguage(select.value).run();
+  });
+
+  function syncCodeBlockLanguageTools() {
+    const codeBlock = editor.isActive("codeBlock") ? getActiveCodeBlockElement(editor, surface) : null;
+    panel.hidden = !codeBlock;
+    if (!codeBlock) {
+      return;
+    }
+    select.value = editor.getAttributes("codeBlock").language || "";
+    positionContextPanel(panel, codeBlock, surface);
+  }
+
+  editor.on("create", syncCodeBlockLanguageTools);
+  editor.on("selectionUpdate", syncCodeBlockLanguageTools);
+  editor.on("transaction", syncCodeBlockLanguageTools);
+  editor.on("focus", syncCodeBlockLanguageTools);
+  editor.on("blur", syncCodeBlockLanguageTools);
+  window.addEventListener("resize", syncCodeBlockLanguageTools);
+  surface.appendChild(panel);
+  syncCodeBlockLanguageTools();
+
+  return {
+    destroy: function () {
+      window.removeEventListener("resize", syncCodeBlockLanguageTools);
+      if (panel.parentNode) {
+        panel.parentNode.removeChild(panel);
+      }
+    }
+  };
 }
 
 function createTableContextToolbar(surface, editor) {
@@ -2248,6 +2313,7 @@ export async function createWikiEditor(element, options) {
     element: editorMount,
     extensions: [
       StarterKit.configure({
+        codeBlock: false,
         link: false,
         heading: {
           levels: [1, 2, 3, 4]
@@ -2259,6 +2325,7 @@ export async function createWikiEditor(element, options) {
       MediaCell,
       MediaRow,
       ImageFigure,
+      WikiCodeBlock,
       WikiCallout,
       WikiPageLink,
       WikiNamespaceLink,
@@ -2444,6 +2511,7 @@ export async function createWikiEditor(element, options) {
   toolbarMount.__wikiIsFullscreenSourceActive = root.__wikiIsFullscreenSourceActive;
   const topToolbar = createToolbar(toolbarMount, editor, pickAndUploadImage);
   const imageContextToolbar = createImageContextToolbar(editorMount, editor);
+  const codeBlockLanguageToolbar = createCodeBlockLanguageToolbar(editorMount, editor);
   const tableContextToolbar = createTableContextToolbar(editorMount, editor);
   linkContextToolbar = createLinkContextToolbar(editorMount, editor);
   const destroyLinkNavigationGuard = installEditorLinkNavigationGuard({
@@ -2494,6 +2562,7 @@ export async function createWikiEditor(element, options) {
       delete toolbarMount.__wikiIsFullscreenSourceActive;
       topToolbar.destroy();
       imageContextToolbar.destroy();
+      codeBlockLanguageToolbar.destroy();
       tableContextToolbar.destroy();
       linkContextToolbar.destroy();
       editorToc.destroy();
