@@ -68,6 +68,9 @@
 }
 
 .westgate-wiki-compose .wiki-editor-toolbar__button {
+  --bs-btn-active-color: var(--bs-btn-color, currentColor);
+  --bs-btn-active-bg: color-mix(in srgb, var(--wiki-editor-focus-border, var(--bs-primary, #0d6efd)) 14%, transparent);
+  --bs-btn-active-border-color: color-mix(in srgb, var(--wiki-editor-focus-border, var(--bs-primary, #0d6efd)) 55%, var(--wiki-editor-toolbar-border, var(--bs-border-color, #dee2e6)));
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -76,6 +79,12 @@
   height: 2.2rem;
   min-width: 2.2rem;
   padding: 0;
+}
+
+.westgate-wiki-compose .wiki-editor-toolbar__button.active {
+  color: var(--bs-btn-active-color);
+  background-color: var(--bs-btn-active-bg);
+  border-color: var(--bs-btn-active-border-color);
 }
 
 .westgate-wiki-compose .wiki-editor-toolbar__icon {

@@ -200,6 +200,14 @@ await test("editor toolbar renders as a bordered self-contained sticky panel", f
   });
 });
 
+await test("editor toolbar active buttons keep icon color readable", function () {
+  [editorCss, vendoredEditorCss].forEach(function (css) {
+    assert.match(css, /\.wiki-editor-toolbar__button\s*{[^}]*--bs-btn-active-color:\s*var\(--bs-btn-color,\s*currentColor\)/);
+    assert.match(css, /\.wiki-editor-toolbar__button\.active\s*{[^}]*color:\s*var\(--bs-btn-active-color\)/);
+    assert.doesNotMatch(css, /(?:^|\n)\s*color:\s*var\(--bs-btn-active-bg\)/);
+  });
+});
+
 await test("styled span classes and styles round-trip through the extracted extension layer", function () {
   const editor = createEditor('<p><span class="legacy-accent" style="font-size: 1.2rem; color: #caa55a">Accent</span></p>');
   const rendered = editor.getHTML();
