@@ -92,15 +92,22 @@
   font-size: var(--wiki-prose-h4-size, 1.15rem) !important;
 }
 
-.wiki-article-prose a {
+.wiki-article-prose a,
+.wiki-article-prose .wiki-editor-link {
   color: var(--wiki-prose-link-color, var(--bs-link-color, inherit));
   text-decoration: var(--wiki-prose-link-decoration, none);
 }
 
 .wiki-article-prose a:hover,
-.wiki-article-prose a:focus {
+.wiki-article-prose a:focus,
+.wiki-article-prose .wiki-editor-link:hover,
+.wiki-article-prose .wiki-editor-link:focus {
   color: var(--wiki-prose-link-hover-color, var(--bs-link-hover-color, var(--bs-link-color, inherit)));
   text-decoration: var(--wiki-prose-link-hover-decoration, underline);
+}
+
+.wiki-article-prose .wiki-editor-link {
+  cursor: pointer;
 }
 
 .wiki-article-prose blockquote {

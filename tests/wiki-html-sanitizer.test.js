@@ -35,6 +35,28 @@ test("renderReadOnlyWikiHtml disables task list checkboxes for article view", fu
   assert.match(rendered, /<input type="checkbox" disabled/);
 });
 
+test("renderReadOnlyWikiHtml converts stored inert editor links into anchors", function () {
+  const html = '<p>A <span class="wiki-editor-link" data-wiki-link-href="https://google.com" data-wiki-link-target="_blank" data-wiki-link-rel="noopener noreferrer">regular link</span>.</p>';
+  const rendered = wikiHtmlSanitizer.renderReadOnlyWikiHtml(html);
+
+  assert.equal(rendered, '<p>A <a href="https://google.com" target="_blank" rel="noopener noreferrer">regular link</a>.</p>');
+});
+
+test("sanitizeWikiHtml keeps stored inert editor links inert", function () {
+  const html = '<p>A <span class="wiki-editor-link" data-wiki-link-href="https://google.com" data-wiki-link-target="_blank" data-wiki-link-rel="noopener noreferrer">regular link</span>.</p>';
+  const sanitized = wikiHtmlSanitizer.sanitizeWikiHtml(html);
+
+  assert.match(sanitized, /<span class="wiki-editor-link" data-wiki-link-href="https:\/\/google\.com"/);
+  assert.doesNotMatch(sanitized, /<a\b/);
+});
+
+test("renderReadOnlyWikiHtml does not convert unsafe inert editor links", function () {
+  const html = '<p>A <span class="wiki-editor-link" data-wiki-link-href="javascript:alert(1)">bad link</span>.</p>';
+  const rendered = wikiHtmlSanitizer.renderReadOnlyWikiHtml(html);
+
+  assert.equal(rendered, '<p>A <span class="wiki-editor-link">bad link</span>.</p>');
+});
+
 test("renderReadOnlyWikiHtml removes empty task checkbox spacer spans", function () {
   const html = '<ul data-type="taskList"><li data-checked="true"><label><input type="checkbox" checked><span></span></label><div><p>Task</p></div></li></ul>';
   const rendered = wikiHtmlSanitizer.renderReadOnlyWikiHtml(html);

@@ -21,7 +21,7 @@ function test(name, fn) {
 
 installJsdomGlobals();
 
-const [{ Editor }, StarterKitModule, ImageModule, PreservedNodeAttributesModule, StyledSpanModule, ContainerBlockModule, MediaRowModule, ImageFigureModule, WikiCalloutModule, SlashCommandModule, toolbarSchemaModule, editorTocModule, legacyHtmlModule, sanitizerContractModule] = await Promise.all([
+const [{ Editor }, StarterKitModule, ImageModule, PreservedNodeAttributesModule, StyledSpanModule, ContainerBlockModule, MediaRowModule, ImageFigureModule, WikiCalloutModule, SlashCommandModule, WikiLinkModule, toolbarSchemaModule, editorTocModule, linkInteractionsModule, legacyHtmlModule, sanitizerContractModule] = await Promise.all([
   import("@tiptap/core"),
   import("@tiptap/starter-kit"),
   import("@tiptap/extension-image"),
@@ -32,8 +32,10 @@ const [{ Editor }, StarterKitModule, ImageModule, PreservedNodeAttributesModule,
   import("../tiptap/src/extensions/image-figure.mjs"),
   import("../tiptap/src/extensions/wiki-callout.mjs"),
   import("../tiptap/src/extensions/slash-command.mjs"),
+  import("../tiptap/src/extensions/wiki-link.mjs"),
   import("../tiptap/src/toolbar/toolbar-schema.mjs"),
   import("../tiptap/src/toolbar/editor-toc.mjs"),
+  import("../tiptap/src/selection/link-interactions.mjs"),
   import("../tiptap/src/normalization/legacy-html.mjs"),
   import("../tiptap/src/shared/sanitizer-contract.mjs")
 ]);
@@ -47,8 +49,10 @@ const { MediaCell, MediaRow } = MediaRowModule;
 const ImageFigure = ImageFigureModule.default;
 const WikiCallout = WikiCalloutModule.default;
 const SlashCommand = SlashCommandModule.default;
+const WikiLink = WikiLinkModule.default;
 const { IMAGE_CONTEXT_BUTTON_IDS, TABLE_CONTEXT_BUTTON_IDS, TOP_TOOLBAR_BUTTON_IDS, TOP_TOOLBAR_GROUPS } = toolbarSchemaModule;
 const { buildHeadingToc, navigateToHeading } = editorTocModule;
+const { installEditorLinkNavigationGuard, selectEditorLink } = linkInteractionsModule;
 const {
   detectUnsupportedContent,
   getNormalizationNotice,
@@ -65,6 +69,7 @@ function createEditor(content) {
     element: mount,
     extensions: [
       StarterKit.configure({
+        link: false,
         heading: {
           levels: [1, 2, 3, 4]
         }
@@ -76,6 +81,12 @@ function createEditor(content) {
       MediaRow,
       ImageFigure,
       WikiCallout,
+      WikiLink.configure({
+        openOnClick: false,
+        autolink: true,
+        linkOnPaste: true,
+        defaultProtocol: "https"
+      }),
       SlashCommand.configure({
         getItems: function () {
           return [
@@ -205,6 +216,374 @@ await test("mediaRow two-up html round-trips without containerBlock wrappers man
 
   firstOpen.destroy();
   reopened.destroy();
+});
+
+await test("wiki link mark stores regular links as inert spans in the editor contract", function () {
+  const editor = createEditor('<p>A <a target="_blank" rel="noopener noreferrer" href="https://google.com">regular link</a>.</p>');
+  const rendered = editor.getHTML();
+
+  assert.match(rendered, /<span class="wiki-editor-link" data-wiki-link-href="https:\/\/google\.com"/);
+  assert.match(rendered, /data-wiki-link-target="_blank"/);
+  assert.match(rendered, /data-wiki-link-rel="noopener noreferrer"/);
+  assert.doesNotMatch(rendered, /<a\b[^>]*href="https:\/\/google\.com"/);
+  editor.commands.setTextSelection(5);
+  assert.equal(editor.getAttributes("link").href, "https://google.com");
+
+  editor.destroy();
+});
+
+await test("editor link navigation guard cancels link clicks before page handlers run", function () {
+  const editorMount = document.createElement("div");
+  const link = document.createElement("a");
+  const linkText = document.createTextNode("Westgate");
+  let selectedLink = null;
+  let toolbarLink = null;
+  let bubbled = false;
+  function recordBubble() {
+    bubbled = true;
+  }
+
+  link.href = "https://example.test/wiki/westgate";
+  link.appendChild(linkText);
+  editorMount.appendChild(link);
+  document.body.appendChild(editorMount);
+  document.body.addEventListener("click", recordBubble);
+
+  const destroyGuard = installEditorLinkNavigationGuard({
+    editorMount,
+    editor: {
+      view: {
+        posAtDOM: function (target) {
+          assert.equal(target, linkText);
+          return 7;
+        }
+      },
+      chain: function () {
+        return {
+          focus: function () {
+            return this;
+          },
+          setTextSelection: function (pos) {
+            assert.equal(pos, 7);
+            selectedLink = link;
+            return this;
+          },
+          extendMarkRange: function (markName) {
+            assert.equal(markName, "link");
+            return this;
+          },
+          run: function () {
+            return true;
+          }
+        };
+      }
+    },
+    getLinkContextToolbar: function () {
+      return {
+        showForLink: function (activeLink) {
+          toolbarLink = activeLink;
+        }
+      };
+    }
+  });
+
+  const event = new window.MouseEvent("click", {
+    bubbles: true,
+    cancelable: true,
+    button: 0
+  });
+  const notCanceled = link.dispatchEvent(event);
+
+  assert.equal(notCanceled, false);
+  assert.equal(event.defaultPrevented, true);
+  assert.equal(bubbled, false);
+  assert.equal(selectedLink, link);
+  assert.equal(toolbarLink, link);
+
+  destroyGuard();
+  document.body.removeEventListener("click", recordBubble);
+  editorMount.remove();
+});
+
+await test("editor link navigation guard opens link tools for inert editor link spans", function () {
+  const editorMount = document.createElement("div");
+  const link = document.createElement("span");
+  const linkText = document.createTextNode("essential");
+  let selectedLink = null;
+  let toolbarLink = null;
+
+  link.className = "wiki-editor-link";
+  link.setAttribute("data-wiki-link-href", "https://google.com");
+  link.appendChild(linkText);
+  editorMount.appendChild(link);
+  document.body.appendChild(editorMount);
+
+  const destroyGuard = installEditorLinkNavigationGuard({
+    editorMount,
+    editor: {
+      view: {
+        posAtDOM: function (target) {
+          assert.equal(target, linkText);
+          return 4;
+        }
+      },
+      chain: function () {
+        return {
+          focus: function () {
+            return this;
+          },
+          setTextSelection: function (pos) {
+            assert.equal(pos, 4);
+            selectedLink = link;
+            return this;
+          },
+          extendMarkRange: function (markName) {
+            assert.equal(markName, "link");
+            return this;
+          },
+          run: function () {
+            return true;
+          }
+        };
+      }
+    },
+    getLinkContextToolbar: function () {
+      return {
+        showForLink: function (activeLink) {
+          toolbarLink = activeLink;
+        }
+      };
+    }
+  });
+
+  const event = new window.MouseEvent("click", {
+    bubbles: true,
+    cancelable: true,
+    button: 0
+  });
+  const notCanceled = link.dispatchEvent(event);
+
+  assert.equal(notCanceled, false);
+  assert.equal(event.defaultPrevented, true);
+  assert.equal(selectedLink, link);
+  assert.equal(toolbarLink, link);
+
+  destroyGuard();
+  editorMount.remove();
+});
+
+await test("editor link navigation guard opens link tools when clicking inert link text nodes", function () {
+  const editorMount = document.createElement("div");
+  const link = document.createElement("span");
+  const linkText = document.createTextNode("https://github.com/gitextensions/gitextensions/releases/latest");
+  let selectedLink = null;
+  let toolbarLink = null;
+
+  link.className = "wiki-editor-link";
+  link.setAttribute("data-wiki-link-href", "https://github.com/gitextensions/gitextensions/releases/latest");
+  link.setAttribute("data-wiki-link-target", "_blank");
+  link.setAttribute("data-wiki-link-rel", "noopener noreferrer nofollow");
+  link.appendChild(linkText);
+  editorMount.appendChild(link);
+  document.body.appendChild(editorMount);
+
+  const destroyGuard = installEditorLinkNavigationGuard({
+    editorMount,
+    editor: {
+      view: {
+        posAtDOM: function (target) {
+          assert.equal(target, linkText);
+          return 12;
+        }
+      },
+      chain: function () {
+        return {
+          focus: function () {
+            return this;
+          },
+          setTextSelection: function (pos) {
+            assert.equal(pos, 12);
+            selectedLink = link;
+            return this;
+          },
+          extendMarkRange: function (markName) {
+            assert.equal(markName, "link");
+            return this;
+          },
+          run: function () {
+            return true;
+          }
+        };
+      }
+    },
+    getLinkContextToolbar: function () {
+      return {
+        showForLink: function (activeLink) {
+          toolbarLink = activeLink;
+        }
+      };
+    }
+  });
+
+  const event = new window.MouseEvent("click", {
+    bubbles: true,
+    cancelable: true,
+    button: 0
+  });
+  const notCanceled = linkText.dispatchEvent(event);
+
+  assert.equal(notCanceled, false);
+  assert.equal(event.defaultPrevented, true);
+  assert.equal(selectedLink, link);
+  assert.equal(toolbarLink, link);
+
+  destroyGuard();
+  editorMount.remove();
+});
+
+await test("editor link navigation guard opens link tools on mousedown before text selection changes", function () {
+  const editorMount = document.createElement("div");
+  const link = document.createElement("span");
+  const linkText = document.createTextNode("https://git-scm.com/download/win");
+  let selectedLink = null;
+  let toolbarLink = null;
+
+  link.className = "wiki-editor-link";
+  link.setAttribute("data-wiki-link-href", "https://git-scm.com/download/win");
+  link.appendChild(linkText);
+  editorMount.appendChild(link);
+  document.body.appendChild(editorMount);
+
+  const destroyGuard = installEditorLinkNavigationGuard({
+    editorMount,
+    editor: {
+      view: {
+        posAtDOM: function (target) {
+          assert.equal(target, linkText);
+          return 16;
+        }
+      },
+      chain: function () {
+        return {
+          focus: function () {
+            return this;
+          },
+          setTextSelection: function (pos) {
+            assert.equal(pos, 16);
+            selectedLink = link;
+            return this;
+          },
+          extendMarkRange: function (markName) {
+            assert.equal(markName, "link");
+            return this;
+          },
+          run: function () {
+            return true;
+          }
+        };
+      }
+    },
+    getLinkContextToolbar: function () {
+      return {
+        showForLink: function (activeLink) {
+          toolbarLink = activeLink;
+        }
+      };
+    }
+  });
+
+  const event = new window.MouseEvent("mousedown", {
+    bubbles: true,
+    cancelable: true,
+    button: 0
+  });
+  const notCanceled = linkText.dispatchEvent(event);
+
+  assert.equal(notCanceled, false);
+  assert.equal(event.defaultPrevented, true);
+  assert.equal(selectedLink, link);
+  assert.equal(toolbarLink, link);
+
+  destroyGuard();
+  editorMount.remove();
+});
+
+await test("selectEditorLink activates the link mark for long inert URL spans", function () {
+  const editor = createEditor('<p><span class="wiki-editor-link" data-wiki-link-href="https://github.com/gitextensions/gitextensions/releases/latest" data-wiki-link-target="_blank" data-wiki-link-rel="noopener noreferrer nofollow">https://github.com/gitextensions/gitextensions/releases/latest</span></p>');
+  const link = editor.view.dom.querySelector("[data-wiki-link-href]");
+
+  assert.ok(link, "expected rendered inert link span");
+  assert.equal(selectEditorLink(editor, link), true);
+  assert.equal(editor.isActive("link"), true);
+  assert.equal(editor.getAttributes("link").href, "https://github.com/gitextensions/gitextensions/releases/latest");
+
+  editor.destroy();
+});
+
+await test("editor link navigation guard cancels links before document capture navigation handlers", function () {
+  const editorMount = document.createElement("div");
+  const link = document.createElement("a");
+  const linkText = document.createTextNode("essential");
+  let documentCaptureSawNavigation = false;
+
+  link.href = "https://google.com/";
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  link.appendChild(linkText);
+  editorMount.appendChild(link);
+  document.body.appendChild(editorMount);
+
+  function recordDocumentCapture(event) {
+    if (!event.defaultPrevented) {
+      documentCaptureSawNavigation = true;
+    }
+  }
+
+  document.addEventListener("click", recordDocumentCapture, true);
+
+  const destroyGuard = installEditorLinkNavigationGuard({
+    editorMount,
+    editor: {
+      view: {
+        posAtDOM: function () {
+          return 3;
+        }
+      },
+      chain: function () {
+        return {
+          focus: function () {
+            return this;
+          },
+          setTextSelection: function () {
+            return this;
+          },
+          extendMarkRange: function () {
+            return this;
+          },
+          run: function () {
+            return true;
+          }
+        };
+      }
+    },
+    getLinkContextToolbar: function () {
+      return null;
+    }
+  });
+
+  const event = new window.MouseEvent("click", {
+    bubbles: true,
+    cancelable: true,
+    button: 0
+  });
+  link.dispatchEvent(event);
+
+  assert.equal(event.defaultPrevented, true);
+  assert.equal(documentCaptureSawNavigation, false);
+
+  destroyGuard();
+  document.removeEventListener("click", recordDocumentCapture, true);
+  editorMount.remove();
 });
 
 await test("wikiCallout parses and renders safe callout HTML", function () {

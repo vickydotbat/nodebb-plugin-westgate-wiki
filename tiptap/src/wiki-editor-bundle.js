@@ -9,7 +9,6 @@ import StarterKit from "@tiptap/starter-kit";
 import CharacterCount from "@tiptap/extension-character-count";
 import Highlight from "@tiptap/extension-highlight";
 import Image from "@tiptap/extension-image";
-import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import Subscript from "@tiptap/extension-subscript";
 import Superscript from "@tiptap/extension-superscript";
@@ -30,6 +29,7 @@ import PreservedNodeAttributes from "./extensions/preserved-node-attributes.mjs"
 import SlashCommand from "./extensions/slash-command.mjs";
 import StyledSpan from "./extensions/styled-span.mjs";
 import WikiCallout from "./extensions/wiki-callout.mjs";
+import WikiLink from "./extensions/wiki-link.mjs";
 import {
   detectUnsupportedContent,
   getNormalizationNotice,
@@ -44,6 +44,10 @@ import {
   setSelectedImageLayout,
   setSelectedImageSize
 } from "./selection/media-selection.mjs";
+import {
+  handleEditorLinkClick,
+  installEditorLinkNavigationGuard
+} from "./selection/link-interactions.mjs";
 import { sanitizeHtml } from "./shared/sanitizer-contract.mjs";
 import { buildHeadingToc, flattenHeadingToc, navigateToHeading } from "./toolbar/editor-toc.mjs";
 import { IMAGE_CONTEXT_BUTTON_IDS, TABLE_CONTEXT_BUTTON_IDS, TOP_TOOLBAR_BUTTON_IDS, TOP_TOOLBAR_GROUPS } from "./toolbar/toolbar-schema.mjs";
@@ -1177,6 +1181,7 @@ export async function createWikiEditor(element, options) {
     element: editorMount,
     extensions: [
       StarterKit.configure({
+        link: false,
         heading: {
           levels: [1, 2, 3, 4]
         }
@@ -1190,7 +1195,7 @@ export async function createWikiEditor(element, options) {
       WikiCallout,
       Underline,
       Highlight,
-      Link.configure({
+      WikiLink.configure({
         openOnClick: false,
         autolink: true,
         linkOnPaste: true,
@@ -1267,16 +1272,13 @@ export async function createWikiEditor(element, options) {
           const imageFigure = target && typeof target.closest === "function" ? target.closest('[data-wiki-node="image-figure"]') : null;
           const imageNode = target && typeof target.closest === "function" ? target.closest('img[data-wiki-node="image"]') : null;
           const mediaCell = target && typeof target.closest === "function" ? target.closest('[data-wiki-node="media-cell"]') : null;
-          const link = target && typeof target.closest === "function" ? target.closest("a[href]") : null;
-          if (link && editorMount.contains(link)) {
-            event.preventDefault();
-            event.stopPropagation();
-            const posTarget = link.firstChild || link;
-            const pos = editor.view.posAtDOM(posTarget, 0);
-            editor.chain().focus().setTextSelection(pos).extendMarkRange("link").run();
-            if (linkContextToolbar) {
-              linkContextToolbar.showForLink(link);
+          if (handleEditorLinkClick({
+            editor,
+            editorMount,
+            getLinkContextToolbar: function () {
+              return linkContextToolbar;
             }
+          }, event)) {
             return true;
           }
 
@@ -1357,6 +1359,13 @@ export async function createWikiEditor(element, options) {
   const imageContextToolbar = createImageContextToolbar(editorMount, editor);
   const tableContextToolbar = createTableContextToolbar(editorMount, editor);
   linkContextToolbar = createLinkContextToolbar(editorMount, editor);
+  const destroyLinkNavigationGuard = installEditorLinkNavigationGuard({
+    editorMount,
+    editor,
+    getLinkContextToolbar: function () {
+      return linkContextToolbar;
+    }
+  });
   const editorToc = createEditorToc(body, editorMount, editor);
 
   return {
@@ -1385,6 +1394,7 @@ export async function createWikiEditor(element, options) {
       editor.commands.focus();
     },
     destroy: function () {
+      destroyLinkNavigationGuard();
       topToolbar.destroy();
       imageContextToolbar.destroy();
       tableContextToolbar.destroy();
