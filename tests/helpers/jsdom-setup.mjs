@@ -21,6 +21,7 @@ export function installJsdomGlobals() {
     HTMLParagraphElement: { configurable: true, value: window.HTMLParagraphElement },
     Event: { configurable: true, value: window.Event },
     CustomEvent: { configurable: true, value: window.CustomEvent },
+    KeyboardEvent: { configurable: true, value: window.KeyboardEvent },
     MutationObserver: { configurable: true, value: window.MutationObserver },
     getComputedStyle: { configurable: true, value: window.getComputedStyle.bind(window) },
     getSelection: { configurable: true, value: window.getSelection.bind(window) },

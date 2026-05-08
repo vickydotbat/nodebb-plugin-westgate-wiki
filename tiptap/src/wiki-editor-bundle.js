@@ -899,23 +899,44 @@ function createToolbar(root, editor, uploadImage) {
   addGroup([
     {
       id: "callout-info",
-      title: "Insert info callout",
+      title: "Toggle info callout",
       action: function () {
+        if (editor.isActive("wikiCallout", { type: "info" })) {
+          editor.chain().focus().unsetWikiCallout().run();
+          return;
+        }
         editor.chain().focus().insertWikiCallout({ type: "info", title: "Info" }).run();
+      },
+      applyState: function (button) {
+        button.classList.toggle("active", editor.isActive("wikiCallout", { type: "info" }));
       }
     },
     {
       id: "callout-warning",
-      title: "Insert warning callout",
+      title: "Toggle warning callout",
       action: function () {
+        if (editor.isActive("wikiCallout", { type: "warning" })) {
+          editor.chain().focus().unsetWikiCallout().run();
+          return;
+        }
         editor.chain().focus().insertWikiCallout({ type: "warning", title: "Warning" }).run();
+      },
+      applyState: function (button) {
+        button.classList.toggle("active", editor.isActive("wikiCallout", { type: "warning" }));
       }
     },
     {
       id: "callout-danger",
-      title: "Insert danger callout",
+      title: "Toggle danger callout",
       action: function () {
+        if (editor.isActive("wikiCallout", { type: "danger" })) {
+          editor.chain().focus().unsetWikiCallout().run();
+          return;
+        }
         editor.chain().focus().insertWikiCallout({ type: "danger", title: "Danger" }).run();
+      },
+      applyState: function (button) {
+        button.classList.toggle("active", editor.isActive("wikiCallout", { type: "danger" }));
       }
     }
   ], "callouts");

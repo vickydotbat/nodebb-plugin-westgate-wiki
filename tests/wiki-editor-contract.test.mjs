@@ -691,6 +691,31 @@ await test("wikiCallout insert command creates a warning callout", function () {
   editor.destroy();
 });
 
+await test("wikiCallout unset command unwraps the selected callout content", function () {
+  const editor = createEditor('<aside class="wiki-callout wiki-callout--warning" data-callout-type="warning" data-callout-title="Compatibility"><p><strong>Compatibility</strong></p><p>Test custom CSS.</p></aside>');
+
+  editor.commands.setTextSelection(18);
+  assert.equal(editor.commands.unsetWikiCallout(), true);
+  const rendered = editor.getHTML();
+
+  assert.doesNotMatch(rendered, /wiki-callout/);
+  assert.match(rendered, /<p><strong>Compatibility<\/strong><\/p>/);
+  assert.match(rendered, /<p>Test custom CSS\.<\/p>/);
+  editor.destroy();
+});
+
+await test("wikiCallout Backspace shortcut unwraps a callout from an empty paragraph", function () {
+  const editor = createEditor('<aside class="wiki-callout wiki-callout--warning" data-callout-type="warning" data-callout-title="Compatibility"><p><strong>Compatibility</strong></p><p></p></aside>');
+
+  editor.commands.setTextSelection(17);
+  editor.commands.keyboardShortcut("Backspace");
+  const rendered = editor.getHTML();
+
+  assert.doesNotMatch(rendered, /wiki-callout/);
+  assert.match(rendered, /<p><strong>Compatibility<\/strong><\/p>/);
+  editor.destroy();
+});
+
 await test("slash command extension exposes keyboard-selectable command state", function () {
   const editor = createEditor("<p>/</p>");
 

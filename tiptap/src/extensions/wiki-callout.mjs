@@ -90,12 +90,27 @@ const WikiCallout = Node.create({
             },
             content
           });
+        },
+      unsetWikiCallout:
+        () =>
+        ({ state, tr, dispatch }) => {
+          const { $from } = state.selection;
+          for (let depth = $from.depth; depth > 0; depth -= 1) {
+            const node = $from.node(depth);
+            if (node.type.name === this.name) {
+              if (dispatch) {
+                tr.replaceWith($from.before(depth), $from.after(depth), node.content).scrollIntoView();
+              }
+              return true;
+            }
+          }
+          return false;
         }
     };
   },
   addKeyboardShortcuts() {
     return {
-      Backspace: function () {
+      Backspace: () => {
         const { state } = this.editor;
         const { $from } = state.selection;
         if ($from.parent.type.name !== "paragraph" || $from.parent.content.size !== 0) {
@@ -103,7 +118,7 @@ const WikiCallout = Node.create({
         }
         for (let depth = $from.depth; depth > 0; depth -= 1) {
           if ($from.node(depth).type.name === this.name) {
-            return this.editor.commands.lift(this.name);
+            return this.editor.commands.unsetWikiCallout();
           }
         }
         return false;
