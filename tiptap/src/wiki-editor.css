@@ -159,6 +159,10 @@
   pointer-events: none;
 }
 
+.westgate-wiki-compose .wiki-editor__fullscreen-source-panel--dirty .wiki-editor__fullscreen-source-highlight {
+  visibility: hidden;
+}
+
 .westgate-wiki-compose .wiki-editor__fullscreen-source-input {
   resize: none;
   background: transparent;
@@ -168,9 +172,17 @@
   overflow: auto;
 }
 
+.westgate-wiki-compose .wiki-editor__fullscreen-source-panel--dirty .wiki-editor__fullscreen-source-input {
+  color: #f9fafb;
+}
+
 .westgate-wiki-compose .wiki-editor__fullscreen-source-input::selection {
   background: rgba(96, 165, 250, 0.35);
   color: transparent;
+}
+
+.westgate-wiki-compose .wiki-editor__fullscreen-source-panel--dirty .wiki-editor__fullscreen-source-input::selection {
+  color: #f9fafb;
 }
 
 .westgate-wiki-compose .wiki-editor-source-token--tag {

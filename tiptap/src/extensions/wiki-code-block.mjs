@@ -179,6 +179,67 @@ function buildSyntaxDecorations(doc) {
   return DecorationSet.create(doc, decorations);
 }
 
+function isCodeBlockNode(node) {
+  return !!(node && node.type && node.type.name === "codeBlock");
+}
+
+function positionTouchesCodeBlock(doc, pos) {
+  const clampedPos = Math.max(0, Math.min(pos, doc.content.size));
+  const directNode = doc.nodeAt(clampedPos);
+  if (isCodeBlockNode(directNode)) {
+    return true;
+  }
+
+  const resolved = doc.resolve(clampedPos);
+  for (let depth = resolved.depth; depth > 0; depth -= 1) {
+    if (isCodeBlockNode(resolved.node(depth))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function rangeTouchesCodeBlock(doc, from, to) {
+  const start = Math.max(0, Math.min(from, doc.content.size));
+  const end = Math.max(start, Math.min(to, doc.content.size));
+  if (positionTouchesCodeBlock(doc, start) || positionTouchesCodeBlock(doc, end)) {
+    return true;
+  }
+
+  let touched = false;
+  doc.nodesBetween(start, end, function (node) {
+    if (isCodeBlockNode(node)) {
+      touched = true;
+      return false;
+    }
+    return !touched;
+  });
+  return touched;
+}
+
+function transactionTouchesCodeBlock(transaction, oldState, newState) {
+  let touched = false;
+  transaction.mapping.maps.forEach(function (map) {
+    map.forEach(function (oldStart, oldEnd, newStart, newEnd) {
+      if (
+        rangeTouchesCodeBlock(oldState.doc, oldStart, oldEnd) ||
+        rangeTouchesCodeBlock(newState.doc, newStart, newEnd)
+      ) {
+        touched = true;
+      }
+    });
+  });
+
+  if (touched) {
+    return true;
+  }
+
+  return transaction.steps.some(function (step) {
+    return Number.isInteger(step.pos) &&
+      (positionTouchesCodeBlock(oldState.doc, step.pos) || positionTouchesCodeBlock(newState.doc, step.pos));
+  });
+}
+
 function readLanguageFromElement(element, prefix) {
   const candidates = [
     element && element.firstElementChild,
@@ -253,11 +314,11 @@ const WikiCodeBlock = CodeBlock.extend({
         key: new PluginKey("wikiCodeBlockSyntaxHighlighting"),
         state: {
           init: (_, state) => buildSyntaxDecorations(state.doc),
-          apply: (transaction, oldDecorations, _oldState, newState) => {
-            if (!transaction.docChanged && !transaction.selectionSet) {
+          apply: (transaction, oldDecorations, oldState, newState) => {
+            if (!transaction.docChanged || !transactionTouchesCodeBlock(transaction, oldState, newState)) {
               return oldDecorations.map(transaction.mapping, transaction.doc);
             }
-            return buildSyntaxDecorations(newState.doc);
+            return buildSyntaxDecorations(transaction.doc);
           }
         },
         props: {

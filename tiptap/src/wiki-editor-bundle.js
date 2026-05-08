@@ -1559,8 +1559,23 @@ function createEditorToc(root, surface, editor) {
     });
   }
 
+  let syncTimer = null;
+  let lastTocSignature = "";
+
+  function getTocSignature(items) {
+    return flattenHeadingToc(items).map(function (item) {
+      return `${item.level}:${item.text}:${item.pos}`;
+    }).join("|");
+  }
+
   function syncToc() {
+    syncTimer = null;
     const items = buildHeadingToc(editor);
+    const signature = getTocSignature(items);
+    if (signature === lastTocSignature) {
+      return;
+    }
+    lastTocSignature = signature;
     assignHeadingIds(items);
     listMount.innerHTML = "";
 
@@ -1577,14 +1592,23 @@ function createEditorToc(root, surface, editor) {
     renderItems(items, listMount);
   }
 
+  function scheduleTocSync() {
+    if (syncTimer) {
+      return;
+    }
+    syncTimer = window.setTimeout(syncToc, 250);
+  }
+
   editor.on("create", syncToc);
-  editor.on("update", syncToc);
-  editor.on("transaction", syncToc);
+  editor.on("update", scheduleTocSync);
   root.appendChild(aside);
   syncToc();
 
   return {
     destroy: function () {
+      window.clearTimeout(syncTimer);
+      editor.off("create", syncToc);
+      editor.off("update", scheduleTocSync);
       if (aside.parentNode) {
         aside.parentNode.removeChild(aside);
       }
@@ -1876,6 +1900,7 @@ function plainSourceHeadingText(source) {
 }
 
 function createFullscreenSourceMode(root, editor, sourcePanel, sourceTextarea, sourceHighlight, resizer, layout, onChange) {
+  const SOURCE_SYNC_DELAY_MS = 500;
   const sourceToggle = sourcePanel.querySelector("[data-wiki-editor-source-toggle]");
   const sourceApply = sourcePanel.querySelector("[data-wiki-editor-source-apply]");
   const sourceShow = layout.querySelector("[data-wiki-editor-source-show]");
@@ -1883,6 +1908,7 @@ function createFullscreenSourceMode(root, editor, sourcePanel, sourceTextarea, s
   let sourceHidden = false;
   let syncingSource = false;
   let sourceDirty = false;
+  let sourceSyncTimer = null;
   let lastSourcePanelWidth = "clamp(22rem, 38vw, 70vw)";
   let resizeCleanup = null;
   let placeholder = null;
@@ -1914,13 +1940,32 @@ function createFullscreenSourceMode(root, editor, sourcePanel, sourceTextarea, s
     }
   }
 
+  function clearScheduledSourceSync() {
+    if (sourceSyncTimer) {
+      window.clearTimeout(sourceSyncTimer);
+      sourceSyncTimer = null;
+    }
+  }
+
   function syncSourceFromEditor() {
-    if (syncingSource || sourceDirty) {
+    clearScheduledSourceSync();
+    if (syncingSource || sourceDirty || !fullscreen || sourceHidden) {
       return;
     }
     sourceTextarea.value = formatSourceHtml(sanitizeHtml(editor.getHTML()));
     renderSourceHighlight();
     setSourceDirty(false);
+  }
+
+  function scheduleSourceFromEditor() {
+    clearScheduledSourceSync();
+    if (syncingSource || sourceDirty || !fullscreen || sourceHidden) {
+      return;
+    }
+    sourceSyncTimer = window.setTimeout(function () {
+      sourceSyncTimer = null;
+      syncSourceFromEditor();
+    }, SOURCE_SYNC_DELAY_MS);
   }
 
   function applySourceToEditor() {
@@ -1976,11 +2021,15 @@ function createFullscreenSourceMode(root, editor, sourcePanel, sourceTextarea, s
   }
 
   function handleTocNavigate(event) {
+    syncSourceFromEditor();
     scrollSourceToHeading(event && event.detail && event.detail.item);
   }
 
   function setSourceHidden(hidden) {
     sourceHidden = !!hidden;
+    if (sourceHidden) {
+      clearScheduledSourceSync();
+    }
     root.classList.toggle("wiki-editor--fullscreen-source-hidden", sourceHidden);
     if (sourceToggle) {
       sourceToggle.setAttribute("aria-pressed", sourceHidden ? "true" : "false");
@@ -1988,6 +2037,9 @@ function createFullscreenSourceMode(root, editor, sourcePanel, sourceTextarea, s
     }
     if (sourceShow) {
       sourceShow.hidden = !sourceHidden;
+    }
+    if (fullscreen && !sourceHidden) {
+      syncSourceFromEditor();
     }
   }
 
@@ -2066,6 +2118,7 @@ function createFullscreenSourceMode(root, editor, sourcePanel, sourceTextarea, s
         }
       }, 0);
     } else {
+      clearScheduledSourceSync();
       if (sourceShow) {
         sourceShow.hidden = true;
       }
@@ -2105,7 +2158,7 @@ function createFullscreenSourceMode(root, editor, sourcePanel, sourceTextarea, s
   }
 
   sourceTextarea.addEventListener("input", function () {
-    renderSourceHighlight();
+    clearScheduledSourceSync();
     setSourceDirty(true);
   });
   sourceTextarea.addEventListener("scroll", syncSourceScroll);
@@ -2128,7 +2181,7 @@ function createFullscreenSourceMode(root, editor, sourcePanel, sourceTextarea, s
     sourceShow.hidden = true;
   }
   editor.on("create", syncSourceFromEditor);
-  editor.on("update", syncSourceFromEditor);
+  editor.on("update", scheduleSourceFromEditor);
   syncSourceFromEditor();
 
   root.__wikiToggleFullscreenSource = function () {
@@ -2143,8 +2196,9 @@ function createFullscreenSourceMode(root, editor, sourcePanel, sourceTextarea, s
       if (resizeCleanup) {
         resizeCleanup();
       }
+      clearScheduledSourceSync();
       editor.off("create", syncSourceFromEditor);
-      editor.off("update", syncSourceFromEditor);
+      editor.off("update", scheduleSourceFromEditor);
       root.removeEventListener("wiki-editor-toc-navigate", handleTocNavigate);
       document.documentElement.classList.remove("wiki-editor-fullscreen-source-active");
       exitActionsPortal();

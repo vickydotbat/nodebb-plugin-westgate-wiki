@@ -809,6 +809,14 @@ await test("wiki code block language applies editor syntax token decorations", f
   editor.destroy();
 });
 
+await test("wiki code block syntax highlighting avoids selection-only rebuilds", function () {
+  const wikiCodeBlockSource = readFileSync(new URL("../tiptap/src/extensions/wiki-code-block.mjs", import.meta.url), "utf8");
+
+  assert.match(wikiCodeBlockSource, /function\s+transactionTouchesCodeBlock\s*\(/);
+  assert.match(wikiCodeBlockSource, /if\s*\(\s*!transaction\.docChanged\s*\|\|\s*!transactionTouchesCodeBlock/);
+  assert.doesNotMatch(wikiCodeBlockSource, /transaction\.selectionSet/);
+});
+
 await test("read-only wiki pages apply syntax token highlighting to language code blocks", function () {
   assert.match(wikiJsSource, /function\s+highlightReadOnlyWikiCodeBlocks\s*\(/);
   assert.match(wikiJsSource, /wiki-code-token wiki-code-token--/);
@@ -866,6 +874,10 @@ await test("fullscreen source mode has guarded editable source synchronization",
   assert.match(editorBundleSource, /function\s+createFullscreenSourceMode\s*\(/);
   assert.match(editorBundleSource, /let\s+syncingSource\s*=\s*false/);
   assert.match(editorBundleSource, /let\s+sourceDirty\s*=\s*false/);
+  assert.match(editorBundleSource, /SOURCE_SYNC_DELAY_MS\s*=\s*500/);
+  assert.match(editorBundleSource, /function\s+scheduleSourceFromEditor\s*\(/);
+  assert.match(editorBundleSource, /window\.setTimeout\(function \(\) \{[\s\S]*syncSourceFromEditor\(\);[\s\S]*\},\s*SOURCE_SYNC_DELAY_MS\)/);
+  assert.match(editorBundleSource, /syncingSource\s*\|\|\s*sourceDirty\s*\|\|\s*!fullscreen\s*\|\|\s*sourceHidden/);
   assert.match(editorBundleSource, /new DOMParser\(\)\.parseFromString/);
   assert.match(editorBundleSource, /sourceTextarea\.value\s*=\s*formatSourceHtml\(sanitizeHtml\(editor\.getHTML\(\)\)\)/);
   assert.match(editorBundleSource, /normalizeSourceHtmlForEditor\(sourceTextarea\.value\)/);
@@ -873,10 +885,20 @@ await test("fullscreen source mode has guarded editable source synchronization",
   assert.match(editorBundleSource, /editor\.commands\.setContent\([^,]+,\s*false\)/);
   assert.match(editorBundleSource, /sourceApply\.addEventListener\("click",\s*applySourceToEditor\)/);
   assert.match(editorBundleSource, /sourceTextarea\.addEventListener\("input",\s*function \(\) \{[\s\S]*setSourceDirty\(true\)/);
+  assert.doesNotMatch(editorBundleSource, /sourceTextarea\.addEventListener\("input",\s*function \(\) \{[\s\S]*renderSourceHighlight\(\)/);
   assert.doesNotMatch(editorBundleSource, /sourceTextarea\.addEventListener\("input",\s*function \(\) \{[\s\S]*syncEditorFromSource\(\)/);
+  assert.match(editorBundleSource, /editor\.on\("update",\s*scheduleSourceFromEditor\)/);
+  assert.doesNotMatch(editorBundleSource, /editor\.on\("update",\s*syncSourceFromEditor\)/);
   assert.match(editorBundleSource, /root\.addEventListener\("wiki-editor-toc-navigate",\s*handleTocNavigate\)/);
   assert.match(editorBundleSource, /root\.removeEventListener\("wiki-editor-toc-navigate",\s*handleTocNavigate\)/);
   assert.match(editorBundleSource, /sourceTextarea\.scrollTo\(\{[\s\S]*behavior:\s*"smooth"/);
+});
+
+await test("editor ToC updates are debounced and avoid transaction-only DOM rewrites", function () {
+  assert.match(editorBundleSource, /function\s+scheduleTocSync\s*\(/);
+  assert.match(editorBundleSource, /window\.setTimeout\(syncToc,\s*250\)/);
+  assert.match(editorBundleSource, /signature\s*===\s*lastTocSignature/);
+  assert.doesNotMatch(editorBundleSource, /editor\.on\("transaction",\s*syncToc\)/);
 });
 
 await test("editor ToC navigation dispatches a source sync event", function () {
@@ -934,6 +956,8 @@ await test("fullscreen source mode css supports resize and source hiding", funct
     assert.match(css, /\.wiki-editor--fullscreen-source-hidden\s+\.wiki-editor__fullscreen-layout\s*{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/);
     assert.match(css, /\.wiki-editor__fullscreen-resizer\s*{[^}]*cursor:\s*col-resize/);
     assert.match(css, /\.wiki-editor__fullscreen-source-actions\s*{[^}]*display:\s*flex/);
+    assert.match(css, /\.wiki-editor__fullscreen-source-panel--dirty\s+\.wiki-editor__fullscreen-source-highlight\s*{[^}]*visibility:\s*hidden/);
+    assert.match(css, /\.wiki-editor__fullscreen-source-panel--dirty\s+\.wiki-editor__fullscreen-source-input\s*{[^}]*color:\s*#f9fafb/);
   });
 });
 
