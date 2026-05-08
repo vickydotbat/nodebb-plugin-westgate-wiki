@@ -64,6 +64,7 @@ const { sanitizeHtml } = sanitizerContractModule;
 const articleBodyCss = readFileSync(new URL("../public/wiki-article-body.css", import.meta.url), "utf8");
 const editorCss = readFileSync(new URL("../tiptap/src/wiki-editor.css", import.meta.url), "utf8");
 const vendoredEditorCss = readFileSync(new URL("../public/vendor/tiptap/wiki-tiptap.css", import.meta.url), "utf8");
+const editorBundleSource = readFileSync(new URL("../tiptap/src/wiki-editor-bundle.js", import.meta.url), "utf8");
 
 function createEditor(content) {
   const mount = document.createElement("div");
@@ -206,6 +207,28 @@ await test("editor toolbar active buttons keep icon color readable", function ()
     assert.match(css, /\.wiki-editor-toolbar__button\.active\s*{[^}]*color:\s*var\(--bs-btn-active-color\)/);
     assert.doesNotMatch(css, /(?:^|\n)\s*color:\s*var\(--bs-btn-active-bg\)/);
   });
+});
+
+await test("editor toolbar group labels stay visually subdued", function () {
+  [editorCss, vendoredEditorCss].forEach(function (css) {
+    assert.match(css, /\.wiki-editor-toolbar__group-label\s*{[^}]*font-size:\s*(?:0)?\.62rem/);
+    assert.match(css, /\.wiki-editor-toolbar__group-label\s*{[^}]*font-weight:\s*600/);
+    assert.match(css, /\.wiki-editor-toolbar__group-label\s*{[^}]*opacity:\s*(?:0)?\.62/);
+  });
+});
+
+await test("editor toolbar labels do not force oversized group spacing", function () {
+  [editorCss, vendoredEditorCss].forEach(function (css) {
+    assert.match(css, /\.wiki-editor-toolbar\s*{[^}]*column-gap:\s*(?:0)?\.7rem/);
+    assert.match(css, /\.wiki-editor-toolbar__group\s*{[^}]*flex-direction:\s*column/);
+    assert.match(css, /\.wiki-editor-toolbar__group-controls\s*{[^}]*display:\s*flex/);
+    assert.match(css, /\.wiki-editor-toolbar__separator\s*{[^}]*margin:\s*0/);
+  });
+});
+
+await test("editor toolbar separators follow adjacent group rows", function () {
+  assert.match(editorBundleSource, /previousGroup\.offsetTop\s*===\s*nextGroup\.offsetTop/);
+  assert.doesNotMatch(editorBundleSource, /previousGroup\.offsetTop\s*===\s*separator\.offsetTop/);
 });
 
 await test("styled span classes and styles round-trip through the extracted extension layer", function () {
@@ -767,7 +790,7 @@ await test("top toolbar schema keeps wiki entity tools and only table creation i
   const tables = TOP_TOOLBAR_GROUPS.find(function (group) { return group.id === "tables"; });
 
   assert.deepEqual(history.buttonIds, ["undo", "redo"]);
-  assert.deepEqual(media.buttonIds, ["link", "unlink", "wiki-page-link", "wiki-namespace-link", "wiki-user-mention", "wiki-footnote", "image-upload", "media-row-2", "media-row-3"]);
+  assert.deepEqual(media.buttonIds, ["link", "wiki-page-link", "wiki-namespace-link", "wiki-user-mention", "wiki-footnote", "image-upload", "media-row-2", "media-row-3"]);
   assert.deepEqual(tables.buttonIds, ["table-insert"]);
 });
 

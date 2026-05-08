@@ -571,6 +571,16 @@ function createToolbar(root, editor, uploadImage) {
     group.className = "wiki-editor-toolbar__group";
     group.setAttribute("data-toolbar-group", schemaGroup.id);
     group.setAttribute("aria-label", schemaGroup.label);
+    const label = document.createElement("span");
+    label.className = "wiki-editor-toolbar__group-label";
+    label.setAttribute("aria-hidden", "true");
+    label.textContent = schemaGroup.label;
+    group.appendChild(label);
+
+    const controls = document.createElement("div");
+    controls.className = "wiki-editor-toolbar__group-controls";
+    group.appendChild(controls);
+
     defs.forEach(function (def) {
       if (!TOP_TOOLBAR_BUTTON_IDS.includes(def.id)) {
         throw new Error(`Unknown top toolbar button: ${def.id}`);
@@ -581,7 +591,7 @@ function createToolbar(root, editor, uploadImage) {
       const button = createButton(def);
       def.applyState = def.applyState || function () {};
       def.button = button;
-      group.appendChild(button);
+      controls.appendChild(button);
     });
     if (groups.length > 0) {
       const separator = document.createElement("span");
@@ -771,16 +781,6 @@ function createToolbar(root, editor, uploadImage) {
       },
       applyState: function (button) {
         button.classList.toggle("active", editor.isActive("link"));
-      }
-    },
-    {
-      id: "unlink",
-      title: "Remove link",
-      action: function () {
-        editor.chain().focus().unsetLink().run();
-      },
-      applyState: function (button) {
-        button.disabled = !editor.isActive("link");
       }
     },
     {
@@ -1011,8 +1011,7 @@ function createToolbar(root, editor, uploadImage) {
       const nextGroup = separator.nextElementSibling;
       const sameRow = previousGroup &&
         nextGroup &&
-        previousGroup.offsetTop === separator.offsetTop &&
-        separator.offsetTop === nextGroup.offsetTop;
+        previousGroup.offsetTop === nextGroup.offsetTop;
       separator.hidden = !sameRow;
     });
   }
