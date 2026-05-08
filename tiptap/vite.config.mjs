@@ -9,17 +9,17 @@ export default defineConfig({
   build: {
     lib: {
       entry: path.resolve(__dirname, "src/wiki-editor-bundle.js"),
-      name: "WikiEditorBundle",
+      name: "WestgateWikiEditor",
       formats: ["iife"],
-      fileName: () => "wiki-ckeditor.bundle.js"
+      fileName: () => "wiki-tiptap.bundle.js"
     },
     rollupOptions: {
       output: {
         inlineDynamicImports: true,
-        assetFileNames: "wiki-ckeditor[extname]"
+        assetFileNames: "wiki-tiptap[extname]"
       }
     },
-    outDir: path.resolve(__dirname, "../public/vendor/ckeditor5"),
+    outDir: path.resolve(__dirname, "../public/vendor/tiptap"),
     emptyOutDir: true
   }
 });

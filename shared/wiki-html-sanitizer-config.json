@@ -1,0 +1,166 @@
+{
+  "allowedTags": [
+    "a",
+    "article",
+    "aside",
+    "blockquote",
+    "br",
+    "code",
+    "col",
+    "colgroup",
+    "dd",
+    "div",
+    "dl",
+    "dt",
+    "em",
+    "figcaption",
+    "figure",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "hr",
+    "img",
+    "input",
+    "label",
+    "li",
+    "mark",
+    "ol",
+    "p",
+    "pre",
+    "s",
+    "section",
+    "span",
+    "strong",
+    "sub",
+    "sup",
+    "table",
+    "tbody",
+    "td",
+    "th",
+    "thead",
+    "tr",
+    "u",
+    "ul"
+  ],
+  "allowedAttributes": {
+    "*": [
+      "class",
+      "id",
+      "style",
+      "title",
+      "dir",
+      "lang",
+      "data-*",
+      "aria-*"
+    ],
+    "a": [
+      "href",
+      "name",
+      "target",
+      "rel"
+    ],
+    "img": [
+      "src",
+      "alt",
+      "title",
+      "width",
+      "height"
+    ],
+    "input": [
+      "type",
+      "checked",
+      "disabled"
+    ],
+    "label": [
+      "contenteditable"
+    ],
+    "li": [
+      "data-checked",
+      "data-type"
+    ],
+    "ol": [
+      "start",
+      "reversed"
+    ],
+    "table": [
+      "data-type"
+    ],
+    "td": [
+      "colspan",
+      "rowspan"
+    ],
+    "th": [
+      "colspan",
+      "rowspan",
+      "scope"
+    ],
+    "ul": [
+      "data-type"
+    ]
+  },
+  "allowedSchemes": [
+    "http",
+    "https",
+    "mailto"
+  ],
+  "allowedSchemesByTag": {
+    "img": [
+      "http",
+      "https",
+      "data"
+    ]
+  },
+  "allowedStyles": {
+    "*": {
+      "background-color": [
+        "^(?:#[0-9a-fA-F]{3,8}|(?:rgb|hsl)a?\\([0-9\\s.,%/+-]+\\)|var\\(--[a-zA-Z0-9_-]+\\)|[a-zA-Z]+)$"
+      ],
+      "color": [
+        "^(?:#[0-9a-fA-F]{3,8}|(?:rgb|hsl)a?\\([0-9\\s.,%/+-]+\\)|var\\(--[a-zA-Z0-9_-]+\\)|[a-zA-Z]+)$"
+      ],
+      "font-family": [
+        "^[a-zA-Z0-9 ,\"'_-]+$"
+      ],
+      "font-size": [
+        "^(?:\\d+(?:\\.\\d+)?(?:px|em|rem|%)|smaller|larger)$"
+      ],
+      "font-style": [
+        "^(?:normal|italic|oblique)$"
+      ],
+      "font-weight": [
+        "^(?:normal|bold|bolder|lighter|[1-9]00)$"
+      ],
+      "text-align": [
+        "^(?:left|right|center|justify)$"
+      ],
+      "text-decoration": [
+        "^(?:none|underline|line-through|underline line-through|line-through underline)$"
+      ],
+      "vertical-align": [
+        "^(?:sub|super)$"
+      ]
+    },
+    "img": {
+      "height": [
+        "^(?:\\d+(?:\\.\\d+)?(?:px|%)|auto)$"
+      ],
+      "width": [
+        "^(?:\\d+(?:\\.\\d+)?(?:px|%)|auto)$"
+      ]
+    },
+    "table": {
+      "margin-left": [
+        "^(?:0|auto)$"
+      ],
+      "margin-right": [
+        "^(?:0|auto)$"
+      ],
+      "width": [
+        "^(?:\\d+(?:\\.\\d+)?(?:px|%)|auto)$"
+      ]
+    }
+  }
+}

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This repository is a NodeBB plugin that adds a Westgate-specific wiki surface on top of forum content. The package is **GPL-3.0-or-later** (CKEditor 5 GPL bundle). Wiki page creation uses **`/wiki/compose/:cid`** with a vendored CKEditor build under `public/vendor/ckeditor5/` (rebuild with `npm run build:ckeditor`).
+This repository is a NodeBB plugin that adds a Westgate-specific wiki surface on top of forum content. The package is **GPL-3.0-or-later**. Wiki page creation uses **`/wiki/compose/:cid`** with a vendored **Tiptap** build under `public/vendor/tiptap/` (rebuild with `npm run build:tiptap` or `npm run build:editors`). CKEditor has been removed from the active compose path; unsupported legacy HTML must be normalized into the plugin-owned Tiptap schema before editing.
 
 Current design baseline:
 
@@ -56,6 +56,14 @@ The existing implementation already does the following:
 - Exposes a reusable wiki link autocomplete service/API that returns canonical
   wiki paths and server-computed insert text for wiki and forum authoring
   contexts.
+- Uses a plugin-owned Tiptap compose editor as the default wiki authoring
+  surface, with automatic/manual fallback to the legacy CKEditor bundle for
+  unsupported legacy HTML or migration breakage.
+- Sanitizes wiki main-post HTML on both the compose client and server-side save
+  validation so editor swaps do not trust browser HTML.
+- Live browser verification on 2026-05-06 confirmed the Tiptap compose/edit
+  flow is working for normal page creation, save, and render in the active
+  Westgate deployment.
 
 The implementation now has a working MVP shape. This document tracks remaining
 hardening, verification, and phase-two work so future changes do not invent a
@@ -68,7 +76,389 @@ scratch; extend `lib/wiki-paths.js` and existing callers.
 
 Current priority order:
 
-1. Live-verify the new collision diagnostics, title rejection, and autocomplete
+1. Continue the editor migration by expanding Tiptap-side legacy HTML support
+   without weakening sanitization.
+   - 2026-05-06 live testing confirmed the standard Tiptap authoring path is
+     healthy for normal wiki pages.
+   - 2026-05-06 source/build hardening added a first preserved legacy
+     `figure.image` path in Tiptap. CKEditor-style image figures with
+     captions, linked images, width/height attributes, and the existing
+     alignment classes now stay as figures instead of being flattened during
+     Tiptap import.
+   - 2026-05-06 follow-up hardening expanded preserved legacy inline/block
+     formatting in Tiptap: safe `class`/`style` attributes now survive through
+     the shared sanitizer allowlist, inline `span` formatting is preserved
+     through a Tiptap mark instead of forcing fallback, and non-plain
+     `div`/`section`/`article` wrappers that only contain inline content are
+     normalized into paragraphs so class-based wiki prose styling survives more
+     edits.
+   - 2026-05-06 presentational-tag normalization now maps basic legacy HTML
+     such as `<i>`, `<b>`, `<strike>`, `<center>`, `<font>`, `<small>`,
+     `<big>`, and `<tt>` onto schema-safe semantic equivalents or sanitized
+     styled spans before unsupported-content detection runs.
+   - 2026-05-06 parser hardening fixed the first-pass `figure.image` Tiptap
+     import so captionless legacy figures no longer crash editor init, and the
+     basic normalization set now also covers adjacent legacy tags such as
+     `<del>`, `<ins>`, `<kbd>`, `<cite>`, `<abbr>`, `<acronym>`, `<dfn>`, and
+     `<address>`.
+   - 2026-05-06 table/list normalization now handles legacy `figure.table`,
+     raw `<caption>`, and old `<dir>`/`<menu>` list markup by converting them
+     into schema-safe table/list structures that the Tiptap path can save
+     without falling straight back to CKEditor. Table captions currently round
+     trip as styled wiki paragraphs placed immediately above the table rather
+     than as native editable table-caption nodes.
+   - 2026-05-06 structural wrapper support added a schema-safe Tiptap
+     container block for legacy `div`, `section`, and `article` wrappers when
+     they contain block content, so those wrappers no longer trigger immediate
+     fallback after normalization leaves them in place.
+   - Next editor phase: image and media layout tooling.
+     - Current Tiptap support is good enough for importing many legacy image
+       shapes, but authoring control is still weak. Authors need explicit tools
+       for layout, not just passive preservation of old HTML.
+     - Priority layouts to support intentionally:
+       `centered image`, `left-aligned image`, `right-aligned image`,
+       `side image with text wrap`, `two-up image row`, `multi-image gallery
+       row`, and `image next to arbitrary prose or note content`.
+     - Treat `image next to image` and `image next to text` as layout
+       containers, not as ad-hoc inline styles pasted into random wrappers.
+       The editor needs plugin-owned schema support for those containers if the
+       content is expected to round-trip safely.
+     - Prefer a staged rollout:
+       1. expose toolbar commands for the existing single-image alignment
+          classes already supported by render CSS
+       2. add a plugin-owned media row/container node for side-by-side images
+          with bounded class/style options
+       3. add a richer mixed-content layout node only if image-plus-prose
+          layouts remain common after step 2
+     - Do not open up arbitrary Flexbox/Grid authoring through raw style
+       passthrough. If Flexbox-backed layouts are needed, model them as
+       explicit plugin-owned classes/nodes with sanitized attributes.
+     - Keep the server sanitizer, Tiptap import normalization, render CSS, and
+       toolbar affordances aligned. A layout is not supported until it can be
+       imported, edited, saved, and rendered without silent collapse back to a
+       linear block flow.
+     - Table formatting is currently in a healthier state than image layout.
+       Do not regress tables while adding media layout tools.
+   - 2026-05-06 initial image/media layout tooling is now implemented in the
+     Tiptap path:
+     - toolbar controls for single-image positioning (`center`, `left`,
+       `right`, `side`)
+     - toolbar controls for image sizing (`small`, `medium`, `large`,
+       `full-width`) backed by explicit plugin-owned classes
+     - plugin-owned `wiki-media-row` / `wiki-media-cell` schema nodes with
+       `2-Up` and `3-Up` insertion commands for side-by-side image or
+       mixed image-plus-text layouts
+     - normalization of simple legacy flex/grid media wrappers into those
+       plugin-owned row/cell classes before sanitization strips raw layout CSS
+     - visible selection/focus affordances for images and media cells, plus
+       click-to-select behavior on images and click-to-focus behavior on empty
+       media cell chrome
+     - 2026-05-07 compose UX follow-up: long wiki pages now justify explicit
+       toolbar reachability as part of the image/media phase, not just as a
+       polish item. The current Tiptap toolbar should remain reachable while
+       editing lower-page images/layouts; a sticky toolbar is an acceptable
+       interim step, but contextual floating/image-local controls remain part
+       of the forward plan if the sticky approach proves insufficient.
+   - Live browser verification is still needed for the new media-row authoring
+     flow, especially image upload inside cells, keyboard navigation between
+     cells, and save/edit round-trip on mixed image-plus-text rows.
+   - 2026-05-07 regression hardening fixed a media-row reopen/save bug where
+     plugin-owned `wiki-media-row` / `wiki-media-cell` wrappers could be
+     reparsed as generic container blocks, manufacturing extra wrapper columns
+     on round-trip and shifting image placement. Keep plugin-owned layout nodes
+     excluded from generic container parsing.
+   - Next image toolkit phase:
+     - Add explicit caption authoring for selected images. Prefer a
+       plugin-owned figure workflow rather than storing captions in unrelated
+       text blocks beside the image.
+     - Add image management actions: replace selected image, remove selected
+       image, and possibly duplicate/move within a media row if the UX stays
+       simple.
+     - Review whether the current size presets are enough or whether bounded
+       width percentages / resize handles are worth adding. Do not expose free
+       arbitrary sizing unless the save/render contract remains predictable.
+     - Keep plain-image and figure-image behavior converging, not diverging.
+       The long-term image toolkit should not force authors to guess which
+       image subtype supports which controls.
+  - Extension architecture roadmap:
+    - The editor is now past the point where a single `wiki-editor-bundle.js`
+      file should keep owning every custom schema decision inline. Future work
+      should treat Tiptap features as an explicit extension layer with clear
+      ownership boundaries.
+    - Guiding rule:
+      - use stock/official Tiptap extensions for generic rich-text primitives
+      - use plugin-owned custom extensions for wiki semantics, migration
+        compatibility, constrained image/layout behavior, and structures that
+        must obey the plugin sanitizer and route/link model
+    - Core stock extensions to keep as first-class primitives for wiki editing:
+      - `StarterKit`
+      - `Image`
+      - `Link`
+      - `Placeholder`
+      - `Table`, `TableRow`, `TableHeader`, `TableCell`
+      - `TaskList`, `TaskItem`
+      - `TextAlign`
+      - `Underline`
+      - `Subscript`
+      - `Superscript`
+      - `Typography`
+      - `CharacterCount`
+      - `Highlight`
+    - Plugin-owned extensions that should remain custom because they encode
+      Westgate/wiki-specific structure or sanitizer-bound behavior:
+      - `preservedNodeAttributes`
+      - `styledSpan`
+      - `containerBlock`
+      - `mediaRow`
+      - `mediaCell`
+      - `imageFigure`
+      - future `wikiImage` extension that extends stock `Image` with plugin
+        class/command policy
+      - future `wikiEditorInteractions` extension for image-selection,
+        media-cell focus, and editor-specific click behavior
+      - future `wikiInternalLink` node/mark
+      - optional future `wikiRedlink` node/mark
+      - future `wikiFootnote` node/mark
+      - future callout/admonition/wiki block extensions if those become part of
+        the product
+    - Stock extensions worth evaluating next, in recommended order, but only
+      when they fit the save/render contract:
+      - `FileHandler`
+        - strongest immediate recommendation for paste/drop image handling
+        - better fit than keeping file-pick/upload behavior as the only image
+          ingestion path
+      - `Details`, `DetailsSummary`, `DetailsContent`
+        - strongest medium-term stock block candidate if guides need
+          collapsible sections
+      - image resize support on `Image`
+        - only if width/height persistence, sanitizer behavior, and render CSS
+          stay bounded and predictable
+      - `DragHandle`
+        - useful once media rows and other custom blocks are common enough that
+          moving them by cursor alone feels clumsy
+      - `Mathematics`
+        - only if gameplay/mechanics docs actually need equation authoring
+      - `Mention`
+        - defer unless editor UX is blocked; forum mention notifications remain
+          server-owned
+      - collaboration-related extensions only if the product actually moves
+        toward real-time multi-user editing
+    - Explicit non-goals:
+      - do not solve editor gaps by enabling broad arbitrary HTML/CSS authoring
+      - do not rely on unstable experimental figure/layout packages without a
+        plugin-owned compatibility layer
+      - do not let toolbar code become the real owner of schema decisions
+  - Recommended extension file structure:
+    - Move custom editor schema/tooling into `tiptap/src/extensions/`.
+    - Add explicit shared-contract modules first so custom extensions do not
+      duplicate sanitizer/class logic.
+    - Target structure:
+      - `tiptap/src/extensions/image-figure.js`
+      - `tiptap/src/extensions/media-row.js`
+      - `tiptap/src/extensions/container-block.js`
+      - `tiptap/src/extensions/styled-span.js`
+      - `tiptap/src/extensions/preserved-node-attributes.js`
+      - `tiptap/src/extensions/wiki-image.js`
+      - `tiptap/src/extensions/wiki-editor-interactions.js`
+      - `tiptap/src/extensions/wiki-internal-link.js`
+      - `tiptap/src/extensions/wiki-footnote.js`
+      - `tiptap/src/extensions/wiki-callout.js`
+    - Shared/support files:
+      - `tiptap/src/normalization/legacy-html.js`
+      - `tiptap/src/shared/preserved-attrs.js`
+      - `tiptap/src/shared/sanitizer-contract.js`
+      - `tiptap/src/shared/image-class-contract.js`
+      - `tiptap/src/toolbar/toolbar-schema.js`
+      - `tiptap/src/toolbar/media-tools.js`
+      - `tiptap/src/toolbar/image-tools.js`
+      - `tiptap/src/selection/media-selection.js`
+    - Keep the top-level bundle file as assembly/composition code only:
+      imports, extension registration order, upload wiring, toolbar mounting,
+      and editor boot logic.
+  - Recommended implementation order for the extension layer:
+    - Phase 0: Freeze the current contract before extraction.
+      - Add focused client-side tests for:
+        - `normalizeLegacyHtmlForTiptap`
+        - `detectUnsupportedContent`
+        - preserved class/style round-trip
+        - `imageFigure`, `mediaRow`, and `mediaCell` parse/render behavior
+        - image click-selection and empty media-cell focus behavior
+      - Reason:
+        - current tests cover the server sanitizer better than the client-side
+          Tiptap contract; extraction should not proceed on assumption alone
+      - 2026-05-07 implementation status:
+        - initial jsdom-backed client contract tests now exist for
+          normalization, unsupported-content detection, client sanitization,
+          styled-span round-trip, `imageFigure` parse/render, and `mediaRow`
+          command/render behavior
+        - the bundle now imports extracted modules for shared sanitizer
+          contract, legacy HTML normalization, preserved attributes,
+          `containerBlock`, `styledSpan`, `mediaRow` / `mediaCell`,
+          `imageFigure`, and selection/image class helpers
+        - extraction target remains behavior preservation, not a schema/model
+          change; interaction-specific tests are still lighter than the
+          normalization/render contract and should be expanded before later
+          image-toolkit work
+    - Phase A: Extract what already exists without changing behavior.
+      - Move `imageFigure`, `mediaRow`, `mediaCell`, `containerBlock`,
+        preserved attribute logic, styled spans, and normalization helpers into
+        separate modules.
+      - Extract shared sanitizer/class helpers before per-extension refactors.
+      - Keep commands, parse/render logic, and CSS contracts behaviorally
+        identical during this extraction.
+      - Preserve:
+        - same saved HTML where practical
+        - same sanitizer contract
+        - same unsupported-content detection and CKEditor fallback behavior
+        - same image click-selection, link-click suppression, and media-cell
+          focus behavior
+      - Exit criteria:
+        - smaller bundle file
+        - same saved HTML contract
+        - same fallback/sanitizer contract
+        - same focused tests passing
+        - easier targeted edits
+    - Phase B: Normalize image handling around extensions, not toolbar helpers.
+      - Add first-class image toolkit behavior on top of extracted modules.
+      - Create a plugin-owned `wikiImage` extension by extending stock `Image`
+        so image class vocabulary, bounded sizing, and future insertion helpers
+        are extension-owned instead of toolbar-owned.
+      - Keep `imageFigure` custom, but align its command surface with
+        `wikiImage`.
+      - Add:
+        - captions for `imageFigure`
+        - replace/remove image actions
+        - explicit policy decision on bounded resize support vs class-based
+          width presets only
+      - Unify plain-image and figure-image toolbar behavior, but do not paper
+        over real model differences.
+      - Required design decision:
+        - decide whether plain images remain first-class indefinitely or are
+          progressively wrapped/converged toward figures when caption/layout
+          metadata appears
+      - Exit criteria:
+        - image positioning, sizing, captioning, replacement, and import
+          behavior feel like one coherent toolkit
+    - Phase C: Introduce semantic wiki inline extensions.
+      - `wikiInternalLink`
+        - strongest recommendation after image toolkit stabilization
+        - should own canonical wiki-target metadata instead of relying purely
+          on raw `[[...]]` text conventions
+      - optional `wikiRedlink`
+      - later `wikiFootnote`
+      - Those should integrate with existing autocomplete, path resolution,
+        mention/footnote processing, and saved HTML rules rather than becoming
+        isolated editor-only abstractions.
+    - Phase D: Introduce optional wiki block extensions only if demanded by
+      actual content needs.
+      - `Details`, `DetailsSummary`, `DetailsContent` for collapsible sections
+      - callouts/admonitions if the product needs plugin-owned variants rather
+        than stock details blocks
+      - `Mathematics` for math blocks/inline equations if real content needs it
+      - `DragHandle` for custom block layouts once layout complexity is high
+        enough
+  - Toolbar architecture plan:
+    - Keep the toolbar as plugin UI, not editor schema.
+    - Replace hard-coded button behavior with command descriptors grouped by
+      capability:
+      - document/history
+      - inline marks
+      - links
+      - images
+      - media rows
+      - lists
+      - alignment
+      - tables
+    - Let extensions own commands and active-state semantics.
+    - Let the toolbar consume those commands rather than owning layout/image
+      policy itself.
+    - Show contextual image tools only when `image` or `imageFigure` is
+      selected.
+    - Show contextual media-row tools only when selection is inside
+      `mediaCell` or `mediaRow`.
+  - Decision framework for future extension choices:
+    - Prefer stock extensions when:
+      - the content model is generic
+      - the saved HTML is conventional and stable
+      - the editor feature does not depend on wiki-specific server logic
+      - extending a stock extension gives the needed behavior without forking
+        the content model
+    - Prefer plugin-owned extensions when:
+      - the feature depends on wiki path resolution, redlinks, or ACP-driven
+        namespace behavior
+      - the feature needs a constrained class/style contract
+      - migration safety requires plugin-owned import normalization
+      - the rendered structure is a wiki product decision rather than a
+        generic editor primitive
+      - server sanitizer and client schema must evolve together
+    - Reject or defer an extension when:
+      - it increases authoring power by producing HTML the sanitizer cannot
+        preserve predictably
+      - it creates a second competing content model for the same wiki feature
+      - it depends on experimental packages without a maintainable fallback
+      - it would move notifications, routing, or other server-owned semantics
+        into a client-only abstraction
+  - Verification expectations for extension work:
+    - Every new extension should be treated as a full contract change, not
+      just editor UI sugar.
+    - Required verification surfaces:
+      - legacy HTML import into Tiptap
+      - unsupported-content detection and fallback decisions
+      - toolbar authoring / command behavior
+      - save pipeline through server sanitizer
+      - reopen/edit round-trip
+      - rendered article output under Westgate theme styles
+      - fallback behavior for unsupported legacy content
+    - Add focused tests where possible for:
+      - sanitizer allowlist alignment
+      - normalization rules
+      - saved class/style contracts
+      - image/media command behavior
+      - route/link semantics for wiki-specific inline nodes
+      - interaction behavior currently handled through editor DOM events
+  - Recommendations on current implementation shape:
+    - Current plugin-owned features that are already right to remain custom:
+      - preserved node/mark attributes
+      - `containerBlock`
+      - `mediaRow` / `mediaCell`
+      - `imageFigure`
+    - Current implementation pieces that should move toward extension-backed
+      ownership:
+      - image layout/size class logic currently owned by toolbar helper
+        functions should move into `wikiImage` / `imageFigure` commands
+      - click-selection, link suppression, and media-cell focus behavior should
+        move into a `wikiEditorInteractions` extension rather than staying as
+        ad hoc bundle-local `editorProps` logic
+      - image paste/drop behavior should move toward stock `FileHandler` rather
+        than keeping file-picker upload as the only supported ingestion path
+    - Current implementation pieces that should stay plugin-UI-owned rather
+      than becoming schema:
+      - toolbar rendering/layout
+      - upload endpoint wiring
+      - compose-page fallback/status messaging
+  - Anti-patterns to avoid while expanding extensions:
+    - do not let arbitrary pasted Flexbox/Grid/CSS become the editor's real
+      layout model
+    - do not add overlapping image systems where plain images, figures, and
+      media cells all expose different incompatible toolbars
+    - do not bypass `shared/wiki-html-sanitizer-config.json` when adding new
+      editor features
+    - do not make client-only schema decisions that the server sanitizer or
+      rendered article CSS cannot honor
+    - do not replace working conversion code with stock extensions just because
+      they exist if the replacement weakens migration safety or route/link
+      semantics
+   - The remaining editor gap is legacy HTML/CSS round-trip support. Do not
+     treat this as a sanitizer-only toggle; changes must preserve content
+     safely through the Tiptap schema and save pipeline.
+   - Table/media figures, arbitrary raw HTML embeds, and broader unsupported
+     layout structures still need deliberate follow-up. Keep CKEditor fallback
+     active for unsupported shapes until each one round-trips safely.
+   - Prefer small, explicit import/normalization steps first: wrapper tags,
+     safe structural markup, then deliberate attribute/style support.
+   - Keep CKEditor fallback available until legacy-content editing coverage is
+     wide enough to remove it intentionally.
+2. Live-verify the new collision diagnostics, title rejection, and autocomplete
    API in a running NodeBB instance after deployment.
    - Per-namespace duplicate title rejection has been live-checked.
    - Duplicate page names in different namespaces remain allowed by design;
@@ -79,10 +469,10 @@ Current priority order:
      `[[development:Map Creation Guide]]`.
    - Forum composer wiki-link insertion now has a toolbar button backed by the
      server-side autocomplete API; live browser verification remains pending.
-2. Continue wiki-owned search only through
+3. Continue wiki-owned search only through
    `lib/wiki-paths.js`; do not let client code or templates construct
    `/wiki/...` manually.
-3. Continue Westgate theme alignment and full live smoke checks.
+4. Continue Westgate theme alignment and full live smoke checks.
 
 Deprecated priority items, completed 2026-05-01:
 
@@ -101,6 +491,11 @@ Deprecated priority items, completed 2026-05-01:
 Architectural rule: search results, redlinks, breadcrumbs, authoring redirects,
 and future aliases must use one source of truth for wiki paths. New wiki-facing
 features must call `lib/wiki-paths.js` or a service that wraps it.
+
+Editor migration rule: changes to Tiptap support must keep the client bundle,
+server sanitizer, and stored HTML contract aligned. Do not claim new HTML/CSS
+support unless the content can be imported, edited, saved, and re-rendered
+without silent data loss.
 
 ## Initialization Objective
 

@@ -19,6 +19,32 @@ function countMatches(value, pattern) {
 }
 
 {
+  const html = footnotes.transformDokuWikiFootnotes('<p>You can add footnotes <span class="wiki-entity wiki-entity--footnote" data-wiki-entity="footnote" data-wiki-footnote="This is a footnote">[note]</span> with the editor.</p>');
+  assert(html.includes('class="wiki-footnote-ref"'), "editor footnote entity should render an inline reference");
+  assert(html.includes("This is a footnote"), "editor footnote entity should populate the bottom note body");
+  assert(!html.includes("data-wiki-entity=\"footnote\""), "editor footnote storage span should not leak into read-only output");
+}
+
+{
+  const html = footnotes.transformDokuWikiFootnotes('<p>Rich entity <span class="wiki-entity wiki-entity--footnote" data-wiki-entity="footnote" data-wiki-footnote="See &lt;a href=&quot;/wiki/page&quot;&gt;Page&lt;/a&gt; and &lt;strong&gt;bold&lt;/strong&gt;">[note]</span>.</p>');
+  assert(html.includes('<a href="/wiki/page" target="_blank" rel="noopener noreferrer">Page</a>'), "editor footnote entity should preserve safe links in note body");
+  assert(html.includes("<strong>bold</strong>"), "editor footnote entity should preserve safe inline formatting in note body");
+  assert(html.includes('class="wiki-footnote-backref" href="#fnt__1"'), "bottom note should link back to the inline reference");
+  assert(html.includes('<span class="wiki-footnote-backref-icon" aria-hidden="true">↑</span>'), "bottom note backlink should expose one sanitizer-safe visible icon");
+  assert(!html.includes("fa-arrow-up"), "bottom note backlink should not render both an icon font glyph and a text arrow");
+  assert(!html.includes("data-wiki-entity"), "stored footnote entity should not leak into read-only output");
+}
+
+{
+  const body = Buffer.from('See <a href="/wiki/page">Page</a> and <strong>bold</strong>', "utf8").toString("base64");
+  const html = footnotes.transformDokuWikiFootnotes(`<p>Rich entity <span class="wiki-entity wiki-entity--footnote" data-wiki-entity="footnote" data-wiki-footnote-b64="${body}">[note]</span>.</p>`);
+  assert(html.includes('<a href="/wiki/page" target="_blank" rel="noopener noreferrer">Page</a>'), "base64 editor footnote entity should preserve safe links in note body");
+  assert(html.includes("<strong>bold</strong>"), "base64 editor footnote entity should preserve safe inline formatting in note body");
+  assert(html.includes('class="wiki-footnote-backref" href="#fnt__1"'), "base64 editor footnote should keep backlink");
+  assert(!html.includes("data-wiki-entity"), "base64 editor footnote entity should not leak into read-only output");
+}
+
+{
   const html = footnotes.transformDokuWikiFootnotes("<p>A ((Same note)) B ((Same note)) C ((Different note))</p>");
   assert.strictEqual(countMatches(html, /class="wiki-footnote-item"/g), 2, "identical notes should share one bottom entry");
   assert(html.includes(">1)</a>"), "first repeated note should use number 1");
@@ -32,15 +58,15 @@ function countMatches(value, pattern) {
     '<p>Rich ((See [[Page]] output <a href="/raw">raw link</a> and [Markdown](https://example.com).))</p>'
   );
   assert(html.includes("[[Page]] output"), "already-rendered wiki-link text should be preserved");
-  assert(html.includes('<a href="/raw">raw link</a>'), "raw HTML anchors should be preserved");
-  assert(html.includes('<a href="https://example.com">Markdown</a>'), "Markdown links inside footnotes should render as anchors");
+  assert(html.includes('<a href="/raw" target="_blank" rel="noopener noreferrer">raw link</a>'), "raw HTML anchors should open in a new tab");
+  assert(html.includes('<a href="https://example.com" target="_blank" rel="noopener noreferrer">Markdown</a>'), "Markdown links inside footnotes should open in a new tab");
 }
 
 {
   const wikiLink = '<a class="wiki-internal-link" href="/wiki/about/player-guide">Player Guide</a>';
   const html = footnotes.transformDokuWikiFootnotes(`<p>See ((${wikiLink} and [outside](/wiki/about))).</p>`);
-  assert(html.includes(wikiLink), "server-rendered wiki links should remain rich links inside notes");
-  assert(html.includes('<a href="/wiki/about">outside</a>'), "relative Markdown links should render inside notes");
+  assert(html.includes('<a class="wiki-internal-link" href="/wiki/about/player-guide" target="_blank" rel="noopener noreferrer">Player Guide</a>'), "server-rendered wiki links should remain rich links inside notes and open in a new tab");
+  assert(html.includes('<a href="/wiki/about" target="_blank" rel="noopener noreferrer">outside</a>'), "relative Markdown links should render inside notes and open in a new tab");
 }
 
 {

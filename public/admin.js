@@ -33,14 +33,18 @@ define("admin/plugins/westgate-wiki", ["settings"], function (Settings) {
     }).get();
   }
 
+  function parseWikiNamespaceGroupNames(rawValue) {
+    return String(rawValue || "")
+      .split(/[\n,]+/)
+      .map(function (s) {
+        return s.trim();
+      })
+      .filter(Boolean);
+  }
+
   function syncWikiNamespaceGroupsFromTextarea(settingsEl) {
     const selected = new Set(
-      String(settingsEl.find("#wikiNamespaceCreateGroups").val() || "")
-        .split(/[\s,\n]+/)
-        .map(function (s) {
-          return s.trim();
-        })
-        .filter(Boolean)
+      parseWikiNamespaceGroupNames(settingsEl.find("#wikiNamespaceCreateGroups").val())
     );
 
     settingsEl.find("[data-wiki-namespace-creator-group]").each(function () {
@@ -49,7 +53,17 @@ define("admin/plugins/westgate-wiki", ["settings"], function (Settings) {
   }
 
   function syncWikiNamespaceTextareaFromCheckboxes(settingsEl) {
-    const names = getCheckedWikiNamespaceGroupNames(settingsEl);
+    const checkedNames = getCheckedWikiNamespaceGroupNames(settingsEl);
+    const knownNames = new Set(
+      settingsEl.find("[data-wiki-namespace-creator-group]").map(function () {
+        return $(this).val();
+      }).get()
+    );
+    const manualNames = parseWikiNamespaceGroupNames(settingsEl.find("#wikiNamespaceCreateGroups").val())
+      .filter(function (name) {
+        return !knownNames.has(name);
+      });
+    const names = checkedNames.concat(manualNames);
     settingsEl.find("#wikiNamespaceCreateGroups").val(names.join(", "));
   }
 
@@ -60,6 +74,7 @@ define("admin/plugins/westgate-wiki", ["settings"], function (Settings) {
       syncCheckboxesFromTextarea(settingsEl);
       syncTextareaFromCheckboxes(settingsEl);
       syncWikiNamespaceGroupsFromTextarea(settingsEl);
+      syncWikiNamespaceTextareaFromCheckboxes(settingsEl);
     });
 
     settingsEl.on("change", "[data-wiki-category-toggle]", function () {

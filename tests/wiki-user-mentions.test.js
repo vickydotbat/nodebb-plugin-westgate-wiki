@@ -108,6 +108,12 @@ const wikiUserMentions = require("../lib/wiki-user-mentions");
   }
 
   {
+    const html = await wikiUserMentions.transformUserMentionsInHtml('<p>Hello <span class="wiki-entity wiki-entity--user" data-wiki-entity="user" data-wiki-username="xtul" data-wiki-userslug="xtul">@xtul</span>.</p>');
+    assert(html.includes('<a class="wiki-user-mention" href="/forum/user/xtul">@xtul</a>'), "editor user entity should render as a profile link");
+    assert(!html.includes("data-wiki-entity=\"user\""), "editor user entity span should not leak into read-only output");
+  }
+
+  {
     const html = await wikiUserMentions.transformUserMentionsInHtml("<p>Hello @missing and @Vicky.</p>");
     assert(html.includes("Hello @missing and "), "unknown user should remain plain text");
     assert(html.includes('href="/forum/user/vicky">@Vicky</a>'), "display casing from the article should be preserved");

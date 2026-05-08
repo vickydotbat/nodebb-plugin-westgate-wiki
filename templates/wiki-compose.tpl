@@ -12,6 +12,14 @@
   </div>
   <!-- ENDIF showSetHomeBanner -->
 
+  <!-- IF editLockBlocked -->
+  <div class="alert alert-warning mb-3" role="alert">
+    {editLockMessage}
+  </div>
+  <p>
+    <a class="btn btn-outline-secondary" href="{config.relative_path}{composeCancelHref}">Return to article</a>
+  </p>
+  <!-- ELSE -->
   <div id="westgate-wiki-compose-data" class="d-none" data-payload-b64="{composePayloadB64}"></div>
 
   <div class="wiki-compose-form card card-body mb-3">
@@ -37,31 +45,7 @@
     <!-- ENDIF showDiscussionToggle -->
 
     <div class="mb-2">
-      <label class="form-label">Article body</label>
-      <div class="wiki-compose-guide small text-muted mb-2" aria-label="Wiki authoring shortcuts">
-        <p class="wiki-compose-guide__intro mb-2">The editor saves HTML for the wiki topic. These shortcuts are turned into links and notes when the page is viewed:</p>
-        <dl class="wiki-compose-guide__list mb-0">
-          <div>
-            <dt>Wiki pages</dt>
-            <dd><code>[[Page]]</code>, <code>[[Namespace/Page]]</code>, or <code>[[Page|Custom label]]</code></dd>
-          </div>
-          <div>
-            <dt>Namespace indexes</dt>
-            <dd><code>[[ns:Root/Child]]</code></dd>
-          </div>
-          <div>
-            <dt>Forum users</dt>
-            <dd><code>@xtul</code> links to the matching forum profile when that user exists.</dd>
-          </div>
-          <div>
-            <dt>Footnotes</dt>
-            <dd><code>((footnote text))</code> collects a note at the bottom of the article.</dd>
-          </div>
-        </dl>
-        <p class="mb-0 mt-2">You can still import Markdown below and load it into the editor.</p>
-      </div>
       <div id="wiki-compose-editor" class="wiki-compose-editor wiki-article-prose"></div>
-      <div id="westgate-wiki-ck-body-sink"></div>
     </div>
 
     <div class="mb-3">
@@ -70,32 +54,23 @@
       <button type="button" class="btn btn-outline-secondary btn-sm mt-2" id="wiki-compose-import-btn">Load into editor</button>
     </div>
 
-    <div class="mb-3 wiki-compose-wikilink">
-      <label class="form-label">Insert wiki link</label>
-      <div class="input-group input-group-sm mb-2">
-        <input type="search" id="wiki-compose-link-search" class="form-control" placeholder="Search pages in this namespace…" autocomplete="off" />
-        <button type="button" class="btn btn-outline-secondary" id="wiki-compose-link-search-btn">Search</button>
-      </div>
-      <select id="wiki-compose-link-pick" class="form-select form-select-sm mb-2" size="4" aria-label="Matching wiki pages"></select>
-      <button type="button" class="btn btn-outline-primary btn-sm" id="wiki-compose-link-insert">Insert [[selection]]</button>
-    </div>
-
-    <div class="wiki-compose-actions d-flex gap-2 flex-wrap">
+    <div class="wiki-compose-actions wiki-compose-actions--floating d-flex gap-2 flex-wrap">
       <button type="button" class="btn btn-primary" id="wiki-compose-submit">{submitLabel}</button>
-      <a class="btn btn-link" id="wiki-compose-cancel" href="{config.relative_path}{composeCancelHref}">Cancel</a>
+      <a class="btn btn-outline-secondary" id="wiki-compose-return" href="{config.relative_path}{composeCancelHref}">Return</a>
     </div>
     <p class="small text-muted mt-2 mb-0" id="wiki-compose-status" aria-live="polite"></p>
   </div>
+  <!-- ENDIF editLockBlocked -->
 </div>
 
 <!-- IF config.cache-buster -->
-<link rel="stylesheet" href="{config.relative_path}/westgate-wiki/compose/vendor.css?{config.cache-buster}" />
+<link rel="stylesheet" href="{config.relative_path}/westgate-wiki/compose/editor.css?{config.cache-buster}" />
 <link rel="stylesheet" href="{config.relative_path}/westgate-wiki/compose/article-body.css?{config.cache-buster}" />
-<script defer src="{config.relative_path}/westgate-wiki/compose/vendor.js?{config.cache-buster}"></script>
+<script defer src="{config.relative_path}/westgate-wiki/compose/editor.js?{config.cache-buster}"></script>
 <script defer src="{config.relative_path}/westgate-wiki/compose/page.js?{config.cache-buster}"></script>
 <!-- ELSE -->
-<link rel="stylesheet" href="{config.relative_path}/westgate-wiki/compose/vendor.css" />
+<link rel="stylesheet" href="{config.relative_path}/westgate-wiki/compose/editor.css" />
 <link rel="stylesheet" href="{config.relative_path}/westgate-wiki/compose/article-body.css" />
-<script defer src="{config.relative_path}/westgate-wiki/compose/vendor.js"></script>
+<script defer src="{config.relative_path}/westgate-wiki/compose/editor.js"></script>
 <script defer src="{config.relative_path}/westgate-wiki/compose/page.js"></script>
 <!-- ENDIF config.cache-buster -->

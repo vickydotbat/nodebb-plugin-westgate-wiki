@@ -7,6 +7,7 @@ const adminControllers = require("./lib/controllers/admin");
 const serializer = require("./lib/serializer");
 const topicService = require("./lib/topic-service");
 const wikiLinkAutocomplete = require("./lib/wiki-link-autocomplete");
+const wikiUserAutocomplete = require("./lib/wiki-user-autocomplete");
 const wikiLinks = require("./lib/wiki-links");
 const wikiFootnotes = require("./lib/wiki-footnotes");
 const wikiHtmlParse = require("./lib/wiki-html-parse");
@@ -16,6 +17,7 @@ const wikiNamespaceMainPages = require("./lib/wiki-namespace-main-pages");
 const wikiUserMentions = require("./lib/wiki-user-mentions");
 const wikiMentionNotifications = require("./lib/wiki-mention-notifications");
 const wikiArticleWatch = require("./lib/wiki-article-watch");
+const wikiEditLocks = require("./lib/wiki-edit-locks");
 const wikiService = require("./lib/wiki-service");
 const wikiPaths = require("./lib/wiki-paths");
 const wikiPageValidation = require("./lib/wiki-page-validation");
@@ -65,9 +67,30 @@ plugin.registerApiRoutes = async function ({ router, middleware }) {
   routeHelpers.setupApiRoute(
     router,
     "get",
+    "/westgate-wiki/user-autocomplete",
+    [],
+    wikiUserAutocomplete.apiSearch
+  );
+  routeHelpers.setupApiRoute(
+    router,
+    "get",
     "/westgate-wiki/namespace/:cid/search",
     [],
     wikiNamespaceSearch.searchNamespaceTopics
+  );
+  routeHelpers.setupApiRoute(
+    router,
+    "put",
+    "/westgate-wiki/edit-lock",
+    [middleware.ensureLoggedIn, middleware.checkRequired.bind(null, ["tid"])],
+    wikiEditLocks.putEditLock
+  );
+  routeHelpers.setupApiRoute(
+    router,
+    "delete",
+    "/westgate-wiki/edit-lock",
+    [middleware.ensureLoggedIn, middleware.checkRequired.bind(null, ["tid", "token"])],
+    wikiEditLocks.deleteEditLock
   );
   routeHelpers.setupApiRoute(
     router,
@@ -220,6 +243,7 @@ plugin.services = {
   wikiLinks,
   wikiMentionNotifications,
   wikiArticleWatch,
+  wikiEditLocks,
   wikiUserMentions,
   wikiNamespaceMainPages,
   wikiPageValidation,

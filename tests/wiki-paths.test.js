@@ -194,6 +194,14 @@ function reset(settings, categories, topics) {
     await wikiLinks.replaceWikiLinks("[[development:Map Creation Guide]]", 1, await require("../lib/config").getSettings()),
     /href="\/wiki\/development\/map-creation-guide"/
   );
+  assert.match(
+    await wikiLinks.replaceWikiLinks('<p><span class="wiki-entity wiki-entity--page" data-wiki-entity="page" data-wiki-target="development/Map Creation Guide" data-wiki-label="Map guide">Map guide</span></p>', 1, await require("../lib/config").getSettings()),
+    /<a class="wiki-internal-link" href="\/wiki\/development\/map-creation-guide">Map guide<\/a>/
+  );
+  assert.match(
+    await wikiLinks.replaceWikiLinks('<p><span class="wiki-entity wiki-entity--namespace" data-wiki-entity="namespace" data-wiki-target="development" data-wiki-label="Development">Development</span></p>', 1, await require("../lib/config").getSettings()),
+    /<a class="wiki-internal-link wiki-namespace-link" href="\/wiki\/development">Development<\/a>/
+  );
 
   reset(
     { categoryIds: "1, 2, 3" },

@@ -1,0 +1,138 @@
+"use strict";
+
+const assert = require("node:assert/strict");
+
+const wikiHtmlSanitizer = require("../lib/wiki-html-sanitizer");
+
+function test(name, fn) {
+  try {
+    fn();
+    process.stdout.write(`ok - ${name}\n`);
+  } catch (err) {
+    process.stderr.write(`not ok - ${name}\n`);
+    throw err;
+  }
+}
+
+test("sanitizeWikiHtml removes script tags and keeps safe markup", function () {
+  const html = '<p>Hello <strong>world</strong><script>alert(1)</script></p>';
+  const sanitized = wikiHtmlSanitizer.sanitizeWikiHtml(html);
+
+  assert.equal(sanitized, "<p>Hello <strong>world</strong></p>");
+});
+
+test("sanitizeWikiHtml normalizes blank target links with rel", function () {
+  const html = '<p><a href="https://example.com" target="_blank">Example</a></p>';
+  const sanitized = wikiHtmlSanitizer.sanitizeWikiHtml(html);
+
+  assert.match(sanitized, /rel="noopener noreferrer"/);
+});
+
+test("renderReadOnlyWikiHtml disables task list checkboxes for article view", function () {
+  const html = '<ul data-type="taskList"><li data-checked="false"><label><input type="checkbox"></label><div><p>Task</p></div></li></ul>';
+  const rendered = wikiHtmlSanitizer.renderReadOnlyWikiHtml(html);
+
+  assert.match(rendered, /<input type="checkbox" disabled/);
+});
+
+test("renderReadOnlyWikiHtml converts stored inert editor links into anchors", function () {
+  const html = '<p>A <span class="wiki-editor-link" data-wiki-link-href="https://google.com" data-wiki-link-target="_blank" data-wiki-link-rel="noopener noreferrer">regular link</span>.</p>';
+  const rendered = wikiHtmlSanitizer.renderReadOnlyWikiHtml(html);
+
+  assert.equal(rendered, '<p>A <a href="https://google.com" target="_blank" rel="noopener noreferrer">regular link</a>.</p>');
+});
+
+test("sanitizeWikiHtml keeps stored inert editor links inert", function () {
+  const html = '<p>A <span class="wiki-editor-link" data-wiki-link-href="https://google.com" data-wiki-link-target="_blank" data-wiki-link-rel="noopener noreferrer">regular link</span>.</p>';
+  const sanitized = wikiHtmlSanitizer.sanitizeWikiHtml(html);
+
+  assert.match(sanitized, /<span class="wiki-editor-link" data-wiki-link-href="https:\/\/google\.com"/);
+  assert.doesNotMatch(sanitized, /<a\b/);
+});
+
+test("sanitizeWikiHtml preserves inert wiki entity spans for editor storage", function () {
+  const html = '<p><span class="wiki-entity wiki-entity--page" data-wiki-entity="page" data-wiki-target="Guides/Page" data-wiki-label="Guide" onclick="alert(1)">Guide</span> <span class="wiki-entity wiki-entity--footnote" data-wiki-entity="footnote" data-wiki-footnote="Note <script>alert(1)</script>">[note]</span></p>';
+  const sanitized = wikiHtmlSanitizer.sanitizeWikiHtml(html);
+
+  assert.match(sanitized, /data-wiki-entity="page"/);
+  assert.match(sanitized, /data-wiki-target="Guides\/Page"/);
+  assert.match(sanitized, /data-wiki-entity="footnote"/);
+  assert.doesNotMatch(sanitized, /onclick/);
+  assert.doesNotMatch(sanitized, /script/);
+});
+
+test("renderReadOnlyWikiHtml leaves wiki entities for parse hooks instead of converting them as links", function () {
+  const html = '<p><span class="wiki-entity wiki-entity--page" data-wiki-entity="page" data-wiki-target="Guides/Page">Guide</span></p>';
+  const rendered = wikiHtmlSanitizer.renderReadOnlyWikiHtml(html);
+
+  assert.match(rendered, /data-wiki-entity="page"/);
+  assert.doesNotMatch(rendered, /<a\b/);
+});
+
+test("renderReadOnlyWikiHtml does not convert unsafe inert editor links", function () {
+  const html = '<p>A <span class="wiki-editor-link" data-wiki-link-href="javascript:alert(1)">bad link</span>.</p>';
+  const rendered = wikiHtmlSanitizer.renderReadOnlyWikiHtml(html);
+
+  assert.equal(rendered, '<p>A <span class="wiki-editor-link">bad link</span>.</p>');
+});
+
+test("renderReadOnlyWikiHtml removes empty task checkbox spacer spans", function () {
+  const html = '<ul data-type="taskList"><li data-checked="true"><label><input type="checkbox" checked><span></span></label><div><p>Task</p></div></li></ul>';
+  const rendered = wikiHtmlSanitizer.renderReadOnlyWikiHtml(html);
+
+  assert.doesNotMatch(rendered, /<span><\/span>/);
+  assert.match(rendered, /<label><input type="checkbox" checked disabled(?:="disabled")? \/><\/label>/);
+});
+
+test("renderReadOnlyWikiHtml preserves visible footnote backlink icons", function () {
+  const html = '<section class="wiki-footnotes"><ol><li><span class="wiki-footnote-backrefs"><a class="wiki-footnote-backref" href="#fnt__1"><span class="wiki-footnote-backref-icon" aria-hidden="true">↑</span><span class="visually-hidden">Back to footnote reference</span></a></span></li></ol></section>';
+  const rendered = wikiHtmlSanitizer.renderReadOnlyWikiHtml(html);
+
+  assert.match(rendered, /class="wiki-footnote-backref-icon"/);
+  assert.match(rendered, />↑<\/span>/);
+  assert.match(rendered, /href="#fnt__1"/);
+});
+
+test("sanitizeWikiHtml preserves safe inline styles and strips unsafe ones", function () {
+  const html = '<p style="text-align: center; position: fixed; color: rgb(10, 20, 30)">Styled</p>';
+  const sanitized = wikiHtmlSanitizer.sanitizeWikiHtml(html);
+
+  assert.match(sanitized, /style="[^"]*text-align:center;?[^"]*"/);
+  assert.match(sanitized, /style="[^"]*color:rgb\(10, 20, 30\);?[^"]*"/);
+  assert.doesNotMatch(sanitized, /position:/);
+});
+
+test("sanitizeWikiHtml preserves semantic span markup for legacy inline formatting", function () {
+  const html = '<p><span class="legacy-accent" style="font-size: 1.2rem; color: #caa55a">Accent</span></p>';
+  const sanitized = wikiHtmlSanitizer.sanitizeWikiHtml(html);
+
+  assert.match(sanitized, /<span class="legacy-accent" style="font-size:1\.2rem;color:#caa55a">Accent<\/span>/);
+});
+
+test("sanitizeWikiHtml preserves safe table alignment styles", function () {
+  const html = '<table style="margin-left: auto; margin-right: 0; position: fixed"><tbody><tr><td>Right</td></tr></tbody></table>';
+  const sanitized = wikiHtmlSanitizer.sanitizeWikiHtml(html);
+
+  assert.match(sanitized, /style="[^"]*margin-left:auto;?[^"]*"/);
+  assert.match(sanitized, /style="[^"]*margin-right:0;?[^"]*"/);
+  assert.doesNotMatch(sanitized, /position:/);
+});
+
+test("sanitizeWikiHtml preserves wiki callout blocks and strips arbitrary styles", function () {
+  const html = '<aside class="wiki-callout wiki-callout--danger bad-class" data-callout-type="danger" data-callout-title="Risk" style="position:fixed"><p><strong>Risk</strong></p><p>Check [[Page]].</p></aside>';
+  const sanitized = wikiHtmlSanitizer.sanitizeWikiHtml(html);
+
+  assert.match(sanitized, /<aside class="wiki-callout wiki-callout--danger bad-class" data-callout-type="danger" data-callout-title="Risk">/);
+  assert.match(sanitized, /\[\[Page\]\]/);
+  assert.doesNotMatch(sanitized, /position:/);
+});
+
+test("hasMeaningfulWikiHtml accepts image-only content", function () {
+  const html = '<img src="https://example.com/example.png" alt="Example" />';
+  assert.equal(wikiHtmlSanitizer.hasMeaningfulWikiHtml(html), true);
+});
+
+test("hasMeaningfulWikiHtml rejects empty content", function () {
+  assert.equal(wikiHtmlSanitizer.hasMeaningfulWikiHtml("  "), false);
+  assert.equal(wikiHtmlSanitizer.hasMeaningfulWikiHtml("<script>alert(1)</script>"), false);
+});

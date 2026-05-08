@@ -6,14 +6,14 @@ The plugin is deliberately wiki-first in presentation, but it still relies on No
 
 ## License
 
-This plugin is distributed under **GPL-3.0-or-later** so it can ship a **CKEditor 5** build under the GPL license key. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and `public/vendor/ckeditor5/LICENSE-CKEditor-5.md`.
+This plugin is distributed under **GPL-3.0-or-later**. The wiki compose flow uses a vendored **Tiptap** bundle built from open-source packages. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and `public/vendor/tiptap/`.
 
 ## Content Model
 
 - Configured categories are wiki namespaces.
 - Topics inside those categories are wiki pages.
 - The first post is the canonical wiki article body.
-- `/wiki/:topic_id/:slug?` is the canonical wiki view.
+- `/wiki/{namespace path}/{page slug}` is the canonical wiki view.
 - `/topic/:slug` remains the discussion thread for the same underlying content.
 - NodeBB category permissions remain the source of truth for who can view and create pages.
 
@@ -21,11 +21,11 @@ This plugin is distributed under **GPL-3.0-or-later** so it can ship a **CKEdito
 
 - Renders a wiki landing page at `/wiki`
 - Renders namespace pages at `/wiki/category/:category_id/:slug?`
-- Renders wiki article pages at `/wiki/:topic_id/:slug?`
+- Renders wiki article pages at canonical `/wiki/...` namespace/page paths
 - Lets admins select wiki namespaces from ACP instead of hand-editing raw IDs
 - Optionally includes descendant categories automatically as nested namespaces
 - Shows ancestor breadcrumbs and namespace-local navigation
-- Exposes `Create Page` and redlink flows via **`/wiki/compose/:cid`** using a **CKEditor 5** rich editor (GPL), including **Paste Markdown** for legacy Markdown, **HTML → GFM Markdown** on save, and image upload to NodeBB’s **`POST /api/post/upload`**
+- Exposes `Create Page` and redlink flows via **`/wiki/compose/:cid`** using a plugin-owned **Tiptap** rich editor, including **Paste Markdown**, slash commands, wiki callouts, server-backed image upload to NodeBB’s **`POST /api/post/upload`**, and paste/drop image handling
 - Optional namespace topic search API: **`GET /api/v3/plugins/westgate-wiki/namespace/:cid/search?q=`** for the compose “insert wiki link” helper
 - Supports first-pass internal wiki links:
   - `[[Page Title]]`
@@ -41,7 +41,7 @@ This plugin is distributed under **GPL-3.0-or-later** so it can ship a **CKEdito
 2. Open `ACP > Plugins > Westgate Wiki`.
 3. Select the categories that should behave as wiki namespaces.
 4. Decide whether descendant categories should automatically count as wiki namespaces.
-5. (Optional) Under **Groups allowed to create wiki namespaces**, choose which NodeBB groups may create **child** namespaces from the wiki. **Administrators** always may; if no groups are selected, only administrators can use **Create child namespace**.
+5. (Optional) Under **Groups allowed to create wiki namespaces**, choose which NodeBB groups may create **child** namespaces from the wiki. **Administrators** always may; if no groups are selected, only administrators can use **Create child namespace**. If you edit the stored list manually, separate group names with commas or newlines, not spaces.
 6. Visit `/wiki`.
 
 ### Creating child namespaces from the wiki
@@ -97,7 +97,7 @@ The plugin is intentionally split by responsibility:
 The plugin ships **layout** and **Bootstrap-aligned defaults** only. The active NodeBB theme supplies brand colors, typography, and panel chrome by setting CSS custom properties on `:root` or `#content` (child themes: import SCSS after your design tokens).
 
 - **`public/wiki.css`** (from `plugin.json` `css`): scopes to `.westgate-wiki`, handles grid/sidebar structure, and documents **shell** variables in the header comment. Read views use Bootstrap **`card` / `card-body`** so surfaces inherit normal forum card styling when variables are not set.
-- **`public/wiki-article-body.css`** (served at **`/westgate-wiki/compose/article-body.css`** on article and compose routes): **article prose** (`--wiki-prose-*`), **compose editable** (`--wiki-compose-editable-*`), and **CKEditor UI** (`--wiki-ck-*`). The full contract is listed in that file’s header comment.
+- **`public/wiki-article-body.css`** (served at **`/westgate-wiki/compose/article-body.css`** on article and compose routes): **article prose** (`--wiki-prose-*`) and **compose editable** (`--wiki-compose-editable-*`). The Tiptap toolbar/surface chrome ships through `public/vendor/tiptap/wiki-tiptap.css`.
 
 **Shell (wiki chrome):** `--wiki-chrome-surface-bg`, `--wiki-chrome-surface-border`, `--wiki-chrome-radius`, `--wiki-chrome-heading-color`, `--wiki-chrome-page-title-font-family`, `--wiki-chrome-muted-color`, `--wiki-chrome-link-color`, `--wiki-chrome-link-hover-color`, `--wiki-chrome-hero-bg`, `--wiki-chrome-accent-color`, `--wiki-chrome-warning-border`, `--wiki-chrome-danger`, `--wiki-chrome-danger-hover`, `--wiki-redlink-color`, `--wiki-redlink-decoration`, `--wiki-redlink-underline-offset`, `--wiki-redlink-border-color`, `--wiki-redlink-action-color`. **Legacy article panel:** `--wiki-panel-bg` and `--wiki-panel-border-color` are checked first for the article card and otherwise fall back through `--wiki-chrome-*` to Bootstrap card tokens.
 
@@ -119,11 +119,15 @@ From the plugin directory:
 
 ```bash
 npm install
-npm run build:ckeditor
+npm run build:editors
 npm test
 ```
 
-The CKEditor bundle is written to `public/vendor/ckeditor5/`. Commit those artifacts or rebuild after dependency upgrades.
+`npm test` now also runs a jsdom-backed client contract suite for the Tiptap
+editor extraction work, covering normalization, unsupported-content detection,
+client sanitization, and media/image extension round-trip behavior.
+
+The Tiptap bundle is written to `public/vendor/tiptap/`. Commit those artifacts or rebuild after dependency upgrades.
 
 From the NodeBB instance:
 
@@ -151,7 +155,7 @@ Check these flows after meaningful changes:
 1. `/wiki` renders only configured top-level namespaces.
 2. Namespace pages show child namespaces and recent pages.
 3. Wiki article pages render the first post as article content.
-4. `Create Page` opens `/wiki/compose/:cid` and a successful publish redirects to `/wiki/:slug`.
+4. `Create Page` opens `/wiki/compose/:cid` and a successful publish redirects to the canonical `/wiki/...` article path.
 5. `Create Sibling Page` still opens the compose route with the sibling namespace `cid` when linked from the article template.
 6. Existing `[[...]]` links resolve to `/wiki/...`.
 7. Missing `[[...]]` links are styled as redlinks and open creation in the correct namespace.
@@ -172,8 +176,8 @@ Check these flows after meaningful changes:
   The live process likely did not pick up the new client script or route/template state. Rebuild and restart the actual process serving the site.
 - Changes do not appear:
   Rebuild NodeBB assets, then restart the process if the change is server-side or initialization-related.
-- Wiki compose: CKEditor scripts/CSS fail with **MIME type “text/plain”** or **NS_ERROR_CORRUPTED_CONTENT** in Firefox:
-  Usually the static files are missing from the install (`public/vendor/ckeditor5/` under the plugin) or the URL is wrong. From the plugin repo run **`npm run build:ckeditor`**, confirm those files exist next to `wiki-compose-page.js`, then reinstall/relink the plugin into NodeBB and run **`./nodebb build`**. In templates, do not prefix **`v=`** before `{config.cache-buster}`—that value already includes the `v=` segment when set.
-- Wiki compose or article page still looks like **plain CKEditor** (white canvas, default fonts), or wiki pages look like unstyled Bootstrap:
-  Article typography and CKEditor theming live in **`/westgate-wiki/compose/article-body.css`**. Wiki landing/section/article **chrome** uses **`public/wiki.css`** plus Bootstrap cards. Confirm **`article-body.css`** returns **200** in the network tab after **`./nodebb build`** and a process restart. The editable gets class **`wiki-article-prose`** from JS (`getEditableElement`) plus the **`#wiki-compose-editor`** wrapper in the template. Child themes should set **`--wiki-prose-*`**, **`--wiki-ck-*`**, and **`--wiki-chrome-*`** (see README section **Styling and theme hooks**) for full parity.
+- Wiki compose scripts/CSS fail to load:
+  Rebuild the vendored editor bundle from the plugin repo with **`npm run build:editors`**, confirm `public/vendor/tiptap/` exists in the installed plugin copy, then rerun **`./nodebb build`** in NodeBB.
+- Wiki compose still looks like plain Bootstrap:
+  Article typography lives in **`/westgate-wiki/compose/article-body.css`**. The Tiptap toolbar/surface chrome lives in **`/westgate-wiki/compose/editor.css`**. Confirm both return **200** in the network tab after **`./nodebb build`** and a process restart. Child themes should set **`--wiki-prose-*`**, **`--wiki-compose-*`**, **`--wiki-editor-*`**, and **`--wiki-chrome-*`** for full parity.
 - **127.0.0.1 vs localhost**: open the forum using the same host as **`url` in `config.json`**. Mixing them breaks websockets, CORP on some plugin assets, and CSRF/session expectations.
