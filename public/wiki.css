@@ -314,6 +314,10 @@
   right: max(4rem, env(safe-area-inset-right, 0px));
   top: auto;
   transform: none;
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease,
+    visibility 0.3s ease;
   z-index: 1035;
 }
 
@@ -321,6 +325,13 @@
   .wiki-fab-dock--floating {
     bottom: max(4rem, env(safe-area-inset-bottom, 0px));
     right: max(0.75rem, env(safe-area-inset-right, 0px));
+  }
+
+  .wiki-fab-dock--floating.wiki-fab-dock--mobile-hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(calc(100% + 5rem));
+    visibility: hidden;
   }
 
   .wiki-fab-dock--floating .wiki-fab-dock-inner {

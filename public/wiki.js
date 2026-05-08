@@ -3,6 +3,13 @@
 $(document).ready(function () {
   let pendingWikiCreate = null;
   let pendingAutoCreateHref = null;
+  let mobileFabDockBound = false;
+  let mobileFabDockTicking = false;
+  let mobileFabDockLastY = Math.max(0, window.scrollY || window.pageYOffset || 0);
+  const MOBILE_FAB_DOCK_QUERY = "(max-width: 991px)";
+  const MOBILE_FAB_DOCK_HIDDEN_CLASS = "wiki-fab-dock--mobile-hidden";
+  const MOBILE_FAB_DOCK_SCROLL_DELTA = 8;
+  const MOBILE_FAB_DOCK_TOP_GUARD = 32;
 
   function clearPendingWikiCreate() {
     pendingWikiCreate = null;
@@ -115,6 +122,61 @@ $(document).ready(function () {
     if (window.westgateWikiInitComposePage) {
       window.westgateWikiInitComposePage();
     }
+  }
+
+  function getScrollY() {
+    return Math.max(0, window.scrollY || window.pageYOffset || 0);
+  }
+
+  function isMobileFabDockViewport() {
+    return typeof window.matchMedia === "function" &&
+      window.matchMedia(MOBILE_FAB_DOCK_QUERY).matches;
+  }
+
+  function setMobileFabDockHidden(hidden) {
+    document.querySelectorAll(".wiki-fab-dock--floating").forEach(function (dock) {
+      dock.classList.toggle(MOBILE_FAB_DOCK_HIDDEN_CLASS, !!hidden);
+      dock.setAttribute("aria-hidden", hidden ? "true" : "false");
+    });
+  }
+
+  function syncMobileFabDockVisibility() {
+    mobileFabDockTicking = false;
+
+    const y = getScrollY();
+    const delta = y - mobileFabDockLastY;
+
+    if (!isMobileFabDockViewport() || y <= MOBILE_FAB_DOCK_TOP_GUARD) {
+      setMobileFabDockHidden(false);
+      mobileFabDockLastY = y;
+      return;
+    }
+
+    if (Math.abs(delta) < MOBILE_FAB_DOCK_SCROLL_DELTA) {
+      return;
+    }
+
+    setMobileFabDockHidden(delta > 0);
+    mobileFabDockLastY = y;
+  }
+
+  function scheduleMobileFabDockVisibility() {
+    if (mobileFabDockTicking) {
+      return;
+    }
+
+    mobileFabDockTicking = true;
+    window.requestAnimationFrame(syncMobileFabDockVisibility);
+  }
+
+  function initMobileFabDockVisibility() {
+    if (!mobileFabDockBound) {
+      mobileFabDockBound = true;
+      window.addEventListener("scroll", scheduleMobileFabDockVisibility, { passive: true });
+      window.addEventListener("resize", scheduleMobileFabDockVisibility);
+    }
+
+    scheduleMobileFabDockVisibility();
   }
 
   const codeHighlightKeywords = {
@@ -533,6 +595,7 @@ $(document).ready(function () {
       maybeOpenCreateFromMarkup();
       maybeInitComposePage();
       highlightReadOnlyWikiCodeBlocks();
+      initMobileFabDockVisibility();
     });
     },
     function (err) {
@@ -578,6 +641,7 @@ $(document).ready(function () {
   maybeOpenCreateFromMarkup();
   maybeInitComposePage();
   highlightReadOnlyWikiCodeBlocks();
+  initMobileFabDockVisibility();
 
   function getCsrfToken() {
     if (window.config && window.config.csrf_token) {
