@@ -5,6 +5,7 @@ import { sanitizeStyleAttribute } from "../shared/sanitizer-contract.mjs";
 export const SUPPORTED_TIPTAP_TAGS = new Set([
   "a",
   "article",
+  "aside",
   "blockquote",
   "br",
   "col",

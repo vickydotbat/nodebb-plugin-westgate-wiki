@@ -20,7 +20,7 @@ function test(name, fn) {
 
 installJsdomGlobals();
 
-const [{ Editor }, StarterKitModule, ImageModule, PreservedNodeAttributesModule, StyledSpanModule, ContainerBlockModule, MediaRowModule, ImageFigureModule, legacyHtmlModule, sanitizerContractModule] = await Promise.all([
+const [{ Editor }, StarterKitModule, ImageModule, PreservedNodeAttributesModule, StyledSpanModule, ContainerBlockModule, MediaRowModule, ImageFigureModule, WikiCalloutModule, SlashCommandModule, toolbarSchemaModule, legacyHtmlModule, sanitizerContractModule] = await Promise.all([
   import("@tiptap/core"),
   import("@tiptap/starter-kit"),
   import("@tiptap/extension-image"),
@@ -29,6 +29,9 @@ const [{ Editor }, StarterKitModule, ImageModule, PreservedNodeAttributesModule,
   import("../tiptap/src/extensions/container-block.mjs"),
   import("../tiptap/src/extensions/media-row.mjs"),
   import("../tiptap/src/extensions/image-figure.mjs"),
+  import("../tiptap/src/extensions/wiki-callout.mjs"),
+  import("../tiptap/src/extensions/slash-command.mjs"),
+  import("../tiptap/src/toolbar/toolbar-schema.mjs"),
   import("../tiptap/src/normalization/legacy-html.mjs"),
   import("../tiptap/src/shared/sanitizer-contract.mjs")
 ]);
@@ -40,6 +43,9 @@ const StyledSpan = StyledSpanModule.default;
 const ContainerBlock = ContainerBlockModule.default;
 const { MediaCell, MediaRow } = MediaRowModule;
 const ImageFigure = ImageFigureModule.default;
+const WikiCallout = WikiCalloutModule.default;
+const SlashCommand = SlashCommandModule.default;
+const { IMAGE_CONTEXT_BUTTON_IDS, TOP_TOOLBAR_BUTTON_IDS, TOP_TOOLBAR_GROUPS } = toolbarSchemaModule;
 const {
   detectUnsupportedContent,
   getNormalizationNotice,
@@ -65,6 +71,20 @@ function createEditor(content) {
       MediaCell,
       MediaRow,
       ImageFigure,
+      WikiCallout,
+      SlashCommand.configure({
+        getItems: function () {
+          return [
+            {
+              id: "warning-callout",
+              label: "Warning callout",
+              run: function ({ editor: activeEditor }) {
+                activeEditor.chain().focus().insertWikiCallout({ type: "warning", title: "Compatibility" }).run();
+              }
+            }
+          ];
+        }
+      }),
       Image.configure({
         allowBase64: true,
         HTMLAttributes: {
@@ -170,4 +190,72 @@ await test("mediaRow two-up html round-trips without containerBlock wrappers man
 
   firstOpen.destroy();
   reopened.destroy();
+});
+
+await test("wikiCallout parses and renders safe callout HTML", function () {
+  const editor = createEditor('<aside class="wiki-callout wiki-callout--warning" data-callout-type="warning" data-callout-title="Compatibility"><p><strong>Compatibility</strong></p><p>Test custom CSS.</p></aside>');
+  const rendered = editor.getHTML();
+
+  assert.match(rendered, /<aside class="wiki-callout wiki-callout--warning" data-callout-type="warning" data-callout-title="Compatibility">/);
+  assert.match(rendered, /<p><strong>Compatibility<\/strong><\/p>/);
+  assert.match(rendered, /<p>Test custom CSS\.<\/p>/);
+  editor.destroy();
+});
+
+await test("wikiCallout insert command creates a warning callout", function () {
+  const editor = createEditor("<p>Start</p>");
+
+  editor.commands.insertWikiCallout({ type: "warning", title: "Compatibility" });
+  const rendered = editor.getHTML();
+
+  assert.match(rendered, /data-callout-type="warning"/);
+  assert.match(rendered, /<strong>Compatibility<\/strong>/);
+  editor.destroy();
+});
+
+await test("slash command extension exposes keyboard-selectable command state", function () {
+  const editor = createEditor("<p>/</p>");
+
+  assert.equal(typeof editor.commands.openWikiSlashMenu, "function");
+  editor.chain().setTextSelection(2).run();
+  editor.commands.insertContent(" ");
+  editor.commands.deleteRange({ from: 2, to: 3 });
+  assert.equal(editor.storage.slashCommand.isOpen, true);
+  assert.equal(editor.storage.slashCommand.activeIndex, 0);
+
+  editor.destroy();
+});
+
+await test("top toolbar schema excludes contextual image layout and size controls", function () {
+  IMAGE_CONTEXT_BUTTON_IDS.forEach(function (id) {
+    assert.equal(TOP_TOOLBAR_BUTTON_IDS.includes(id), false);
+  });
+
+  assert.equal(TOP_TOOLBAR_BUTTON_IDS.includes("image-upload"), true);
+  assert.equal(IMAGE_CONTEXT_BUTTON_IDS.includes("image-size-md"), true);
+  assert.equal(IMAGE_CONTEXT_BUTTON_IDS.includes("image-align-right"), true);
+});
+
+await test("top toolbar schema groups related tools with divider-friendly boundaries", function () {
+  const groupIds = TOP_TOOLBAR_GROUPS.map(function (group) {
+    return group.id;
+  });
+  assert.deepEqual(groupIds, [
+    "history",
+    "structure",
+    "inline-formatting",
+    "links-media",
+    "blocks",
+    "callouts",
+    "alignment",
+    "tables"
+  ]);
+
+  const history = TOP_TOOLBAR_GROUPS.find(function (group) { return group.id === "history"; });
+  const media = TOP_TOOLBAR_GROUPS.find(function (group) { return group.id === "links-media"; });
+  const tables = TOP_TOOLBAR_GROUPS.find(function (group) { return group.id === "tables"; });
+
+  assert.deepEqual(history.buttonIds, ["undo", "redo"]);
+  assert.deepEqual(media.buttonIds, ["link", "unlink", "image-upload", "media-row-2", "media-row-3"]);
+  assert.deepEqual(tables.buttonIds, ["table-insert", "table-add-row", "table-add-column", "table-delete"]);
 });

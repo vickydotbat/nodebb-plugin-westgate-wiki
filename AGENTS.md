@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This repository is a NodeBB plugin that adds a Westgate-specific wiki surface on top of forum content. The package is **GPL-3.0-or-later**. Wiki page creation uses **`/wiki/compose/:cid`** with a vendored **Tiptap** build under `public/vendor/tiptap/` (rebuild with `npm run build:tiptap` or `npm run build:editors`). The old **CKEditor 5** bundle remains vendored under `public/vendor/ckeditor5/` as a fallback path for legacy HTML that the current Tiptap schema cannot round-trip safely yet.
+This repository is a NodeBB plugin that adds a Westgate-specific wiki surface on top of forum content. The package is **GPL-3.0-or-later**. Wiki page creation uses **`/wiki/compose/:cid`** with a vendored **Tiptap** build under `public/vendor/tiptap/` (rebuild with `npm run build:tiptap` or `npm run build:editors`). CKEditor has been removed from the active compose path; unsupported legacy HTML must be normalized into the plugin-owned Tiptap schema before editing.
 
 Current design baseline:
 

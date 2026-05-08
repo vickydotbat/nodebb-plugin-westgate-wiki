@@ -1152,7 +1152,7 @@ a[href*="/wiki/"][href*="redlink=1"] {
   margin: 0.35rem 0 0;
 }
 
-/* CKEditor editable sizing / chrome: see wiki-article-body.css (loads after CKEditor on compose) */
+/* Tiptap editable sizing/chrome is served through the compose editor bundle CSS. */
 
 @media (max-width: 767px) {
   .wiki-with-fab .wiki-content-layout--sidebar {

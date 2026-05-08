@@ -61,7 +61,6 @@
         <p class="mb-0 mt-2">You can still import Markdown below and load it into the editor.</p>
       </div>
       <div id="wiki-compose-editor" class="wiki-compose-editor wiki-article-prose"></div>
-      <div id="westgate-wiki-ck-body-sink"></div>
     </div>
 
     <div class="mb-3">

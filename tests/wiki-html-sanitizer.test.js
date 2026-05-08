@@ -53,6 +53,15 @@ test("sanitizeWikiHtml preserves safe table alignment styles", function () {
   assert.doesNotMatch(sanitized, /position:/);
 });
 
+test("sanitizeWikiHtml preserves wiki callout blocks and strips arbitrary styles", function () {
+  const html = '<aside class="wiki-callout wiki-callout--danger bad-class" data-callout-type="danger" data-callout-title="Risk" style="position:fixed"><p><strong>Risk</strong></p><p>Check [[Page]].</p></aside>';
+  const sanitized = wikiHtmlSanitizer.sanitizeWikiHtml(html);
+
+  assert.match(sanitized, /<aside class="wiki-callout wiki-callout--danger bad-class" data-callout-type="danger" data-callout-title="Risk">/);
+  assert.match(sanitized, /\[\[Page\]\]/);
+  assert.doesNotMatch(sanitized, /position:/);
+});
+
 test("hasMeaningfulWikiHtml accepts image-only content", function () {
   const html = '<img src="https://example.com/example.png" alt="Example" />';
   assert.equal(wikiHtmlSanitizer.hasMeaningfulWikiHtml(html), true);

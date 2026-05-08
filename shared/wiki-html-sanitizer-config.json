@@ -2,6 +2,7 @@
   "allowedTags": [
     "a",
     "article",
+    "aside",
     "blockquote",
     "br",
     "code",

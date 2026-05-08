@@ -1,10 +1,8 @@
-/* global WestgateWikiEditor, WikiEditorBundle, ajaxify */
+/* global WestgateWikiEditor, ajaxify */
 "use strict";
 
 /** Must match `MAX_WIKI_MAIN_BODY_UTF8_BYTES` in lib/wiki-page-validation.js */
 const MAX_WIKI_MAIN_BODY_UTF8_BYTES = 512 * 1024;
-const PRIMARY_EDITOR_KIND = "tiptap";
-const FALLBACK_EDITOR_KIND = "ckeditor";
 
 function utf8ByteLength(str) {
   if (typeof TextEncoder !== "undefined") {
@@ -41,32 +39,20 @@ function setStatus(el, text) {
   }
 }
 
-function cleanupOrphanedCKEditorBodyWrappers() {
-  document.querySelectorAll("body > .ck-body-wrapper").forEach(function (wrap) {
-    if (wrap.querySelector(".ck-powered-by, .ck-powered-by-balloon")) {
-      wrap.remove();
-    }
-  });
-  document.querySelectorAll("body > .ck-powered-by-balloon, body > .ck.ck-powered-by-balloon").forEach(function (panel) {
-    panel.remove();
-  });
-}
-
-function waitForEditorGlobal(kind, attempts) {
+function waitForEditorGlobal(attempts) {
   const max = attempts || 80;
-  const globalName = kind === PRIMARY_EDITOR_KIND ? "WestgateWikiEditor" : "WikiEditorBundle";
 
   return new Promise(function (resolve, reject) {
     let n = 0;
     (function tick() {
-      const candidate = window[globalName];
+      const candidate = window.WestgateWikiEditor;
       if (candidate && typeof candidate.createWikiEditor === "function") {
         resolve(candidate);
         return;
       }
       n += 1;
       if (n >= max) {
-        reject(new Error(`Editor bundle failed to load (${kind}).`));
+        reject(new Error("Tiptap editor bundle failed to load."));
         return;
       }
       setTimeout(tick, 50);
@@ -74,106 +60,13 @@ function waitForEditorGlobal(kind, attempts) {
   });
 }
 
-function loadAssetOnce(tagName, attrs, markerAttr) {
-  const existing = document.querySelector(`${tagName}[${markerAttr}]`);
-  if (existing) {
-    return Promise.resolve(existing);
-  }
-
-  return new Promise(function (resolve, reject) {
-    const el = document.createElement(tagName);
-    Object.entries(attrs).forEach(function ([key, value]) {
-      el.setAttribute(key, value);
-    });
-    el.setAttribute(markerAttr, "1");
-    el.addEventListener("load", function () {
-      resolve(el);
-    }, { once: true });
-    el.addEventListener("error", function () {
-      reject(new Error(`Failed to load ${attrs.href || attrs.src}`));
-    }, { once: true });
-    document.head.appendChild(el);
-  });
-}
-
-async function ensureFallbackEditorAssets(payload) {
-  const rel = payload.relativePath || "";
-  const cacheSuffix = payload.cacheBuster ? `?${encodeURIComponent(payload.cacheBuster)}` : "";
-  await loadAssetOnce("link", {
-    rel: "stylesheet",
-    href: `${rel}/westgate-wiki/compose/fallback-editor.css${cacheSuffix}`
-  }, "data-westgate-wiki-fallback-editor-css");
-  await loadAssetOnce("script", {
-    defer: "defer",
-    src: `${rel}/westgate-wiki/compose/fallback-editor.js${cacheSuffix}`
-  }, "data-westgate-wiki-fallback-editor-js");
-}
-
-function normalizeCkEditorHandle(instance) {
-  return {
-    getHTML: function () {
-      return instance.getData();
-    },
-    getJSON: function () {
-      return null;
-    },
-    getMarkdown: function () {
-      return typeof WikiEditorBundle.htmlToMarkdown === "function"
-        ? WikiEditorBundle.htmlToMarkdown(instance.getData())
-        : "";
-    },
-    setHTML: function (html) {
-      instance.setData(html || "");
-    },
-    setMarkdown: function (markdown) {
-      if (typeof WikiEditorBundle.markdownToHtml !== "function") {
-        throw new Error("Markdown import is unavailable in the legacy editor bundle.");
-      }
-      instance.setData(WikiEditorBundle.markdownToHtml(markdown || ""));
-    },
-    insertWikiLink: function (insertText) {
-      const snippet = String(insertText || "");
-      instance.model.change(function (writer) {
-        writer.insertText(snippet, instance.model.document.selection.getFirstPosition());
-      });
-    },
-    focus: function () {
-      if (instance.editing && instance.editing.view) {
-        instance.editing.view.focus();
-      }
-    },
-    destroy: function () {
-      return instance.destroy();
-    }
-  };
-}
-
-async function createEditorHandle(kind, editorEl, payload, initialData) {
-  if (kind === FALLBACK_EDITOR_KIND) {
-    await ensureFallbackEditorAssets(payload);
-  }
-
-  const bundle = await waitForEditorGlobal(kind);
-  const instance = await bundle.createWikiEditor(editorEl, {
+async function createEditorHandle(editorEl, payload, initialData) {
+  const bundle = await waitForEditorGlobal();
+  return await bundle.createWikiEditor(editorEl, {
     relativePath: payload.relativePath,
     csrfToken: payload.csrfToken,
     initialData: initialData
   });
-
-  if (kind === FALLBACK_EDITOR_KIND) {
-    return normalizeCkEditorHandle(instance);
-  }
-
-  return instance;
-}
-
-function getRequestedEditorKind() {
-  const params = new URLSearchParams(window.location.search || "");
-  const requested = String(params.get("editor") || "").toLowerCase();
-  if (requested === FALLBACK_EDITOR_KIND) {
-    return FALLBACK_EDITOR_KIND;
-  }
-  return PRIMARY_EDITOR_KIND;
 }
 
 async function initWikiComposePage() {
@@ -188,7 +81,6 @@ async function initWikiComposePage() {
     return;
   }
   root.setAttribute("data-wiki-compose-ready", "1");
-  cleanupOrphanedCKEditorBodyWrappers();
 
   const b64 = dataEl.getAttribute("data-payload-b64");
   if (!b64) {
@@ -218,7 +110,6 @@ async function initWikiComposePage() {
   const discussionDisabledCheckbox = document.getElementById("wiki-compose-discussion-disabled");
 
   let editorInstance = null;
-  let activeEditorKind = null;
   let destroyStarted = false;
 
   async function destroyWikiEditor() {
@@ -240,7 +131,6 @@ async function initWikiComposePage() {
       }
     } finally {
       destroyStarted = false;
-      cleanupOrphanedCKEditorBodyWrappers();
     }
   }
 
@@ -299,44 +189,24 @@ async function initWikiComposePage() {
     const initialData = payload.mode === "edit" && typeof payload.initialContent === "string"
       ? payload.initialContent
       : "";
-    const requestedKind = getRequestedEditorKind();
     const tiptapBundle = window.WestgateWikiEditor;
     const tiptapFallbackReason =
-      requestedKind === PRIMARY_EDITOR_KIND &&
       tiptapBundle &&
       typeof tiptapBundle.detectUnsupportedContent === "function"
         ? tiptapBundle.detectUnsupportedContent(initialData)
         : "";
     const tiptapNormalizationNotice =
-      requestedKind === PRIMARY_EDITOR_KIND &&
       tiptapBundle &&
       typeof tiptapBundle.getNormalizationNotice === "function"
         ? tiptapBundle.getNormalizationNotice(initialData)
         : "";
 
-    if (requestedKind === FALLBACK_EDITOR_KIND) {
-      activeEditorKind = FALLBACK_EDITOR_KIND;
-      editorInstance = await createEditorHandle(FALLBACK_EDITOR_KIND, editorEl, payload, initialData);
-      setStatus(statusEl, "Using legacy CKEditor fallback by request.");
-      return;
-    }
-
     if (tiptapFallbackReason) {
-      activeEditorKind = FALLBACK_EDITOR_KIND;
-      editorInstance = await createEditorHandle(FALLBACK_EDITOR_KIND, editorEl, payload, initialData);
-      setStatus(statusEl, `Using legacy CKEditor fallback: ${tiptapFallbackReason}`, "warning");
-      return;
+      throw new Error(`This article contains unsupported legacy HTML for the Tiptap editor: ${tiptapFallbackReason}`);
     }
 
-    try {
-      activeEditorKind = PRIMARY_EDITOR_KIND;
-      editorInstance = await createEditorHandle(PRIMARY_EDITOR_KIND, editorEl, payload, initialData);
-      setStatus(statusEl, tiptapNormalizationNotice, tiptapNormalizationNotice ? "warning" : "muted");
-    } catch (err) {
-      activeEditorKind = FALLBACK_EDITOR_KIND;
-      editorInstance = await createEditorHandle(FALLBACK_EDITOR_KIND, editorEl, payload, initialData);
-      setStatus(statusEl, `Tiptap failed to initialize. Using legacy CKEditor fallback. ${(err && err.message) || String(err)}`, "warning");
-    }
+    editorInstance = await createEditorHandle(editorEl, payload, initialData);
+    setStatus(statusEl, tiptapNormalizationNotice, tiptapNormalizationNotice ? "warning" : "muted");
   }
 
   attachLifecycleCleanup();
@@ -357,7 +227,7 @@ async function initWikiComposePage() {
       try {
         editorInstance.setMarkdown(md);
         importTa.value = "";
-        setStatus(statusEl, activeEditorKind === FALLBACK_EDITOR_KIND ? "Markdown loaded into legacy editor." : "");
+        setStatus(statusEl, "");
       } catch (err) {
         setStatus(statusEl, (err && err.message) || String(err), "error");
       }
@@ -424,6 +294,11 @@ async function initWikiComposePage() {
       const content = (editorInstance.getHTML() || "").trim();
       if (!content) {
         setStatus(statusEl, "Body cannot be empty.", "error");
+        return;
+      }
+
+      if (typeof editorInstance.hasPendingUploads === "function" && editorInstance.hasPendingUploads()) {
+        setStatus(statusEl, "Wait for image uploads to finish before saving.", "warning");
         return;
       }
 

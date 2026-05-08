@@ -8,12 +8,6 @@ This plugin bundles or builds against the following major components.
 - License: MIT
 - Built output is emitted to `public/vendor/tiptap/` by `npm run build:tiptap`
 
-## CKEditor 5
-
-- Source: https://github.com/ckeditor/ckeditor5
-- License: GPL-2.0-or-later (open-source distribution; retained as the legacy compose fallback bundle)
-- Built output is emitted to `public/vendor/ckeditor5/` by `npm run build:ckeditor`
-
 ## Turndown and GFM plugin
 
 - Turndown: https://github.com/mixmark-io/turndown (MIT)
