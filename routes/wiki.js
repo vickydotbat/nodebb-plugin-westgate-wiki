@@ -11,6 +11,7 @@ const wikiNamespaceCreators = require("../lib/wiki-namespace-creators");
 const wikiAlphabeticalIndex = require("../lib/wiki-alphabetical-index");
 const wikiService = require("../lib/wiki-service");
 const topicService = require("../lib/topic-service");
+const wikiSearchService = require("../lib/wiki-search-service");
 const wikiBreadcrumbTrail = require("../lib/wiki-breadcrumb-trail");
 const wikiPaths = require("../lib/wiki-paths");
 
@@ -58,6 +59,37 @@ function buildWikiPageRenderData(wikiPage, { isWikiHome }) {
   };
 }
 
+function buildWikiSearchRenderData(searchResult) {
+  const groups = searchResult.groups || { exact: [], pages: [], namespaces: [] };
+  const exactResults = groups.exact || [];
+  const pageResults = groups.pages || [];
+  const namespaceResults = groups.namespaces || [];
+  const hasQuery = !!searchResult.hasQuery;
+  const hasResults = searchResult.totalReturned > 0;
+
+  return {
+    title: hasQuery ? `Search: ${searchResult.query} | Westgate Wiki` : "Search | Westgate Wiki",
+    ...wikiBreadcrumbTrail.forWikiSearch(),
+    wikiSearchQuery: searchResult.query || "",
+    search: searchResult,
+    exactResults,
+    pageResults,
+    namespaceResults,
+    hasExactResults: exactResults.length > 0,
+    hasPageResults: pageResults.length > 0,
+    hasNamespaceResults: namespaceResults.length > 0,
+    hasSearchQuery: hasQuery,
+    searchQueryTooShort: !!searchResult.queryTooShort,
+    searchIsConfigured: !!searchResult.isConfigured,
+    hasReadableWikiNamespaces: !!searchResult.hasReadableNamespaces,
+    hasSearchResults: hasResults,
+    showSearchNoResults: hasQuery && !searchResult.queryTooShort && searchResult.isConfigured && searchResult.hasReadableNamespaces && !hasResults,
+    showSearchEmptyPrompt: !hasQuery && searchResult.isConfigured,
+    showSearchSetupState: !searchResult.isConfigured,
+    showSearchNoReadableNamespaces: hasQuery && !searchResult.queryTooShort && searchResult.isConfigured && !searchResult.hasReadableNamespaces
+  };
+}
+
 async function getWikiFallbackContext(uid) {
   const wikiData = await wikiService.getSections(uid);
   const canCreateWikiNamespaces = await wikiNamespaceCreators.getCanCreateWikiNamespaces(uid);
@@ -79,6 +111,21 @@ function register(params) {
   composeAssets.register(router);
 
   routeHelpers.setupPageRoute(router, "/wiki/namespace/create/:parent_cid", [middleware.ensureLoggedIn], wikiNamespaceCreateController.renderChild);
+
+  routeHelpers.setupPageRoute(router, "/wiki/search", async (req, res, next) => {
+    try {
+      const result = await wikiSearchService.search({
+        q: req.query && req.query.q,
+        mode: "full",
+        limit: req.query && req.query.limit,
+        uid: req.uid
+      });
+
+      return res.render("wiki-search", buildWikiSearchRenderData(result));
+    } catch (err) {
+      next(err);
+    }
+  });
 
   routeHelpers.setupPageRoute(router, "/wiki", async (req, res, next) => {
     try {
@@ -286,5 +333,6 @@ function register(params) {
 
 module.exports = {
   register,
-  buildWikiPageRenderData
+  buildWikiPageRenderData,
+  buildWikiSearchRenderData
 };
