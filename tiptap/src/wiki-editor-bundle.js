@@ -1942,9 +1942,11 @@ function createFullscreenSourceMode(root, editor, sourcePanel, sourceTextarea, s
   const SOURCE_SYNC_DELAY_MS = 500;
   const sourceToggle = sourcePanel.querySelector("[data-wiki-editor-source-toggle]");
   const sourceApply = sourcePanel.querySelector("[data-wiki-editor-source-apply]");
+  const sourceWrap = sourcePanel.querySelector("[data-wiki-editor-source-wrap]");
   const sourceShow = layout.querySelector("[data-wiki-editor-source-show]");
   let fullscreen = false;
   let sourceHidden = false;
+  let sourceWrapEnabled = false;
   let syncingSource = false;
   let sourceDirty = false;
   let sourceSyncTimer = null;
@@ -1969,6 +1971,19 @@ function createFullscreenSourceMode(root, editor, sourcePanel, sourceTextarea, s
   function renderSourceHighlight() {
     sourceHighlight.innerHTML = highlightSourceHtml(sourceTextarea.value);
     syncSourceScroll();
+  }
+
+  function setSourceWrap(enabled) {
+    sourceWrapEnabled = !!enabled;
+    sourcePanel.classList.toggle("wiki-editor__fullscreen-source-panel--wrap", sourceWrapEnabled);
+    sourceTextarea.setAttribute("wrap", sourceWrapEnabled ? "soft" : "off");
+    if (sourceWrap) {
+      sourceWrap.classList.toggle("active", sourceWrapEnabled);
+      sourceWrap.setAttribute("aria-pressed", sourceWrapEnabled ? "true" : "false");
+      sourceWrap.setAttribute("title", sourceWrapEnabled ? "Disable word wrap" : "Enable word wrap");
+      sourceWrap.setAttribute("aria-label", sourceWrapEnabled ? "Disable source word wrap" : "Enable source word wrap");
+    }
+    renderSourceHighlight();
   }
 
   function setSourceDirty(dirty) {
@@ -2205,6 +2220,12 @@ function createFullscreenSourceMode(root, editor, sourcePanel, sourceTextarea, s
     sourceApply.addEventListener("click", applySourceToEditor);
     sourceApply.disabled = true;
   }
+  if (sourceWrap) {
+    sourceWrap.addEventListener("click", function () {
+      setSourceWrap(!sourceWrapEnabled);
+      sourceTextarea.focus();
+    });
+  }
   root.addEventListener("wiki-editor-toc-navigate", handleTocNavigate);
   resizer.addEventListener("pointerdown", startResize);
   if (sourceToggle) {
@@ -2221,6 +2242,7 @@ function createFullscreenSourceMode(root, editor, sourcePanel, sourceTextarea, s
   }
   editor.on("create", syncSourceFromEditor);
   editor.on("update", scheduleSourceFromEditor);
+  setSourceWrap(false);
   syncSourceFromEditor();
 
   root.__wikiToggleFullscreenSource = function () {
@@ -2302,6 +2324,9 @@ export async function createWikiEditor(element, options) {
     '<div class="wiki-editor__fullscreen-source-actions">',
     '<button type="button" class="btn btn-primary btn-sm wiki-editor__fullscreen-source-apply" data-wiki-editor-source-apply disabled>',
     "Apply source",
+    "</button>",
+    '<button type="button" class="btn btn-outline-secondary btn-sm wiki-editor__fullscreen-source-wrap" data-wiki-editor-source-wrap title="Enable word wrap" aria-label="Enable source word wrap" aria-pressed="false">',
+    '<i class="fa fa-align-left" aria-hidden="true"></i>',
     "</button>",
     '<button type="button" class="btn btn-outline-secondary btn-sm wiki-editor__fullscreen-source-toggle" data-wiki-editor-source-toggle title="Hide source panel" aria-pressed="false">',
     '<i class="fa fa-columns" aria-hidden="true"></i>',

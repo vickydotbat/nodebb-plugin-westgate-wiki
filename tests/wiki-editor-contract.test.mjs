@@ -932,6 +932,13 @@ await test("fullscreen source mode has guarded editable source synchronization",
   assert.match(editorBundleSource, /function\s+scrollSourceToHeading\s*\(/);
   assert.match(editorBundleSource, /function\s+highlightSourceHtml\s*\(/);
   assert.match(editorBundleSource, /function\s+createFullscreenSourceMode\s*\(/);
+  assert.match(editorBundleSource, /data-wiki-editor-source-wrap/);
+  assert.match(editorBundleSource, /const\s+sourceWrap\s*=\s*sourcePanel\.querySelector\("\[data-wiki-editor-source-wrap\]"\)/);
+  assert.match(editorBundleSource, /let\s+sourceWrapEnabled\s*=\s*false/);
+  assert.match(editorBundleSource, /function\s+setSourceWrap\s*\(/);
+  assert.match(editorBundleSource, /sourcePanel\.classList\.toggle\("wiki-editor__fullscreen-source-panel--wrap",\s*sourceWrapEnabled\)/);
+  assert.match(editorBundleSource, /sourceTextarea\.setAttribute\("wrap",\s*sourceWrapEnabled\s*\?\s*"soft"\s*:\s*"off"\)/);
+  assert.match(editorBundleSource, /sourceWrap\.addEventListener\("click",\s*function \(\) \{[\s\S]*setSourceWrap\(!sourceWrapEnabled\)/);
   assert.match(editorBundleSource, /let\s+syncingSource\s*=\s*false/);
   assert.match(editorBundleSource, /let\s+sourceDirty\s*=\s*false/);
   assert.match(editorBundleSource, /SOURCE_SYNC_DELAY_MS\s*=\s*500/);
@@ -1016,6 +1023,9 @@ await test("fullscreen source mode css supports resize and source hiding", funct
     assert.match(css, /\.wiki-editor--fullscreen-source-hidden\s+\.wiki-editor__fullscreen-layout\s*{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/);
     assert.match(css, /\.wiki-editor__fullscreen-resizer\s*{[^}]*cursor:\s*col-resize/);
     assert.match(css, /\.wiki-editor__fullscreen-source-actions\s*{[^}]*display:\s*flex/);
+    assert.match(css, /\.wiki-editor__fullscreen-source-toggle,\s*\.westgate-wiki-compose\s+\.wiki-editor__fullscreen-source-wrap\s*{[^}]*width:\s*2rem/);
+    assert.match(css, /\.wiki-editor__fullscreen-source-panel--wrap\s+\.wiki-editor__fullscreen-source-highlight,\s*\.westgate-wiki-compose\s+\.wiki-editor__fullscreen-source-panel--wrap\s+\.wiki-editor__fullscreen-source-input\s*{[^}]*white-space:\s*pre-wrap/);
+    assert.match(css, /\.wiki-editor__fullscreen-source-panel--wrap\s+\.wiki-editor__fullscreen-source-highlight,\s*\.westgate-wiki-compose\s+\.wiki-editor__fullscreen-source-panel--wrap\s+\.wiki-editor__fullscreen-source-input\s*{[^}]*overflow-wrap:\s*break-word/);
     assert.match(css, /\.wiki-editor__fullscreen-source-panel--dirty\s+\.wiki-editor__fullscreen-source-highlight\s*{[^}]*visibility:\s*hidden/);
     assert.match(css, /\.wiki-editor__fullscreen-source-panel--dirty\s+\.wiki-editor__fullscreen-source-input\s*{[^}]*color:\s*#f9fafb/);
   });

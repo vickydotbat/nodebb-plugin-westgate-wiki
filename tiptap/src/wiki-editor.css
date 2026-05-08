@@ -120,7 +120,8 @@
   text-transform: uppercase;
 }
 
-.westgate-wiki-compose .wiki-editor__fullscreen-source-toggle {
+.westgate-wiki-compose .wiki-editor__fullscreen-source-toggle,
+.westgate-wiki-compose .wiki-editor__fullscreen-source-wrap {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -170,6 +171,12 @@
   caret-color: #f9fafb;
   outline: none;
   overflow: auto;
+}
+
+.westgate-wiki-compose .wiki-editor__fullscreen-source-panel--wrap .wiki-editor__fullscreen-source-highlight,
+.westgate-wiki-compose .wiki-editor__fullscreen-source-panel--wrap .wiki-editor__fullscreen-source-input {
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
 }
 
 .westgate-wiki-compose .wiki-editor__fullscreen-source-panel--dirty .wiki-editor__fullscreen-source-input {
