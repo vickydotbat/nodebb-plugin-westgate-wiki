@@ -60,6 +60,7 @@
         </dl>
         <p class="mb-0 mt-2">You can still import Markdown below and load it into the editor.</p>
       </div>
+      <div class="pb-4"></div>
       <div id="wiki-compose-editor" class="wiki-compose-editor wiki-article-prose"></div>
     </div>
 

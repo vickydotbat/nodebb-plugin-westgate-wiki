@@ -10,8 +10,11 @@
 }
 
 .westgate-wiki-compose .wiki-editor__toolbar-mount {
-  border-bottom: 1px solid var(--wiki-editor-toolbar-border, var(--bs-border-color, #dee2e6));
+  border: 1px solid var(--wiki-editor-toolbar-border, var(--bs-border-color, #dee2e6));
+  border-radius: var(--bs-border-radius, 0.5rem);
   background: var(--wiki-editor-toolbar-background, var(--bs-tertiary-bg, #f8f9fa));
+  background-clip: padding-box;
+  margin: 0.75rem 0.75rem 0;
   position: sticky;
   top: var(--wiki-compose-toolbar-sticky-top, 0.75rem);
   z-index: 7;
