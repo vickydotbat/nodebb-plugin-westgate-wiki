@@ -39,6 +39,43 @@ function setStatus(el, text) {
   }
 }
 
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function highlightCssSource(source) {
+  return escapeHtml(source)
+    .replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="wiki-compose-css-token wiki-compose-css-token--comment">$1</span>')
+    .replace(/(@[a-z-]+)/gi, '<span class="wiki-compose-css-token wiki-compose-css-token--at">$1</span>')
+    .replace(/([#.][a-z0-9_-]+)/gi, '<span class="wiki-compose-css-token wiki-compose-css-token--selector">$1</span>')
+    .replace(/([a-z-]+)(\s*:)/gi, '<span class="wiki-compose-css-token wiki-compose-css-token--property">$1</span>$2')
+    .replace(/(:\s*)([^;{}\n]+)/g, '$1<span class="wiki-compose-css-token wiki-compose-css-token--value">$2</span>');
+}
+
+function syncCssLineNumbers(textarea, linesEl, highlightEl) {
+  if (!textarea) {
+    return;
+  }
+  const lineCount = Math.max(1, String(textarea.value || "").split("\n").length);
+  if (linesEl) {
+    const rows = [];
+    for (let i = 1; i <= lineCount; i += 1) {
+      rows.push(String(i));
+    }
+    linesEl.textContent = rows.join("\n");
+    linesEl.scrollTop = textarea.scrollTop;
+  }
+  if (highlightEl) {
+    highlightEl.innerHTML = highlightCssSource(textarea.value);
+    highlightEl.scrollTop = textarea.scrollTop;
+    highlightEl.scrollLeft = textarea.scrollLeft;
+  }
+}
+
 function waitForEditorGlobal(attempts) {
   const max = attempts || 80;
 
@@ -109,8 +146,14 @@ async function initWikiComposePage() {
   const returnLink = document.getElementById("wiki-compose-return");
   const namespaceMainPageCheckbox = document.getElementById("wiki-compose-namespace-main-page");
   const discussionDisabledCheckbox = document.getElementById("wiki-compose-discussion-disabled");
+  const cssButton = document.getElementById("wiki-compose-css-btn");
+  const cssDialog = document.getElementById("wiki-compose-css-dialog");
+  const cssInput = document.getElementById("wiki-compose-css-input");
+  const cssLines = document.getElementById("wiki-compose-css-lines");
+  const cssHighlight = document.getElementById("wiki-compose-css-highlight");
 
   let editorInstance = null;
+  let articleCss = String(payload.initialArticleCss || "");
   let destroyStarted = false;
   let hasUnsavedChanges = false;
   let editLockRefreshTimer = null;
@@ -127,6 +170,33 @@ async function initWikiComposePage() {
         returnLink.setAttribute("href", `${payload.relativePath || ""}${path}`);
       }
     }
+  }
+
+  function syncCssEditor() {
+    syncCssLineNumbers(cssInput, cssLines, cssHighlight);
+  }
+
+  if (cssInput) {
+    cssInput.value = articleCss;
+    cssInput.addEventListener("input", function () {
+      articleCss = cssInput.value;
+      syncCssEditor();
+      markUnsaved();
+    });
+    cssInput.addEventListener("scroll", syncCssEditor);
+    syncCssEditor();
+  }
+
+  if (cssButton && cssDialog && cssInput) {
+    cssButton.addEventListener("click", function () {
+      if (typeof cssDialog.showModal === "function") {
+        cssDialog.showModal();
+      } else {
+        cssDialog.setAttribute("open", "open");
+      }
+      syncCssEditor();
+      cssInput.focus();
+    });
   }
 
   async function destroyWikiEditor() {
@@ -512,6 +582,37 @@ async function initWikiComposePage() {
           wikiSlug = responsePayload.topic.slug;
         } else if (!isEdit && responsePayload && responsePayload.slug) {
           wikiSlug = responsePayload.slug;
+        }
+
+        if (payload.articleCssApiUrl && savedTid) {
+          const cssRes = await fetch(payload.articleCssApiUrl, {
+            method: "PUT",
+            credentials: "same-origin",
+            headers: {
+              "Content-Type": "application/json",
+              "x-csrf-token": payload.csrfToken
+            },
+            body: JSON.stringify({
+              tid: parseInt(savedTid, 10),
+              css: articleCss
+            })
+          });
+          if (!cssRes.ok) {
+            let cssJson = null;
+            try {
+              cssJson = await cssRes.json();
+            } catch (e) {
+              cssJson = null;
+            }
+            const cssMsg = (cssJson && cssJson.status && cssJson.status.message) || cssRes.statusText;
+            throw new Error("Page saved, but article CSS was not updated: " + cssMsg);
+          }
+          const cssJson = await cssRes.json();
+          articleCss = String((cssJson && cssJson.response && cssJson.response.articleCss) || articleCss || "");
+          if (cssInput) {
+            cssInput.value = articleCss;
+            syncCssEditor();
+          }
         }
 
         if (

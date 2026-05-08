@@ -51,6 +51,9 @@ function buildWikiPageRenderData(wikiPage, { isWikiHome }) {
     hasSectionPages: !!(wikiPage.sectionNavigation && (wikiPage.sectionNavigation.topicCount || 0) > 0),
     wikiSidebarPageRows,
     hasWikiSidebarPageRows: wikiSidebarPageRows.length > 0,
+    hasArticleCss: !!wikiPage.scopedArticleCss,
+    articleCss: wikiPage.articleCss || "",
+    scopedArticleCss: wikiPage.scopedArticleCss || "",
     mainPost: wikiPage.mainPost
   };
 }

@@ -119,7 +119,12 @@
         <section class="wiki-page-body">
           <!-- IF mainPost -->
           <article class="wiki-page-content wiki-article-prose card">
-            <div class="card-body">
+            <!-- IF hasArticleCss -->
+            <style data-westgate-wiki-article-css>
+{scopedArticleCss}
+            </style>
+            <!-- ENDIF hasArticleCss -->
+            <div class="card-body wiki-article-custom-css-scope-{topic.tid}">
               {mainPost.content}
             </div>
           </article>

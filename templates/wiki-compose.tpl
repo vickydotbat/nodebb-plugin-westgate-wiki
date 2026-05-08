@@ -44,9 +44,36 @@
     </div>
     <!-- ENDIF showDiscussionToggle -->
 
+    <div class="wiki-compose-css-tools mb-2">
+      <button type="button" class="btn btn-outline-secondary btn-sm" id="wiki-compose-css-btn">
+        <i class="fa fa-code" aria-hidden="true"></i>
+        Article CSS
+      </button>
+    </div>
+
     <div class="mb-2">
       <div id="wiki-compose-editor" class="wiki-compose-editor wiki-article-prose"></div>
     </div>
+
+    <dialog id="wiki-compose-css-dialog" class="wiki-compose-css-dialog">
+      <form method="dialog" class="wiki-compose-css-dialog__panel">
+        <header class="wiki-compose-css-dialog__header">
+          <h2 class="wiki-compose-css-dialog__title">Article CSS</h2>
+          <button type="submit" class="btn btn-outline-secondary btn-sm" id="wiki-compose-css-close" aria-label="Close article CSS editor">
+            <i class="fa fa-times" aria-hidden="true"></i>
+          </button>
+        </header>
+        <div class="wiki-compose-css-editor">
+          <pre class="wiki-compose-css-lines" id="wiki-compose-css-lines" aria-hidden="true">1</pre>
+          <pre class="wiki-compose-css-highlight" id="wiki-compose-css-highlight" aria-hidden="true"></pre>
+          <textarea id="wiki-compose-css-input" class="wiki-compose-css-input" spellcheck="false" aria-label="Article CSS"></textarea>
+        </div>
+        <footer class="wiki-compose-css-dialog__footer">
+          <p class="small text-muted mb-0">CSS is sanitized and scoped to this wiki article when saved.</p>
+          <button type="submit" class="btn btn-primary btn-sm" id="wiki-compose-css-done">Done</button>
+        </footer>
+      </form>
+    </dialog>
 
     <div class="mb-3">
       <label class="form-label" for="wiki-compose-import-md">Import Markdown (optional)</label>

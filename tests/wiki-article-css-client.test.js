@@ -1,0 +1,49 @@
+"use strict";
+
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+
+const composeTemplate = fs.readFileSync(path.join(__dirname, "..", "templates/wiki-compose.tpl"), "utf8");
+const pageTemplate = fs.readFileSync(path.join(__dirname, "..", "templates/wiki-page.tpl"), "utf8");
+const composeController = fs.readFileSync(path.join(__dirname, "..", "lib/controllers/compose.js"), "utf8");
+const composePageJs = fs.readFileSync(path.join(__dirname, "..", "public/wiki-compose-page.js"), "utf8");
+const wikiCss = fs.readFileSync(path.join(__dirname, "..", "public/wiki.css"), "utf8");
+const libraryJs = fs.readFileSync(path.join(__dirname, "..", "library.js"), "utf8");
+const topicService = fs.readFileSync(path.join(__dirname, "..", "lib/topic-service.js"), "utf8");
+
+assert.match(composeTemplate, /id="wiki-compose-css-btn"/);
+assert.match(composeTemplate, /id="wiki-compose-css-dialog"/);
+assert.match(composeTemplate, /id="wiki-compose-css-input"/);
+assert.match(composeTemplate, /wiki-compose-css-lines/);
+assert.match(composeTemplate, /wiki-compose-css-highlight/);
+
+assert.match(composeController, /const wikiArticleCss = require\("\.\.\/wiki-article-css"\)/);
+assert.match(composeController, /articleCssApiUrl: `\$\{relativePath\}\/api\/v3\/plugins\/westgate-wiki\/article-css`/);
+assert.match(composeController, /initialArticleCss/);
+
+assert.match(composePageJs, /const cssButton = document\.getElementById\("wiki-compose-css-btn"\)/);
+assert.match(composePageJs, /function\s+highlightCssSource\s*\(/);
+assert.match(composePageJs, /function\s+syncCssLineNumbers\s*\(/);
+assert.match(composePageJs, /cssDialog\.showModal\(\)/);
+assert.match(composePageJs, /articleCssApiUrl/);
+assert.match(composePageJs, /css:\s*articleCss/);
+
+assert.match(wikiCss, /\.wiki-compose-css-dialog\s*{/);
+assert.match(wikiCss, /\.wiki-compose-css-editor\s*{/);
+assert.match(wikiCss, /\.wiki-compose-css-lines\s*{/);
+assert.match(wikiCss, /\.wiki-compose-css-highlight\s*{/);
+assert.match(wikiCss, /\.wiki-compose-css-input\s*{/);
+
+assert.match(libraryJs, /const wikiArticleCss = require\("\.\/lib\/wiki-article-css"\)/);
+assert.match(libraryJs, /"\/westgate-wiki\/article-css"/);
+assert.match(libraryJs, /wikiArticleCss\.putArticleCss/);
+
+assert.match(topicService, /const articleCss = await wikiArticleCss\.getArticleCss/);
+assert.match(topicService, /articleCss,/);
+assert.match(topicService, /scopedArticleCss:\s*wikiArticleCss\.scopeArticleCss/);
+assert.match(pageTemplate, /wiki-article-custom-css-scope-\{topic\.tid\}/);
+assert.match(pageTemplate, /data-westgate-wiki-article-css/);
+assert.match(pageTemplate, /\{scopedArticleCss\}/);
+
+console.log("wiki-article-css client tests passed");

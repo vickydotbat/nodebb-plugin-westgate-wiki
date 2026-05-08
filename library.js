@@ -13,6 +13,7 @@ const wikiFootnotes = require("./lib/wiki-footnotes");
 const wikiHtmlParse = require("./lib/wiki-html-parse");
 const wikiDiscussionPlaceholder = require("./lib/wiki-discussion-placeholder");
 const wikiDiscussionSettings = require("./lib/wiki-discussion-settings");
+const wikiArticleCss = require("./lib/wiki-article-css");
 const wikiNamespaceMainPages = require("./lib/wiki-namespace-main-pages");
 const wikiUserMentions = require("./lib/wiki-user-mentions");
 const wikiMentionNotifications = require("./lib/wiki-mention-notifications");
@@ -112,6 +113,13 @@ plugin.registerApiRoutes = async function ({ router, middleware }) {
     "/westgate-wiki/discussion",
     [middleware.ensureLoggedIn, middleware.checkRequired.bind(null, ["tid"])],
     wikiDiscussionSettings.putDiscussionSettings
+  );
+  routeHelpers.setupApiRoute(
+    router,
+    "put",
+    "/westgate-wiki/article-css",
+    [middleware.ensureLoggedIn, middleware.checkRequired.bind(null, ["tid"])],
+    wikiArticleCss.putArticleCss
   );
   routeHelpers.setupApiRoute(
     router,
@@ -237,6 +245,7 @@ plugin.services = {
   serializer,
   topicService,
   wikiLinkAutocomplete,
+  wikiArticleCss,
   wikiDiscussionPlaceholder,
   wikiDiscussionSettings,
   wikiFootnotes,
