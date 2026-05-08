@@ -50,6 +50,7 @@ import {
   handleEditorLinkClick,
   installEditorLinkNavigationGuard
 } from "./selection/link-interactions.mjs";
+import { createImageResizeOverlay } from "./selection/image-resize.mjs";
 import { sanitizeHtml } from "./shared/sanitizer-contract.mjs";
 import { buildHeadingToc, flattenHeadingToc, navigateToHeading } from "./toolbar/editor-toc.mjs";
 import { IMAGE_CONTEXT_BUTTON_IDS, TABLE_CONTEXT_BUTTON_IDS, TOP_TOOLBAR_BUTTON_IDS, TOP_TOOLBAR_GROUPS } from "./toolbar/toolbar-schema.mjs";
@@ -134,6 +135,7 @@ const BUTTON_ICONS = {
   "image-size-md": "fa-arrows-h",
   "image-size-lg": "fa-expand",
   "image-size-full": "fa-arrows-alt",
+  "image-convert-figure": "fa-picture-o",
   "fullscreen-source": "fa-window-maximize"
 };
 
@@ -1139,6 +1141,18 @@ function getImageToolDefs(editor) {
       },
       applyState: function (button) {
         button.classList.toggle("active", isImageSizeActive(editor, "full"));
+      }
+    },
+    {
+      id: "image-convert-figure",
+      title: "Add figure wrapper",
+      action: function () {
+        editor.chain().focus().convertImageToFigure().run();
+      },
+      applyState: function (button) {
+        const nodeName = getActiveImageNodeName(editor);
+        button.disabled = nodeName !== "image";
+        button.classList.toggle("active", nodeName === "imageFigure");
       }
     }
   ];
@@ -2565,6 +2579,7 @@ export async function createWikiEditor(element, options) {
   toolbarMount.__wikiIsFullscreenSourceActive = root.__wikiIsFullscreenSourceActive;
   const topToolbar = createToolbar(toolbarMount, editor, pickAndUploadImage);
   const imageContextToolbar = createImageContextToolbar(editorMount, editor);
+  const imageResizeOverlay = createImageResizeOverlay(editorMount, editor);
   const codeBlockLanguageToolbar = createCodeBlockLanguageToolbar(editorMount, editor);
   const tableContextToolbar = createTableContextToolbar(editorMount, editor);
   linkContextToolbar = createLinkContextToolbar(editorMount, editor);
@@ -2616,6 +2631,7 @@ export async function createWikiEditor(element, options) {
       delete toolbarMount.__wikiIsFullscreenSourceActive;
       topToolbar.destroy();
       imageContextToolbar.destroy();
+      imageResizeOverlay.destroy();
       codeBlockLanguageToolbar.destroy();
       tableContextToolbar.destroy();
       linkContextToolbar.destroy();

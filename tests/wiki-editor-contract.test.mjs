@@ -21,7 +21,7 @@ function test(name, fn) {
 
 installJsdomGlobals();
 
-const [{ Editor }, StarterKitModule, ImageModule, PreservedNodeAttributesModule, StyledSpanModule, ContainerBlockModule, MediaRowModule, ImageFigureModule, WikiCalloutModule, SlashCommandModule, WikiCodeBlockModule, WikiLinkModule, WikiEntitiesModule, toolbarSchemaModule, editorTocModule, linkInteractionsModule, legacyHtmlModule, sanitizerContractModule] = await Promise.all([
+const [{ Editor }, StarterKitModule, ImageModule, PreservedNodeAttributesModule, StyledSpanModule, ContainerBlockModule, MediaRowModule, ImageFigureModule, WikiCalloutModule, SlashCommandModule, WikiCodeBlockModule, WikiLinkModule, WikiEntitiesModule, toolbarSchemaModule, editorTocModule, linkInteractionsModule, imageResizeModule, legacyHtmlModule, sanitizerContractModule] = await Promise.all([
   import("@tiptap/core"),
   import("@tiptap/starter-kit"),
   import("@tiptap/extension-image"),
@@ -38,6 +38,7 @@ const [{ Editor }, StarterKitModule, ImageModule, PreservedNodeAttributesModule,
   import("../tiptap/src/toolbar/toolbar-schema.mjs"),
   import("../tiptap/src/toolbar/editor-toc.mjs"),
   import("../tiptap/src/selection/link-interactions.mjs"),
+  import("../tiptap/src/selection/image-resize.mjs"),
   import("../tiptap/src/normalization/legacy-html.mjs"),
   import("../tiptap/src/shared/sanitizer-contract.mjs")
 ]);
@@ -57,6 +58,7 @@ const { WikiFootnote, WikiNamespaceLink, WikiPageLink, WikiUserMention } = WikiE
 const { IMAGE_CONTEXT_BUTTON_IDS, TABLE_CONTEXT_BUTTON_IDS, TOP_TOOLBAR_BUTTON_IDS, TOP_TOOLBAR_GROUPS } = toolbarSchemaModule;
 const { buildHeadingToc, navigateToHeading } = editorTocModule;
 const { installEditorLinkNavigationGuard, selectEditorLink } = linkInteractionsModule;
+const { calculateResizedImageWidth, setSelectedImageWidth } = imageResizeModule;
 const {
   detectUnsupportedContent,
   getNormalizationNotice,
@@ -214,6 +216,15 @@ await test("editor toolbar active buttons keep icon color readable", function ()
   });
 });
 
+await test("editor image resize handles are scoped and draggable from the corners", function () {
+  [editorCss, vendoredEditorCss].forEach(function (css) {
+    assert.match(css, /\.westgate-wiki-compose \.wiki-editor-image-resize\s*{/);
+    assert.match(css, /\.westgate-wiki-compose \.wiki-editor-image-resize__handle--nw\s*{[^}]*cursor:\s*nwse-resize/);
+    assert.match(css, /\.westgate-wiki-compose \.wiki-editor-image-resize__handle--ne\s*{[^}]*cursor:\s*nesw-resize/);
+    assert.match(css, /\.wiki-editor--resizing-image\s*{[^}]*user-select:\s*none/);
+  });
+});
+
 await test("editor toolbar group labels stay visually subdued", function () {
   [editorCss, vendoredEditorCss].forEach(function (css) {
     assert.match(css, /\.wiki-editor-toolbar__group-label\s*{[^}]*font-size:\s*(?:0)?\.62rem/);
@@ -253,6 +264,54 @@ await test("imageFigure parses and renders linked figures with captions intact",
   assert.match(rendered, /<figure class="image image-style-align-right wiki-image-size-md" data-wiki-node="image-figure" id="hero">/);
   assert.match(rendered, /<a href="\/full\.png" target="_blank" rel="noopener noreferrer"><img src="\/thumb\.png" alt="Thumb" width="240"><\/a>/);
   assert.match(rendered, /<figcaption><p>Caption<\/p><\/figcaption>/);
+  editor.destroy();
+});
+
+await test("regular image can be converted into a plugin-owned image figure", function () {
+  const editor = createEditor('<p><img src="/plain.png" alt="Plain" title="Plain title" width="320" class="wiki-image-align-right wiki-image-size-md"></p>');
+  const image = editor.view.dom.querySelector("img");
+  const selectionPos = editor.view.posAtDOM(image, 0);
+
+  editor.chain().focus().setNodeSelection(selectionPos).convertImageToFigure().run();
+  const rendered = editor.getHTML();
+
+  assert.match(rendered, /<figure class="image image-style-align-right wiki-image-size-md" data-wiki-node="image-figure">/);
+  assert.match(rendered, /<img src="\/plain\.png" alt="Plain" title="Plain title" width="320">/);
+  assert.match(rendered, /<figcaption><p><\/p><\/figcaption>/);
+  assert.doesNotMatch(rendered, /<p><figure/);
+  assert.equal(editor.state.selection.$from.parent.type.name, "paragraph");
+  assert.equal(editor.state.selection.$from.node(editor.state.selection.$from.depth - 1).type.name, "imageFigure");
+  editor.destroy();
+});
+
+await test("selected image width updates as a bounded resize attribute", function () {
+  const editor = createEditor('<p><img src="/plain.png" alt="Plain" width="320" class="wiki-image-size-md"></p>');
+  const image = editor.view.dom.querySelector("img");
+  const selectionPos = editor.view.posAtDOM(image, 0);
+
+  editor.chain().focus().setNodeSelection(selectionPos).run();
+  assert.equal(calculateResizedImageWidth({ startWidth: 320, deltaX: 90, directionX: 1, minWidth: 96, maxWidth: 380 }), 380);
+  assert.equal(setSelectedImageWidth(editor, 380), true);
+
+  const rendered = editor.getHTML();
+  assert.match(rendered, /<img[^>]*src="\/plain\.png"[^>]*>/);
+  assert.match(rendered, /<img[^>]*width="380"[^>]*>/);
+  assert.doesNotMatch(rendered, /wiki-image-size-md/);
+  editor.destroy();
+});
+
+await test("selected image figure width updates through the same resize contract", function () {
+  const editor = createEditor('<figure class="image wiki-image-size-lg"><img src="/figure.png" alt="Figure" width="420"><figcaption><p>Caption</p></figcaption></figure>');
+  const figure = editor.view.dom.querySelector("figure.image");
+  const selectionPos = editor.view.posAtDOM(figure, 0);
+
+  editor.chain().focus().setNodeSelection(selectionPos).run();
+  assert.equal(setSelectedImageWidth(editor, 260), true);
+
+  const rendered = editor.getHTML();
+  assert.match(rendered, /<figure class="image" data-wiki-node="image-figure">/);
+  assert.match(rendered, /<img src="\/figure\.png" alt="Figure" width="260">/);
+  assert.doesNotMatch(rendered, /wiki-image-size-lg/);
   editor.destroy();
 });
 
@@ -833,6 +892,7 @@ await test("top toolbar schema excludes contextual image layout and size control
   assert.equal(TOP_TOOLBAR_BUTTON_IDS.includes("image-upload"), true);
   assert.equal(IMAGE_CONTEXT_BUTTON_IDS.includes("image-size-md"), true);
   assert.equal(IMAGE_CONTEXT_BUTTON_IDS.includes("image-align-right"), true);
+  assert.equal(IMAGE_CONTEXT_BUTTON_IDS.includes("image-convert-figure"), true);
 });
 
 await test("top toolbar schema keeps wiki entity tools and only table creation in the always-visible toolbar", function () {

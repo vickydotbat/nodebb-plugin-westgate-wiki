@@ -21,6 +21,13 @@ export const ALLOWED_IMAGE_NODE_CLASSES = new Set([
   "wiki-image-size-full"
 ]);
 
+export const IMAGE_SIZE_CLASSES = new Set([
+  "wiki-image-size-sm",
+  "wiki-image-size-md",
+  "wiki-image-size-lg",
+  "wiki-image-size-full"
+]);
+
 export function normalizeClassTokens(value, allowedSet, requiredToken) {
   const tokens = String(value || "")
     .split(/\s+/)
@@ -43,6 +50,33 @@ export function removeClassTokens(value, tokensToRemove) {
     .filter(function (token) { return !tokensToRemove.has(token); })
     .join(" ")
     .trim();
+}
+
+export function removeImageSizeClasses(value) {
+  return removeClassTokens(value, IMAGE_SIZE_CLASSES);
+}
+
+export function getFigureClassForImageNodeClass(value) {
+  const className = String(value || "");
+  const classes = ["image"];
+
+  if (className.includes("wiki-image-align-left")) {
+    classes.push("image-style-align-left");
+  } else if (className.includes("wiki-image-align-right")) {
+    classes.push("image-style-align-right");
+  } else if (className.includes("wiki-image-align-side")) {
+    classes.push("image-style-side");
+  } else {
+    classes.push("image-style-block");
+  }
+
+  IMAGE_SIZE_CLASSES.forEach(function (sizeClass) {
+    if (className.includes(sizeClass)) {
+      classes.push(sizeClass);
+    }
+  });
+
+  return normalizeClassTokens(classes.join(" "), ALLOWED_IMAGE_FIGURE_CLASSES, "image") || "image";
 }
 
 export function getImageLayoutClassForNode(nodeName, currentClass, layout) {
@@ -74,16 +108,9 @@ export function getImageLayoutClassForNode(nodeName, currentClass, layout) {
 }
 
 export function getImageSizeClassForNode(nodeName, currentClass, size) {
-  const sizeClasses = new Set([
-    "wiki-image-size-sm",
-    "wiki-image-size-md",
-    "wiki-image-size-lg",
-    "wiki-image-size-full"
-  ]);
-
   if (nodeName === "imageFigure") {
     const hasImageClass = /\bimage\b/.test(currentClass);
-    const retained = removeClassTokens(currentClass, sizeClasses);
+    const retained = removeClassTokens(currentClass, IMAGE_SIZE_CLASSES);
     const sizeClass = {
       sm: "wiki-image-size-sm",
       md: "wiki-image-size-md",
@@ -94,7 +121,7 @@ export function getImageSizeClassForNode(nodeName, currentClass, size) {
     return sizeClass ? `${base} ${sizeClass}`.trim() : base.trim();
   }
 
-  const retained = removeClassTokens(currentClass, sizeClasses);
+  const retained = removeClassTokens(currentClass, IMAGE_SIZE_CLASSES);
   const sizeClass = {
     sm: "wiki-image-size-sm",
     md: "wiki-image-size-md",

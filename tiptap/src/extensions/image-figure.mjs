@@ -1,7 +1,8 @@
 import { mergeAttributes, Node } from "@tiptap/core";
+import { TextSelection } from "@tiptap/pm/state";
 
 import { getFigureImageElement, getFigureImageLinkElement } from "../normalization/legacy-html.mjs";
-import { ALLOWED_IMAGE_FIGURE_CLASSES, normalizeClassTokens } from "../shared/image-class-contract.mjs";
+import { ALLOWED_IMAGE_FIGURE_CLASSES, getFigureClassForImageNodeClass, normalizeClassTokens } from "../shared/image-class-contract.mjs";
 
 export function getFigureImageAttrs(element) {
   const image = getFigureImageElement(element);
@@ -146,6 +147,53 @@ const ImageFigure = Node.create({
     }
 
     return ["figure", figureAttrs, imageSpec];
+  },
+  addCommands() {
+    return {
+      convertImageToFigure:
+        () =>
+        ({ state, dispatch }) => {
+          const { selection } = state;
+          const node = selection && selection.node;
+          if (!node || node.type.name !== "image") {
+            return false;
+          }
+
+          const imageFigureType = state.schema.nodes[this.name];
+          if (!imageFigureType) {
+            return false;
+          }
+
+          const paragraphType = state.schema.nodes.paragraph;
+          if (!paragraphType) {
+            return false;
+          }
+
+          const attrs = node.attrs || {};
+          const figure = imageFigureType.create(
+            {
+              src: attrs.src || null,
+              alt: attrs.alt || null,
+              title: attrs.title || null,
+              width: attrs.width || null,
+              height: attrs.height || null,
+              class: getFigureClassForImageNodeClass(attrs.class || ""),
+              id: attrs.id || null
+            },
+            paragraphType.create()
+          );
+          if (!figure) {
+            return false;
+          }
+
+          if (dispatch) {
+            const insertPos = selection.from;
+            const tr = state.tr.replaceSelectionWith(figure);
+            dispatch(tr.setSelection(TextSelection.create(tr.doc, insertPos + 2)).scrollIntoView());
+          }
+          return true;
+        }
+    };
   }
 });
 

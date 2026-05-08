@@ -648,6 +648,61 @@
   outline-offset: 2px;
 }
 
+.westgate-wiki-compose .wiki-editor-image-resize {
+  position: absolute;
+  z-index: 9;
+  box-sizing: border-box;
+  border: 1px solid color-mix(in srgb, var(--wiki-editor-focus-border, var(--bs-primary, #0d6efd)) 70%, transparent);
+  border-radius: var(--bs-border-radius-sm, 0.25rem);
+  pointer-events: none;
+}
+
+.westgate-wiki-compose .wiki-editor-image-resize[hidden] {
+  display: none;
+}
+
+.westgate-wiki-compose .wiki-editor-image-resize__handle {
+  position: absolute;
+  z-index: 1;
+  box-sizing: border-box;
+  width: 0.85rem;
+  height: 0.85rem;
+  border: 2px solid var(--wiki-editor-focus-border, var(--bs-primary, #0d6efd));
+  border-radius: 50%;
+  background: var(--bs-body-bg, #fff);
+  box-shadow: 0 0.12rem 0.35rem rgba(0, 0, 0, 0.2);
+  pointer-events: auto;
+}
+
+.westgate-wiki-compose .wiki-editor-image-resize__handle--nw {
+  top: -0.45rem;
+  left: -0.45rem;
+  cursor: nwse-resize;
+}
+
+.westgate-wiki-compose .wiki-editor-image-resize__handle--ne {
+  top: -0.45rem;
+  right: -0.45rem;
+  cursor: nesw-resize;
+}
+
+.westgate-wiki-compose .wiki-editor-image-resize__handle--sw {
+  bottom: -0.45rem;
+  left: -0.45rem;
+  cursor: nesw-resize;
+}
+
+.westgate-wiki-compose .wiki-editor-image-resize__handle--se {
+  right: -0.45rem;
+  bottom: -0.45rem;
+  cursor: nwse-resize;
+}
+
+.wiki-editor--resizing-image {
+  cursor: nwse-resize;
+  user-select: none;
+}
+
 .westgate-wiki-compose .wiki-editor__content .wiki-media-row {
   border: 1px solid color-mix(in srgb, var(--wiki-editor-focus-border, var(--bs-primary, #0d6efd)) 28%, transparent);
   border-radius: var(--bs-border-radius, 0.75rem);

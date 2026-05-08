@@ -58,7 +58,8 @@ export const IMAGE_CONTEXT_BUTTON_IDS = [
   "image-size-sm",
   "image-size-md",
   "image-size-lg",
-  "image-size-full"
+  "image-size-full",
+  "image-convert-figure"
 ];
 
 export const TABLE_CONTEXT_BUTTON_IDS = [
