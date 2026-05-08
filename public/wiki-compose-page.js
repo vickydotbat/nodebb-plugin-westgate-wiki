@@ -113,6 +113,8 @@ async function initWikiComposePage() {
   let editorInstance = null;
   let destroyStarted = false;
   let hasUnsavedChanges = false;
+  let editLockRefreshTimer = null;
+  let editLockReleased = false;
 
   function markUnsaved() {
     hasUnsavedChanges = true;
@@ -128,7 +130,7 @@ async function initWikiComposePage() {
   }
 
   async function destroyWikiEditor() {
-    if (destroyStarted || !editorInstance) {
+    if (destroyStarted) {
       return;
     }
 
@@ -137,9 +139,11 @@ async function initWikiComposePage() {
     destroyStarted = true;
 
     try {
-      if (typeof editor.destroy === "function") {
+      stopEditLockHeartbeat();
+      if (editor && typeof editor.destroy === "function") {
         await editor.destroy();
       }
+      await releaseEditLock();
     } catch (err) {
       if (window.console && console.warn) {
         console.warn("westgate-wiki: editor cleanup failed", err);
@@ -147,6 +151,86 @@ async function initWikiComposePage() {
     } finally {
       destroyStarted = false;
     }
+  }
+
+  function hasEditLock() {
+    return payload.mode === "edit" && payload.editLockUrl && payload.editLockToken && payload.tid;
+  }
+
+  function stopEditLockHeartbeat() {
+    if (editLockRefreshTimer) {
+      clearInterval(editLockRefreshTimer);
+      editLockRefreshTimer = null;
+    }
+  }
+
+  async function sendEditLockRequest(method) {
+    if (!hasEditLock() || editLockReleased) {
+      return null;
+    }
+
+    const res = await fetch(payload.editLockUrl, {
+      method: method,
+      credentials: "same-origin",
+      keepalive: method === "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        "x-csrf-token": payload.csrfToken
+      },
+      body: JSON.stringify({
+        tid: parseInt(payload.tid, 10),
+        token: payload.editLockToken
+      })
+    });
+    let body = null;
+    try {
+      body = await res.json();
+    } catch (err) {
+      body = null;
+    }
+    if (!res.ok) {
+      const msg = (body && body.status && body.status.message) ||
+        (body && body.response && body.response.message) ||
+        res.statusText;
+      throw new Error(msg);
+    }
+    return body;
+  }
+
+  async function refreshEditLock() {
+    try {
+      await sendEditLockRequest("PUT");
+    } catch (err) {
+      stopEditLockHeartbeat();
+      if (submitBtn) {
+        submitBtn.disabled = true;
+      }
+      setStatus(statusEl, (err && err.message) || "This wiki edit lock could not be renewed. Reopen the editor before saving.", "error");
+    }
+  }
+
+  async function releaseEditLock() {
+    if (!hasEditLock() || editLockReleased) {
+      return;
+    }
+    try {
+      await sendEditLockRequest("DELETE");
+    } catch (err) {
+      if (window.console && console.warn) {
+        console.warn("westgate-wiki: edit lock release failed", err);
+      }
+    } finally {
+      editLockReleased = true;
+    }
+  }
+
+  function startEditLockHeartbeat() {
+    if (!hasEditLock() || editLockRefreshTimer) {
+      return;
+    }
+    const ttlMs = parseInt(payload.editLockTtlMs, 10) || 120000;
+    const intervalMs = Math.max(15000, Math.floor(ttlMs / 2));
+    editLockRefreshTimer = setInterval(refreshEditLock, intervalMs);
   }
 
   async function leaveComposePage(path) {
@@ -235,8 +319,10 @@ async function initWikiComposePage() {
 
   try {
     await initializeEditor();
+    startEditLockHeartbeat();
   } catch (err) {
     setStatus(statusEl, (err && err.message) || String(err), "error");
+    await releaseEditLock();
     return;
   }
 
@@ -376,7 +462,9 @@ async function initWikiComposePage() {
         }
 
         if (isEdit) {
-          res = await fetch(payload.postEditUrl, {
+          const postEditUrl = new URL(payload.postEditUrl, window.location.origin);
+          postEditUrl.searchParams.set("wikiEditLockToken", payload.editLockToken || "");
+          res = await fetch(postEditUrl.toString(), {
             method: "PUT",
             credentials: "same-origin",
             headers: {
@@ -385,7 +473,8 @@ async function initWikiComposePage() {
             },
             body: JSON.stringify({
               content: content,
-              title: title
+              title: title,
+              wikiEditLockToken: payload.editLockToken
             })
           });
           body = await res.json();

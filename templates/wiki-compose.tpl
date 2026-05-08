@@ -12,6 +12,14 @@
   </div>
   <!-- ENDIF showSetHomeBanner -->
 
+  <!-- IF editLockBlocked -->
+  <div class="alert alert-warning mb-3" role="alert">
+    {editLockMessage}
+  </div>
+  <p>
+    <a class="btn btn-outline-secondary" href="{config.relative_path}{composeCancelHref}">Return to article</a>
+  </p>
+  <!-- ELSE -->
   <div id="westgate-wiki-compose-data" class="d-none" data-payload-b64="{composePayloadB64}"></div>
 
   <div class="wiki-compose-form card card-body mb-3">
@@ -52,6 +60,7 @@
     </div>
     <p class="small text-muted mt-2 mb-0" id="wiki-compose-status" aria-live="polite"></p>
   </div>
+  <!-- ENDIF editLockBlocked -->
 </div>
 
 <!-- IF config.cache-buster -->

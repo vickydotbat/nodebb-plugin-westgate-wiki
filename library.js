@@ -17,6 +17,7 @@ const wikiNamespaceMainPages = require("./lib/wiki-namespace-main-pages");
 const wikiUserMentions = require("./lib/wiki-user-mentions");
 const wikiMentionNotifications = require("./lib/wiki-mention-notifications");
 const wikiArticleWatch = require("./lib/wiki-article-watch");
+const wikiEditLocks = require("./lib/wiki-edit-locks");
 const wikiService = require("./lib/wiki-service");
 const wikiPaths = require("./lib/wiki-paths");
 const wikiPageValidation = require("./lib/wiki-page-validation");
@@ -76,6 +77,20 @@ plugin.registerApiRoutes = async function ({ router, middleware }) {
     "/westgate-wiki/namespace/:cid/search",
     [],
     wikiNamespaceSearch.searchNamespaceTopics
+  );
+  routeHelpers.setupApiRoute(
+    router,
+    "put",
+    "/westgate-wiki/edit-lock",
+    [middleware.ensureLoggedIn, middleware.checkRequired.bind(null, ["tid"])],
+    wikiEditLocks.putEditLock
+  );
+  routeHelpers.setupApiRoute(
+    router,
+    "delete",
+    "/westgate-wiki/edit-lock",
+    [middleware.ensureLoggedIn, middleware.checkRequired.bind(null, ["tid", "token"])],
+    wikiEditLocks.deleteEditLock
   );
   routeHelpers.setupApiRoute(
     router,
@@ -228,6 +243,7 @@ plugin.services = {
   wikiLinks,
   wikiMentionNotifications,
   wikiArticleWatch,
+  wikiEditLocks,
   wikiUserMentions,
   wikiNamespaceMainPages,
   wikiPageValidation,
