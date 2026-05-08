@@ -139,6 +139,7 @@ await (async function testSearchPageInstantResults() {
       </div>
     </form>
     <section data-wiki-search-page>
+      <h1 data-wiki-search-heading>Search the Wiki</h1>
       <div data-wiki-search-page-status></div>
       <div data-wiki-search-page-results></div>
     </section>
@@ -150,6 +151,7 @@ await (async function testSearchPageInstantResults() {
   await tick(280);
 
   const pageText = document.querySelector("[data-wiki-search-page-results]").textContent;
+  assert.equal(document.querySelector("[data-wiki-search-heading]").textContent, "Results for map");
   assert.match(pageText, /Pages/);
   assert.match(pageText, /Map Creation Guide/);
   assert.match(pageText, /Namespaces/);

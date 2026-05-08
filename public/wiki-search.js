@@ -127,10 +127,15 @@
   function renderPageResults(page, payload, query) {
     var status = page.querySelector("[data-wiki-search-page-status]");
     var host = page.querySelector("[data-wiki-search-page-results]");
+    var heading = document.querySelector("[data-wiki-search-heading]");
     var groups = payload.groups || {};
 
     if (!host) {
       return;
+    }
+
+    if (heading) {
+      heading.textContent = query ? "Results for " + query : "Search the Wiki";
     }
 
     if (status) {

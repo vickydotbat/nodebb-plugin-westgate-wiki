@@ -1,9 +1,10 @@
 <div class="westgate-wiki py-4">
   <header class="wiki-page-header wiki-page-header--search mb-4">
-    <!-- IMPORT partials/wiki/breadcrumb-trail.tpl -->
     <!-- IMPORT partials/wiki/search-chrome.tpl -->
     <div class="wiki-page-heading">
-      <h1 class="wiki-page-heading__title">Search the Wiki</h1>
+      <h1 class="wiki-page-heading__title" data-wiki-search-heading>
+        <!-- IF hasSearchQuery -->Results for {wikiSearchQuery}<!-- ELSE -->Search the Wiki<!-- ENDIF hasSearchQuery -->
+      </h1>
     </div>
   </header>
 
