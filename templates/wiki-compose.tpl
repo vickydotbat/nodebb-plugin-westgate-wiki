@@ -79,9 +79,9 @@
       <button type="button" class="btn btn-outline-primary btn-sm" id="wiki-compose-link-insert">Insert [[selection]]</button>
     </div>
 
-    <div class="wiki-compose-actions d-flex gap-2 flex-wrap">
+    <div class="wiki-compose-actions wiki-compose-actions--floating d-flex gap-2 flex-wrap">
       <button type="button" class="btn btn-primary" id="wiki-compose-submit">{submitLabel}</button>
-      <a class="btn btn-link" id="wiki-compose-cancel" href="{config.relative_path}{composeCancelHref}">Cancel</a>
+      <a class="btn btn-outline-secondary" id="wiki-compose-return" href="{config.relative_path}{composeCancelHref}">Return</a>
     </div>
     <p class="small text-muted mt-2 mb-0" id="wiki-compose-status" aria-live="polite"></p>
   </div>

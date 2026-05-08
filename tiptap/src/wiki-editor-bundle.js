@@ -45,7 +45,8 @@ import {
   setSelectedImageSize
 } from "./selection/media-selection.mjs";
 import { sanitizeHtml } from "./shared/sanitizer-contract.mjs";
-import { IMAGE_CONTEXT_BUTTON_IDS, TOP_TOOLBAR_BUTTON_IDS, TOP_TOOLBAR_GROUPS } from "./toolbar/toolbar-schema.mjs";
+import { buildHeadingToc, flattenHeadingToc, navigateToHeading } from "./toolbar/editor-toc.mjs";
+import { IMAGE_CONTEXT_BUTTON_IDS, TABLE_CONTEXT_BUTTON_IDS, TOP_TOOLBAR_BUTTON_IDS, TOP_TOOLBAR_GROUPS } from "./toolbar/toolbar-schema.mjs";
 
 const markdownIt = new MarkdownIt({ html: true, linkify: true, typographer: true });
 
@@ -104,8 +105,16 @@ const BUTTON_ICONS = {
   "align-right": "fa-align-right",
   "align-justify": "fa-align-justify",
   "table-insert": "fa-table",
-  "table-add-row": "fa-plus",
-  "table-add-column": "fa-plus",
+  "table-add-row-before": "fa-plus",
+  "table-add-row-after": "fa-plus",
+  "table-delete-row": "fa-minus",
+  "table-add-column-before": "fa-plus",
+  "table-add-column-after": "fa-plus",
+  "table-delete-column": "fa-minus",
+  "table-merge-cells": "fa-compress",
+  "table-split-cell": "fa-expand",
+  "table-toggle-header-row": "fa-header",
+  "table-toggle-header-column": "fa-header",
   "table-delete": "fa-trash",
   "image-align-center": "fa-align-center",
   "image-align-left": "fa-align-left",
@@ -545,38 +554,6 @@ function createToolbar(root, editor, uploadImage) {
       action: function () {
         editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
       }
-    },
-    {
-      id: "table-add-row",
-      title: "Add row after",
-      badge: "R",
-      action: function () {
-        editor.chain().focus().addRowAfter().run();
-      },
-      applyState: function (button) {
-        button.disabled = !editor.can().chain().focus().addRowAfter().run();
-      }
-    },
-    {
-      id: "table-add-column",
-      title: "Add column after",
-      badge: "C",
-      action: function () {
-        editor.chain().focus().addColumnAfter().run();
-      },
-      applyState: function (button) {
-        button.disabled = !editor.can().chain().focus().addColumnAfter().run();
-      }
-    },
-    {
-      id: "table-delete",
-      title: "Delete table",
-      action: function () {
-        editor.chain().focus().deleteTable().run();
-      },
-      applyState: function (button) {
-        button.disabled = !editor.can().chain().focus().deleteTable().run();
-      }
     }
   ], "tables");
 
@@ -786,6 +763,310 @@ function createImageContextToolbar(surface, editor) {
   };
 }
 
+function getTableToolDefs(editor) {
+  return [
+    {
+      id: "table-add-row-before",
+      title: "Insert row before",
+      badge: "R+",
+      action: function () { editor.chain().focus().addRowBefore().run(); },
+      applyState: function (button) { button.disabled = !editor.can().chain().focus().addRowBefore().run(); }
+    },
+    {
+      id: "table-add-row-after",
+      title: "Insert row after",
+      badge: "+R",
+      action: function () { editor.chain().focus().addRowAfter().run(); },
+      applyState: function (button) { button.disabled = !editor.can().chain().focus().addRowAfter().run(); }
+    },
+    {
+      id: "table-delete-row",
+      title: "Delete current row",
+      badge: "R",
+      action: function () { editor.chain().focus().deleteRow().run(); },
+      applyState: function (button) { button.disabled = !editor.can().chain().focus().deleteRow().run(); }
+    },
+    {
+      id: "table-add-column-before",
+      title: "Insert column before",
+      badge: "C+",
+      action: function () { editor.chain().focus().addColumnBefore().run(); },
+      applyState: function (button) { button.disabled = !editor.can().chain().focus().addColumnBefore().run(); }
+    },
+    {
+      id: "table-add-column-after",
+      title: "Insert column after",
+      badge: "+C",
+      action: function () { editor.chain().focus().addColumnAfter().run(); },
+      applyState: function (button) { button.disabled = !editor.can().chain().focus().addColumnAfter().run(); }
+    },
+    {
+      id: "table-delete-column",
+      title: "Delete current column",
+      badge: "C",
+      action: function () { editor.chain().focus().deleteColumn().run(); },
+      applyState: function (button) { button.disabled = !editor.can().chain().focus().deleteColumn().run(); }
+    },
+    {
+      id: "table-merge-cells",
+      title: "Merge selected cells",
+      action: function () { editor.chain().focus().mergeCells().run(); },
+      applyState: function (button) { button.disabled = !editor.can().chain().focus().mergeCells().run(); }
+    },
+    {
+      id: "table-split-cell",
+      title: "Split selected cell",
+      action: function () { editor.chain().focus().splitCell().run(); },
+      applyState: function (button) { button.disabled = !editor.can().chain().focus().splitCell().run(); }
+    },
+    {
+      id: "table-toggle-header-row",
+      title: "Toggle header row",
+      badge: "R",
+      action: function () { editor.chain().focus().toggleHeaderRow().run(); },
+      applyState: function (button) { button.disabled = !editor.can().chain().focus().toggleHeaderRow().run(); }
+    },
+    {
+      id: "table-toggle-header-column",
+      title: "Toggle header column",
+      badge: "C",
+      action: function () { editor.chain().focus().toggleHeaderColumn().run(); },
+      applyState: function (button) { button.disabled = !editor.can().chain().focus().toggleHeaderColumn().run(); }
+    },
+    {
+      id: "table-delete",
+      title: "Delete table",
+      action: function () { editor.chain().focus().deleteTable().run(); },
+      applyState: function (button) { button.disabled = !editor.can().chain().focus().deleteTable().run(); }
+    }
+  ];
+}
+
+function getSelectionElement(editor) {
+  const domAtPos = editor.view.domAtPos(editor.state.selection.from);
+  const node = domAtPos && domAtPos.node;
+  if (!node) {
+    return null;
+  }
+  return node.nodeType === 1 ? node : node.parentElement;
+}
+
+function getActiveTableElement(editor, surface) {
+  const selectionElement = getSelectionElement(editor);
+  const table = selectionElement && typeof selectionElement.closest === "function" ? selectionElement.closest("table") : null;
+  return table && surface.contains(table) ? table : null;
+}
+
+function positionContextPanel(panel, targetEl, surface) {
+  const surfaceRect = surface.getBoundingClientRect();
+  const targetRect = targetEl.getBoundingClientRect();
+  const panelWidth = panel.offsetWidth || 320;
+  const left = Math.max(8, Math.min(targetRect.left - surfaceRect.left, surfaceRect.width - panelWidth - 8));
+  const top = Math.max(8, targetRect.top - surfaceRect.top - panel.offsetHeight - 8);
+  panel.style.left = `${left}px`;
+  panel.style.top = `${top}px`;
+}
+
+function createTableContextToolbar(surface, editor) {
+  const panel = document.createElement("div");
+  panel.className = "wiki-editor-context-tools wiki-editor-table-tools";
+  panel.setAttribute("role", "toolbar");
+  panel.setAttribute("aria-label", "Selected table tools");
+  panel.hidden = true;
+
+  const defs = getTableToolDefs(editor);
+  defs.forEach(function (def) {
+    if (!TABLE_CONTEXT_BUTTON_IDS.includes(def.id)) {
+      throw new Error(`Unknown table context button: ${def.id}`);
+    }
+    def.button = createButton(def);
+    panel.appendChild(def.button);
+  });
+
+  function syncTableTools() {
+    const table = editor.isActive("table") ? getActiveTableElement(editor, surface) : null;
+    panel.hidden = !table;
+    if (!table) {
+      return;
+    }
+
+    defs.forEach(function (def) {
+      def.button.classList.remove("active");
+      def.button.disabled = false;
+      def.applyState(def.button);
+    });
+    positionContextPanel(panel, table, surface);
+  }
+
+  editor.on("create", syncTableTools);
+  editor.on("selectionUpdate", syncTableTools);
+  editor.on("transaction", syncTableTools);
+  editor.on("focus", syncTableTools);
+  editor.on("blur", syncTableTools);
+  window.addEventListener("resize", syncTableTools);
+  surface.appendChild(panel);
+  syncTableTools();
+
+  return {
+    destroy: function () {
+      window.removeEventListener("resize", syncTableTools);
+      if (panel.parentNode) {
+        panel.parentNode.removeChild(panel);
+      }
+    }
+  };
+}
+
+function createLinkContextToolbar(surface, editor) {
+  const panel = document.createElement("div");
+  panel.className = "wiki-editor-context-tools wiki-editor-link-tools";
+  panel.setAttribute("role", "toolbar");
+  panel.setAttribute("aria-label", "Selected link tools");
+  panel.hidden = true;
+
+  function editLink() {
+    const currentHref = editor.getAttributes("link").href || "";
+    const href = window.prompt("Link URL", currentHref || "https://");
+    if (!href) {
+      return;
+    }
+    editor.chain().focus().extendMarkRange("link").setLink({
+      href: href.trim(),
+      target: "_blank",
+      rel: "noopener noreferrer"
+    }).run();
+    panel.hidden = true;
+  }
+
+  function unlink() {
+    editor.chain().focus().extendMarkRange("link").unsetLink().run();
+    panel.hidden = true;
+  }
+
+  [
+    { id: "link", title: "Edit link", action: editLink },
+    { id: "unlink", title: "Remove link", action: unlink }
+  ].forEach(function (def) {
+    panel.appendChild(createButton(def));
+  });
+
+  function showForLink(linkEl) {
+    if (!linkEl || !surface.contains(linkEl)) {
+      panel.hidden = true;
+      return;
+    }
+    panel.hidden = false;
+    positionContextPanel(panel, linkEl, surface);
+  }
+
+  function hideIfSelectionLeavesLink() {
+    if (!editor.isActive("link")) {
+      panel.hidden = true;
+    }
+  }
+
+  editor.on("selectionUpdate", hideIfSelectionLeavesLink);
+  editor.on("transaction", hideIfSelectionLeavesLink);
+  window.addEventListener("resize", hideIfSelectionLeavesLink);
+  surface.appendChild(panel);
+
+  return {
+    showForLink,
+    destroy: function () {
+      window.removeEventListener("resize", hideIfSelectionLeavesLink);
+      if (panel.parentNode) {
+        panel.parentNode.removeChild(panel);
+      }
+    }
+  };
+}
+
+function createEditorToc(root, surface, editor) {
+  const aside = document.createElement("aside");
+  aside.className = "wiki-editor-toc";
+  aside.setAttribute("aria-label", "Article table of contents");
+
+  const title = document.createElement("div");
+  title.className = "wiki-editor-toc__title";
+  title.textContent = "Contents";
+  aside.appendChild(title);
+
+  const listMount = document.createElement("div");
+  listMount.className = "wiki-editor-toc__list";
+  aside.appendChild(listMount);
+
+  function assignHeadingIds(items) {
+    flattenHeadingToc(items).forEach(function (item) {
+      const dom = editor.view.nodeDOM(item.pos);
+      if (dom && dom.nodeType === 1) {
+        dom.id = item.id;
+      }
+    });
+  }
+
+  function renderItems(items, parent) {
+    const list = document.createElement("ol");
+    list.className = "wiki-editor-toc__entries";
+    parent.appendChild(list);
+
+    items.forEach(function (item) {
+      const row = document.createElement("li");
+      row.className = `wiki-editor-toc__entry wiki-editor-toc__entry--level-${item.level}`;
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "wiki-editor-toc__link";
+      button.textContent = item.text;
+      button.addEventListener("mousedown", function (event) {
+        event.preventDefault();
+      });
+      button.addEventListener("click", function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        navigateToHeading({ item, surface, editor });
+      });
+      row.appendChild(button);
+
+      if (item.children && item.children.length) {
+        renderItems(item.children, row);
+      }
+      list.appendChild(row);
+    });
+  }
+
+  function syncToc() {
+    const items = buildHeadingToc(editor);
+    assignHeadingIds(items);
+    listMount.innerHTML = "";
+
+    if (!items.length) {
+      const empty = document.createElement("p");
+      empty.className = "wiki-editor-toc__empty";
+      empty.textContent = "No headings";
+      listMount.appendChild(empty);
+      aside.classList.add("wiki-editor-toc--empty");
+      return;
+    }
+
+    aside.classList.remove("wiki-editor-toc--empty");
+    renderItems(items, listMount);
+  }
+
+  editor.on("create", syncToc);
+  editor.on("update", syncToc);
+  editor.on("transaction", syncToc);
+  root.appendChild(aside);
+  syncToc();
+
+  return {
+    destroy: function () {
+      if (aside.parentNode) {
+        aside.parentNode.removeChild(aside);
+      }
+    }
+  };
+}
+
 async function uploadImageFile(relativePath, csrfToken, file) {
   const uploadUrl = `${relativePath || ""}/api/post/upload`;
   const formData = new FormData();
@@ -815,6 +1096,7 @@ async function uploadImageFile(relativePath, csrfToken, file) {
 
 export async function createWikiEditor(element, options) {
   const { relativePath, csrfToken, initialData = "" } = options || {};
+  const onChange = options && typeof options.onChange === "function" ? options.onChange : function () {};
   const normalizedInitialData = normalizeLegacyHtmlForTiptap(initialData);
   let pendingUploads = 0;
 
@@ -825,9 +1107,13 @@ export async function createWikiEditor(element, options) {
   toolbarMount.className = "wiki-editor__toolbar-mount";
   root.appendChild(toolbarMount);
 
+  const body = document.createElement("div");
+  body.className = "wiki-editor__body";
+  root.appendChild(body);
+
   const editorMount = document.createElement("div");
   editorMount.className = "wiki-editor__surface wiki-article-prose";
-  root.appendChild(editorMount);
+  body.appendChild(editorMount);
 
   const metaRow = document.createElement("div");
   metaRow.className = "wiki-editor__meta small text-muted";
@@ -842,6 +1128,7 @@ export async function createWikiEditor(element, options) {
 
   element.innerHTML = "";
   element.appendChild(root);
+  let linkContextToolbar = null;
 
   function setUploadStatus(text) {
     if (text) {
@@ -984,6 +1271,12 @@ export async function createWikiEditor(element, options) {
           if (link && editorMount.contains(link)) {
             event.preventDefault();
             event.stopPropagation();
+            const posTarget = link.firstChild || link;
+            const pos = editor.view.posAtDOM(posTarget, 0);
+            editor.chain().focus().setTextSelection(pos).extendMarkRange("link").run();
+            if (linkContextToolbar) {
+              linkContextToolbar.showForLink(link);
+            }
             return true;
           }
 
@@ -1040,6 +1333,7 @@ export async function createWikiEditor(element, options) {
     onUpdate: function ({ editor: activeEditor }) {
       const plainTextLength = activeEditor.getText().trim().length;
       metaRow.textContent = `${plainTextLength.toLocaleString()} characters`;
+      onChange();
     }
   });
 
@@ -1061,6 +1355,9 @@ export async function createWikiEditor(element, options) {
 
   const topToolbar = createToolbar(toolbarMount, editor, pickAndUploadImage);
   const imageContextToolbar = createImageContextToolbar(editorMount, editor);
+  const tableContextToolbar = createTableContextToolbar(editorMount, editor);
+  linkContextToolbar = createLinkContextToolbar(editorMount, editor);
+  const editorToc = createEditorToc(body, editorMount, editor);
 
   return {
     getHTML: function () {
@@ -1090,6 +1387,9 @@ export async function createWikiEditor(element, options) {
     destroy: function () {
       topToolbar.destroy();
       imageContextToolbar.destroy();
+      tableContextToolbar.destroy();
+      linkContextToolbar.destroy();
+      editorToc.destroy();
       return editor.destroy();
     }
   };

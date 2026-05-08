@@ -37,7 +37,7 @@ export const TOP_TOOLBAR_GROUPS = [
   {
     id: "tables",
     label: "Tables",
-    buttonIds: ["table-insert", "table-add-row", "table-add-column", "table-delete"]
+    buttonIds: ["table-insert"]
   }
 ];
 
@@ -54,6 +54,20 @@ export const IMAGE_CONTEXT_BUTTON_IDS = [
   "image-size-md",
   "image-size-lg",
   "image-size-full"
+];
+
+export const TABLE_CONTEXT_BUTTON_IDS = [
+  "table-add-row-before",
+  "table-add-row-after",
+  "table-delete-row",
+  "table-add-column-before",
+  "table-add-column-after",
+  "table-delete-column",
+  "table-merge-cells",
+  "table-split-cell",
+  "table-toggle-header-row",
+  "table-toggle-header-column",
+  "table-delete"
 ];
 
 export function isImageContextButton(id) {

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import { installJsdomGlobals } from "./helpers/jsdom-setup.mjs";
 
@@ -20,7 +21,7 @@ function test(name, fn) {
 
 installJsdomGlobals();
 
-const [{ Editor }, StarterKitModule, ImageModule, PreservedNodeAttributesModule, StyledSpanModule, ContainerBlockModule, MediaRowModule, ImageFigureModule, WikiCalloutModule, SlashCommandModule, toolbarSchemaModule, legacyHtmlModule, sanitizerContractModule] = await Promise.all([
+const [{ Editor }, StarterKitModule, ImageModule, PreservedNodeAttributesModule, StyledSpanModule, ContainerBlockModule, MediaRowModule, ImageFigureModule, WikiCalloutModule, SlashCommandModule, toolbarSchemaModule, editorTocModule, legacyHtmlModule, sanitizerContractModule] = await Promise.all([
   import("@tiptap/core"),
   import("@tiptap/starter-kit"),
   import("@tiptap/extension-image"),
@@ -32,6 +33,7 @@ const [{ Editor }, StarterKitModule, ImageModule, PreservedNodeAttributesModule,
   import("../tiptap/src/extensions/wiki-callout.mjs"),
   import("../tiptap/src/extensions/slash-command.mjs"),
   import("../tiptap/src/toolbar/toolbar-schema.mjs"),
+  import("../tiptap/src/toolbar/editor-toc.mjs"),
   import("../tiptap/src/normalization/legacy-html.mjs"),
   import("../tiptap/src/shared/sanitizer-contract.mjs")
 ]);
@@ -45,13 +47,15 @@ const { MediaCell, MediaRow } = MediaRowModule;
 const ImageFigure = ImageFigureModule.default;
 const WikiCallout = WikiCalloutModule.default;
 const SlashCommand = SlashCommandModule.default;
-const { IMAGE_CONTEXT_BUTTON_IDS, TOP_TOOLBAR_BUTTON_IDS, TOP_TOOLBAR_GROUPS } = toolbarSchemaModule;
+const { IMAGE_CONTEXT_BUTTON_IDS, TABLE_CONTEXT_BUTTON_IDS, TOP_TOOLBAR_BUTTON_IDS, TOP_TOOLBAR_GROUPS } = toolbarSchemaModule;
+const { buildHeadingToc, navigateToHeading } = editorTocModule;
 const {
   detectUnsupportedContent,
   getNormalizationNotice,
   normalizeLegacyHtmlForTiptap
 } = legacyHtmlModule;
 const { sanitizeHtml } = sanitizerContractModule;
+const articleBodyCss = readFileSync(new URL("../public/wiki-article-body.css", import.meta.url), "utf8");
 
 function createEditor(content) {
   const mount = document.createElement("div");
@@ -139,6 +143,17 @@ await test("sanitizeHtml preserves safe styles and removes unsafe ones on the cl
   assert.match(sanitized, /text-align:\s*center/);
   assert.match(sanitized, /color:\s*rgb\(10, 20, 30\)/);
   assert.doesNotMatch(sanitized, /position:/);
+});
+
+await test("article prose css renders Tiptap task lists without list bullets", function () {
+  assert.match(articleBodyCss, /\.wiki-article-prose\s+ul\[data-type="taskList"\]/);
+  assert.match(articleBodyCss, /ul\[data-type="taskList"\]\s*{[^}]*list-style:\s*none/);
+  assert.match(articleBodyCss, /ul\[data-type="taskList"\]\s*>\s*li\s*{[^}]*display:\s*flex/);
+  assert.doesNotMatch(articleBodyCss, /ul\[data-type="taskList"\]\s*>\s*li\s*{[^}]*align-items:\s*center/);
+  assert.match(articleBodyCss, /ul\[data-type="taskList"\]\s*>\s*li\s*>\s*label\s*{[^}]*margin-top:\s*0\.35rem/);
+  assert.match(articleBodyCss, /ul\[data-type="taskList"\]\s*>\s*li\s*>\s*div\s*>\s*p\s*{[^}]*margin-bottom:\s*0/);
+  assert.match(articleBodyCss, /ul\[data-type="taskList"\]\s+ul\[data-type="taskList"\]\s*{[^}]*margin-top:\s*0/);
+  assert.match(articleBodyCss, /ul\[data-type="taskList"\]\s+ul\[data-type="taskList"\]\s*{[^}]*margin-bottom:\s*0/);
 });
 
 await test("styled span classes and styles round-trip through the extracted extension layer", function () {
@@ -236,7 +251,7 @@ await test("top toolbar schema excludes contextual image layout and size control
   assert.equal(IMAGE_CONTEXT_BUTTON_IDS.includes("image-align-right"), true);
 });
 
-await test("top toolbar schema groups related tools with divider-friendly boundaries", function () {
+await test("top toolbar schema keeps only table creation in the always-visible toolbar", function () {
   const groupIds = TOP_TOOLBAR_GROUPS.map(function (group) {
     return group.id;
   });
@@ -257,5 +272,86 @@ await test("top toolbar schema groups related tools with divider-friendly bounda
 
   assert.deepEqual(history.buttonIds, ["undo", "redo"]);
   assert.deepEqual(media.buttonIds, ["link", "unlink", "image-upload", "media-row-2", "media-row-3"]);
-  assert.deepEqual(tables.buttonIds, ["table-insert", "table-add-row", "table-add-column", "table-delete"]);
+  assert.deepEqual(tables.buttonIds, ["table-insert"]);
+});
+
+await test("contextual table schema exposes row, column, cell merge, and delete tools", function () {
+  assert.deepEqual(TABLE_CONTEXT_BUTTON_IDS, [
+    "table-add-row-before",
+    "table-add-row-after",
+    "table-delete-row",
+    "table-add-column-before",
+    "table-add-column-after",
+    "table-delete-column",
+    "table-merge-cells",
+    "table-split-cell",
+    "table-toggle-header-row",
+    "table-toggle-header-column",
+    "table-delete"
+  ]);
+});
+
+await test("buildHeadingToc nests smaller headings under the nearest larger heading", function () {
+  const editor = createEditor(
+    "<h1>Root</h1><p>Intro</p><h2>Child</h2><h3>Grandchild</h3><h2>Second Child</h2><h4>Deep Direct</h4><h1>Next Root</h1>"
+  );
+  const toc = buildHeadingToc(editor);
+
+  assert.equal(toc.length, 2);
+  assert.equal(toc[0].text, "Root");
+  assert.equal(toc[0].children.length, 2);
+  assert.equal(toc[0].children[0].text, "Child");
+  assert.equal(toc[0].children[0].children[0].text, "Grandchild");
+  assert.equal(toc[0].children[1].text, "Second Child");
+  assert.equal(toc[0].children[1].children[0].text, "Deep Direct");
+  assert.equal(toc[1].text, "Next Root");
+  assert.match(toc[0].id, /^wiki-editor-heading-/);
+  editor.destroy();
+});
+
+await test("navigateToHeading scrolls the ProseMirror heading position without refocusing the editor", function () {
+  const originalScrollTo = window.scrollTo;
+  const originalPageYOffset = window.pageYOffset;
+  let scrollOptions = null;
+  let focusCount = 0;
+  const heading = document.createElement("h2");
+  heading.id = "wiki-editor-heading-1-target";
+  heading.getBoundingClientRect = function () {
+    return { top: 240, left: 0, right: 0, bottom: 270, width: 100, height: 30 };
+  };
+  heading.scrollIntoView = function () {
+    throw new Error("navigateToHeading should use deterministic scroll coordinates");
+  };
+  Object.defineProperty(window, "pageYOffset", { configurable: true, value: 100 });
+  window.scrollTo = function (options) {
+    scrollOptions = options;
+  };
+
+  const surface = document.createElement("div");
+  surface.appendChild(heading);
+
+  try {
+    navigateToHeading({
+      item: { id: heading.id, pos: 7 },
+      surface,
+      editor: {
+        view: {
+          nodeDOM: function (pos) {
+            return pos === 7 ? heading : null;
+          }
+        },
+        commands: {
+          focus: function () {
+            focusCount += 1;
+          }
+        }
+      }
+    });
+
+    assert.deepEqual(scrollOptions, { top: 328, behavior: "smooth" });
+    assert.equal(focusCount, 0);
+  } finally {
+    window.scrollTo = originalScrollTo;
+    Object.defineProperty(window, "pageYOffset", { configurable: true, value: originalPageYOffset });
+  }
 });

@@ -28,6 +28,21 @@ test("sanitizeWikiHtml normalizes blank target links with rel", function () {
   assert.match(sanitized, /rel="noopener noreferrer"/);
 });
 
+test("renderReadOnlyWikiHtml disables task list checkboxes for article view", function () {
+  const html = '<ul data-type="taskList"><li data-checked="false"><label><input type="checkbox"></label><div><p>Task</p></div></li></ul>';
+  const rendered = wikiHtmlSanitizer.renderReadOnlyWikiHtml(html);
+
+  assert.match(rendered, /<input type="checkbox" disabled/);
+});
+
+test("renderReadOnlyWikiHtml removes empty task checkbox spacer spans", function () {
+  const html = '<ul data-type="taskList"><li data-checked="true"><label><input type="checkbox" checked><span></span></label><div><p>Task</p></div></li></ul>';
+  const rendered = wikiHtmlSanitizer.renderReadOnlyWikiHtml(html);
+
+  assert.doesNotMatch(rendered, /<span><\/span>/);
+  assert.match(rendered, /<label><input type="checkbox" checked disabled(?:="disabled")? \/><\/label>/);
+});
+
 test("sanitizeWikiHtml preserves safe inline styles and strips unsafe ones", function () {
   const html = '<p style="text-align: center; position: fixed; color: rgb(10, 20, 30)">Styled</p>';
   const sanitized = wikiHtmlSanitizer.sanitizeWikiHtml(html);

@@ -1103,6 +1103,25 @@ a[href*="/wiki/"][href*="redlink=1"] {
   min-height: 28rem;
 }
 
+.westgate-wiki-compose .wiki-compose-actions--floating {
+  position: fixed;
+  bottom: 1rem;
+  left: 50vw;
+  z-index: 20;
+  width: max-content;
+  max-width: 100vw;
+  margin-left: auto;
+  border: 1px solid var(--wiki-chrome-border-color, var(--bs-border-color, #dee2e6));
+  border-radius: var(--bs-border-radius, 0.5rem);
+  background: color-mix(in srgb, var(--bs-body-bg, #fff) 96%, transparent);
+  box-shadow: 0 0.7rem 1.6rem rgba(0, 0, 0, 0.16);
+  padding: 0.5rem;
+}
+
+.westgate-wiki-compose .wiki-compose-form {
+  padding-bottom: 5rem;
+}
+
 .westgate-wiki-compose .wiki-compose-guide {
   border-left: 3px solid var(--wiki-chrome-border-color, var(--bs-border-color, currentColor));
   padding-left: 0.85rem;

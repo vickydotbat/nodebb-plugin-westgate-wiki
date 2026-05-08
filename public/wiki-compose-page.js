@@ -65,7 +65,8 @@ async function createEditorHandle(editorEl, payload, initialData) {
   return await bundle.createWikiEditor(editorEl, {
     relativePath: payload.relativePath,
     csrfToken: payload.csrfToken,
-    initialData: initialData
+    initialData: initialData,
+    onChange: payload.onChange
   });
 }
 
@@ -105,12 +106,26 @@ async function initWikiComposePage() {
   const linkSearchBtn = document.getElementById("wiki-compose-link-search-btn");
   const linkPick = document.getElementById("wiki-compose-link-pick");
   const linkInsert = document.getElementById("wiki-compose-link-insert");
-  const cancelLink = document.getElementById("wiki-compose-cancel");
+  const returnLink = document.getElementById("wiki-compose-return");
   const namespaceMainPageCheckbox = document.getElementById("wiki-compose-namespace-main-page");
   const discussionDisabledCheckbox = document.getElementById("wiki-compose-discussion-disabled");
 
   let editorInstance = null;
   let destroyStarted = false;
+  let hasUnsavedChanges = false;
+
+  function markUnsaved() {
+    hasUnsavedChanges = true;
+  }
+
+  function markSaved(path) {
+    hasUnsavedChanges = false;
+    if (path) {
+      if (returnLink) {
+        returnLink.setAttribute("href", `${payload.relativePath || ""}${path}`);
+      }
+    }
+  }
 
   async function destroyWikiEditor() {
     if (destroyStarted || !editorInstance) {
@@ -162,15 +177,18 @@ async function initWikiComposePage() {
       destroyWikiEditor();
     }, { once: true });
 
-    if (cancelLink) {
-      cancelLink.addEventListener("click", async function (event) {
-        const href = cancelLink.getAttribute("href") || "";
+    if (returnLink) {
+      returnLink.addEventListener("click", async function (event) {
+        const href = returnLink.getAttribute("href") || "";
 
         if (!href) {
           return;
         }
 
         event.preventDefault();
+        if (hasUnsavedChanges && !window.confirm("You have unsaved changes. Return to the article anyway?")) {
+          return;
+        }
         await destroyWikiEditor();
 
         if (typeof ajaxify !== "undefined" && ajaxify.go) {
@@ -205,7 +223,8 @@ async function initWikiComposePage() {
       throw new Error(`This article contains unsupported legacy HTML for the Tiptap editor: ${tiptapFallbackReason}`);
     }
 
-    editorInstance = await createEditorHandle(editorEl, payload, initialData);
+    const editorPayload = Object.assign({}, payload, { onChange: markUnsaved });
+    editorInstance = await createEditorHandle(editorEl, editorPayload, initialData);
     setStatus(statusEl, tiptapNormalizationNotice, tiptapNormalizationNotice ? "warning" : "muted");
   }
 
@@ -227,6 +246,7 @@ async function initWikiComposePage() {
       try {
         editorInstance.setMarkdown(md);
         importTa.value = "";
+        markUnsaved();
         setStatus(statusEl, "");
       } catch (err) {
         setStatus(statusEl, (err && err.message) || String(err), "error");
@@ -279,9 +299,17 @@ async function initWikiComposePage() {
         return;
       }
       editorInstance.insertWikiLink(label);
+      markUnsaved();
       editorInstance.focus();
     });
   }
+
+  [titleInput, namespaceMainPageCheckbox, discussionDisabledCheckbox].forEach(function (input) {
+    if (input) {
+      input.addEventListener("input", markUnsaved);
+      input.addEventListener("change", markUnsaved);
+    }
+  });
 
   if (submitBtn) {
     submitBtn.addEventListener("click", async function () {
@@ -487,19 +515,21 @@ async function initWikiComposePage() {
           }
         }
 
-        if (homepageSetOk) {
-          await leaveComposePage("/wiki");
-          return;
-        }
-
         const slugLeaf = wikiSlug ? String(wikiSlug).split("/").filter(Boolean).pop() : "";
         const cleanWikiPath = payload.sectionWikiPath && slugLeaf ? `${payload.sectionWikiPath}/${slugLeaf}` : "";
 
-        if (cleanWikiPath) {
-          await leaveComposePage(cleanWikiPath);
-        } else {
+        if (!cleanWikiPath) {
           throw new Error("Unexpected API response");
         }
+
+        markSaved(homepageSetOk ? "/wiki" : cleanWikiPath);
+        setStatus(
+          statusEl,
+          homepageSetOk
+            ? "Page published and set as /wiki. Use Return to article when you are ready to leave."
+            : "Page saved. Use Return to article when you are ready to leave."
+        );
+        submitBtn.disabled = false;
       } catch (err) {
         setStatus(statusEl, (err && err.message) || String(err), "error");
         submitBtn.disabled = false;
