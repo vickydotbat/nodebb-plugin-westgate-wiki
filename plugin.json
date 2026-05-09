@@ -6,6 +6,7 @@
   "library": "./library.js",
   "scripts": [
     "public/wiki.js",
+    "public/wiki-search.js",
     "public/wiki-namespace-create.js",
     "public/wiki-article-toc.js",
     "public/wiki-directory.js"

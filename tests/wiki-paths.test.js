@@ -119,6 +119,13 @@ function reset(settings, categories, topics) {
   };
   setCategories(categories);
   setTopics(topics || []);
+  try {
+    require("../lib/config").invalidateSettingsCache();
+    require("../lib/wiki-paths").invalidateNamespaceIndexCache({ skipSettingsInvalidation: true });
+    require("../lib/wiki-directory-service").invalidateAllWikiCaches();
+  } catch (e) {
+    // Modules may not be loaded yet during test bootstrap.
+  }
 }
 
 (async () => {

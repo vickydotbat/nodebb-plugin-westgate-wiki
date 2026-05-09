@@ -1,6 +1,7 @@
 <div class="westgate-wiki py-4">
   <header class="wiki-page-header mb-4">
     <!-- IMPORT partials/wiki/breadcrumb-trail.tpl -->
+    <!-- IMPORT partials/wiki/search-chrome.tpl -->
     <div class="wiki-page-heading">
       <h1 class="wiki-page-heading__title">{section.name}</h1>
     </div>

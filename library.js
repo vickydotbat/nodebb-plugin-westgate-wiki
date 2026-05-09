@@ -7,6 +7,7 @@ const adminControllers = require("./lib/controllers/admin");
 const serializer = require("./lib/serializer");
 const topicService = require("./lib/topic-service");
 const wikiLinkAutocomplete = require("./lib/wiki-link-autocomplete");
+const wikiSearchService = require("./lib/wiki-search-service");
 const wikiUserAutocomplete = require("./lib/wiki-user-autocomplete");
 const wikiLinks = require("./lib/wiki-links");
 const wikiFootnotes = require("./lib/wiki-footnotes");
@@ -64,6 +65,13 @@ plugin.registerApiRoutes = async function ({ router, middleware }) {
     "/westgate-wiki/link-autocomplete",
     [],
     wikiLinkAutocomplete.apiSearch
+  );
+  routeHelpers.setupApiRoute(
+    router,
+    "get",
+    "/westgate-wiki/search",
+    [],
+    wikiSearchService.apiSearch
   );
   routeHelpers.setupApiRoute(
     router,
@@ -238,13 +246,41 @@ plugin.wikiFilterPrivilegesTopicsGet = async function (data) {
   }
   return data;
 };
+
+function getWikiCacheMetrics() {
+  const wikiDirectory = require("./lib/wiki-directory-service");
+  return {
+    config: typeof config.getCacheMetrics === "function" ? config.getCacheMetrics() : {},
+    wikiPaths: typeof wikiPaths.getCacheMetrics === "function" ? wikiPaths.getCacheMetrics() : {},
+    wikiDirectory: typeof wikiDirectory.getCacheMetrics === "function" ? wikiDirectory.getCacheMetrics() : {}
+  };
+}
+
+function resetWikiCacheMetrics() {
+  const wikiDirectory = require("./lib/wiki-directory-service");
+  if (typeof config.resetCacheMetrics === "function") {
+    config.resetCacheMetrics();
+  }
+  if (typeof wikiPaths.resetCacheMetrics === "function") {
+    wikiPaths.resetCacheMetrics();
+  }
+  if (typeof wikiDirectory.resetCacheMetrics === "function") {
+    wikiDirectory.resetCacheMetrics();
+  }
+}
+
 plugin.services = {
   cacheService,
+  cacheMetrics: {
+    get: getWikiCacheMetrics,
+    reset: resetWikiCacheMetrics
+  },
   config,
   forumExclusionService,
   serializer,
   topicService,
   wikiLinkAutocomplete,
+  wikiSearchService,
   wikiArticleCss,
   wikiDiscussionPlaceholder,
   wikiDiscussionSettings,
