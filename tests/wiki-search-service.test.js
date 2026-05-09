@@ -128,6 +128,8 @@ require.main.require = function requireNodebbStub(id) {
 };
 
 const wikiSearch = require("../lib/wiki-search-service");
+const wikiDirectory = require("../lib/wiki-directory-service");
+const wikiService = require("../lib/wiki-service");
 
 (async () => {
   reset({
@@ -206,6 +208,45 @@ const wikiSearch = require("../lib/wiki-search-service");
     assert.deepStrictEqual(
       pageResults.map((row) => row.wikiPath).sort(),
       ["/wiki/development/setup", "/wiki/lore/setup"]
+    );
+  }
+
+  reset({
+    settings: { categoryIds: "1, 2" },
+    categories: [
+      { cid: 1, name: "Wiki", slug: "1/wiki", parentCid: 0, topic_count: 0 },
+      { cid: 2, name: "Lore", slug: "2/lore", parentCid: 1, topic_count: 3 }
+    ],
+    topics: [
+      { tid: 40, cid: 2, title: "Asdg", titleRaw: "Asdg", slug: "40/asdg", deleted: 0, scheduled: 0, lastposttime: 1000 },
+      { tid: 41, cid: 2, title: "Asdf :: A child", titleRaw: "Asdf :: A child", slug: "41/asdf-a-child", deleted: 0, scheduled: 0, lastposttime: 2000 },
+      { tid: 42, cid: 2, title: "Asdf", titleRaw: "Asdf", slug: "42/asdf", deleted: 0, scheduled: 0, lastposttime: 3000 }
+    ],
+    readableCids: [1, 2],
+    readableTids: [40, 41, 42]
+  });
+
+  {
+    const rows = await wikiDirectory.getOrderedSummaries(2, 1, false);
+    assert.deepStrictEqual(
+      rows.map((row) => row.tid),
+      [42, 41, 40],
+      "subpages should sort directly after their parent page before the next sibling"
+    );
+  }
+
+  {
+    const section = wikiService.sortSectionTopics({
+      topics: [
+        { tid: 40, title: "Asdg", titleLeaf: "Asdg", titlePath: ["Asdg"] },
+        { tid: 41, title: "Asdf :: A child", titleLeaf: "A child", titlePath: ["Asdf", "A child"] },
+        { tid: 42, title: "Asdf", titleLeaf: "Asdf", titlePath: ["Asdf"] }
+      ]
+    });
+    assert.deepStrictEqual(
+      section.topics.map((row) => row.tid),
+      [42, 41, 40],
+      "initial section rendering should preserve tree ordering"
     );
   }
 

@@ -231,6 +231,25 @@ function reset(settings, categories, topics) {
     /href="\/wiki\/development\/guides\/module-development-setup-on-windows"/
   );
 
+  reset(
+    { categoryIds: "1, 2, 3" },
+    [
+      { cid: 1, name: "Wiki", slug: "1/wiki", parentCid: 0 },
+      { cid: 2, name: "Spells", slug: "2/spells", parentCid: 1, topic_count: 1 },
+      { cid: 3, name: "Clairaudience", slug: "3/clairaudience", parentCid: 2, topic_count: 0 }
+    ],
+    [
+      { tid: 40, cid: 2, title: "Clairaudience&#x2F;Clairvoyance", titleRaw: "Clairaudience&#x2F;Clairvoyance", slug: "40/clairaudience-clairvoyance", deleted: 0, scheduled: 0, postcount: 1 }
+    ]
+  );
+  const slashTitleLink = await wikiLinks.replaceWikiLinks(
+    "[[Clairaudience/Clairvoyance]]",
+    2,
+    await require("../lib/config").getSettings()
+  );
+  assert.match(slashTitleLink, /href="\/wiki\/spells\/clairaudience-clairvoyance"/);
+  assert.doesNotMatch(slashTitleLink, /wiki-redlink/);
+
   console.log("wiki-paths tests passed");
 })().catch((err) => {
   console.error(err);
