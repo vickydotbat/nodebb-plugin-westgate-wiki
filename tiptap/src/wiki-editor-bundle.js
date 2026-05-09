@@ -30,6 +30,7 @@ import SlashCommand from "./extensions/slash-command.mjs";
 import StyledSpan from "./extensions/styled-span.mjs";
 import WikiCallout from "./extensions/wiki-callout.mjs";
 import WikiCodeBlock, { CODE_BLOCK_LANGUAGE_OPTIONS } from "./extensions/wiki-code-block.mjs";
+import WikiEditingKeymap from "./extensions/wiki-editing-keymap.mjs";
 import { WikiFootnote, WikiNamespaceLink, WikiPageLink, WikiUserMention } from "./extensions/wiki-entities.mjs";
 import WikiLink from "./extensions/wiki-link.mjs";
 import {
@@ -2445,6 +2446,7 @@ export async function createWikiEditor(element, options) {
       ImageFigure,
       WikiCodeBlock,
       WikiCallout,
+      WikiEditingKeymap,
       WikiPageLink,
       WikiNamespaceLink,
       WikiUserMention,

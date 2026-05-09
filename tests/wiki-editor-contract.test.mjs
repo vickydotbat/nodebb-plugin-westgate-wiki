@@ -21,7 +21,7 @@ function test(name, fn) {
 
 installJsdomGlobals();
 
-const [{ Editor }, StarterKitModule, ImageModule, PreservedNodeAttributesModule, StyledSpanModule, ContainerBlockModule, MediaRowModule, ImageFigureModule, WikiCalloutModule, SlashCommandModule, WikiCodeBlockModule, WikiLinkModule, WikiEntitiesModule, toolbarSchemaModule, editorTocModule, linkInteractionsModule, imageResizeModule, legacyHtmlModule, sanitizerContractModule] = await Promise.all([
+const [{ Editor }, StarterKitModule, ImageModule, PreservedNodeAttributesModule, StyledSpanModule, ContainerBlockModule, MediaRowModule, ImageFigureModule, WikiCalloutModule, WikiEditingKeymapModule, SlashCommandModule, WikiCodeBlockModule, WikiLinkModule, WikiEntitiesModule, toolbarSchemaModule, editorTocModule, linkInteractionsModule, imageResizeModule, legacyHtmlModule, sanitizerContractModule] = await Promise.all([
   import("@tiptap/core"),
   import("@tiptap/starter-kit"),
   import("@tiptap/extension-image"),
@@ -31,6 +31,7 @@ const [{ Editor }, StarterKitModule, ImageModule, PreservedNodeAttributesModule,
   import("../tiptap/src/extensions/media-row.mjs"),
   import("../tiptap/src/extensions/image-figure.mjs"),
   import("../tiptap/src/extensions/wiki-callout.mjs"),
+  import("../tiptap/src/extensions/wiki-editing-keymap.mjs"),
   import("../tiptap/src/extensions/slash-command.mjs"),
   import("../tiptap/src/extensions/wiki-code-block.mjs"),
   import("../tiptap/src/extensions/wiki-link.mjs"),
@@ -51,6 +52,7 @@ const ContainerBlock = ContainerBlockModule.default;
 const { MediaCell, MediaRow } = MediaRowModule;
 const ImageFigure = ImageFigureModule.default;
 const WikiCallout = WikiCalloutModule.default;
+const WikiEditingKeymap = WikiEditingKeymapModule.default;
 const SlashCommand = SlashCommandModule.default;
 const WikiCodeBlock = WikiCodeBlockModule.default;
 const WikiLink = WikiLinkModule.default;
@@ -92,6 +94,7 @@ function createEditor(content) {
       MediaRow,
       ImageFigure,
       WikiCallout,
+      WikiEditingKeymap,
       WikiCodeBlock,
       WikiPageLink,
       WikiNamespaceLink,
@@ -808,6 +811,20 @@ await test("wikiCallout Backspace shortcut unwraps a callout from an empty parag
 
   assert.doesNotMatch(rendered, /wiki-callout/);
   assert.match(rendered, /<p><strong>Compatibility<\/strong><\/p>/);
+  editor.destroy();
+});
+
+await test("Backspace after a list removes the trailing empty paragraph instead of creating extra gaps", function () {
+  const editor = createEditor("<ul><li><p>Forums</p></li><li><p>Discord Server</p></li></ul><p></p>");
+
+  editor.commands.setTextSelection(editor.state.doc.content.size - 1);
+  for (let i = 0; i < 5; i += 1) {
+    editor.commands.keyboardShortcut("Backspace");
+  }
+  const rendered = editor.getHTML();
+
+  assert.equal(rendered, "<ul><li><p>Forums</p></li><li><p>Discord Server</p></li></ul><p></p>");
+  assert.doesNotMatch(rendered, /<li><p>Discord Server<\/p><p><\/p><\/li>/);
   editor.destroy();
 });
 
