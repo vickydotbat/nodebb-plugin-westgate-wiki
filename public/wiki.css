@@ -1257,6 +1257,21 @@
   display: block;
 }
 
+.wiki-article-prose a.wiki-subpage-link {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  text-decoration: none;
+  vertical-align: baseline;
+}
+
+.wiki-article-prose a.wiki-subpage-link:hover,
+.wiki-article-prose a.wiki-subpage-link:focus {
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--wiki-chrome-link-hover-color, var(--bs-link-hover-color)) 55%, transparent);
+  text-underline-offset: 0.12em;
+}
+
 .wiki-sidebar-list .is-active a {
   color: var(--wiki-chrome-link-color, var(--bs-link-color, inherit));
   font-weight: 600;

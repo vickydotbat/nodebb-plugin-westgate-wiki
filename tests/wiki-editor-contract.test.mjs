@@ -21,7 +21,7 @@ function test(name, fn) {
 
 installJsdomGlobals();
 
-const [{ Editor }, StarterKitModule, ImageModule, PreservedNodeAttributesModule, StyledSpanModule, ContainerBlockModule, MediaRowModule, ImageFigureModule, WikiCalloutModule, SlashCommandModule, WikiCodeBlockModule, WikiLinkModule, WikiEntitiesModule, toolbarSchemaModule, editorTocModule, linkInteractionsModule, imageResizeModule, legacyHtmlModule, sanitizerContractModule] = await Promise.all([
+const [{ Editor }, StarterKitModule, ImageModule, PreservedNodeAttributesModule, StyledSpanModule, ContainerBlockModule, MediaRowModule, ImageFigureModule, WikiCalloutModule, WikiEditingKeymapModule, SlashCommandModule, WikiCodeBlockModule, WikiLinkModule, WikiEntitiesModule, toolbarSchemaModule, editorTocModule, linkInteractionsModule, imageResizeModule, legacyHtmlModule, sanitizerContractModule] = await Promise.all([
   import("@tiptap/core"),
   import("@tiptap/starter-kit"),
   import("@tiptap/extension-image"),
@@ -31,6 +31,7 @@ const [{ Editor }, StarterKitModule, ImageModule, PreservedNodeAttributesModule,
   import("../tiptap/src/extensions/media-row.mjs"),
   import("../tiptap/src/extensions/image-figure.mjs"),
   import("../tiptap/src/extensions/wiki-callout.mjs"),
+  import("../tiptap/src/extensions/wiki-editing-keymap.mjs"),
   import("../tiptap/src/extensions/slash-command.mjs"),
   import("../tiptap/src/extensions/wiki-code-block.mjs"),
   import("../tiptap/src/extensions/wiki-link.mjs"),
@@ -51,6 +52,7 @@ const ContainerBlock = ContainerBlockModule.default;
 const { MediaCell, MediaRow } = MediaRowModule;
 const ImageFigure = ImageFigureModule.default;
 const WikiCallout = WikiCalloutModule.default;
+const WikiEditingKeymap = WikiEditingKeymapModule.default;
 const SlashCommand = SlashCommandModule.default;
 const WikiCodeBlock = WikiCodeBlockModule.default;
 const WikiLink = WikiLinkModule.default;
@@ -70,6 +72,7 @@ const wikiJsSource = readFileSync(new URL("../public/wiki.js", import.meta.url),
 const editorCss = readFileSync(new URL("../tiptap/src/wiki-editor.css", import.meta.url), "utf8");
 const vendoredEditorCss = readFileSync(new URL("../public/vendor/tiptap/wiki-tiptap.css", import.meta.url), "utf8");
 const editorBundleSource = readFileSync(new URL("../tiptap/src/wiki-editor-bundle.js", import.meta.url), "utf8");
+const vendoredEditorBundleSource = readFileSync(new URL("../public/vendor/tiptap/wiki-tiptap.bundle.js", import.meta.url), "utf8");
 
 function createEditor(content) {
   const mount = document.createElement("div");
@@ -92,6 +95,7 @@ function createEditor(content) {
       MediaRow,
       ImageFigure,
       WikiCallout,
+      WikiEditingKeymap,
       WikiCodeBlock,
       WikiPageLink,
       WikiNamespaceLink,
@@ -245,6 +249,15 @@ await test("editor toolbar labels do not force oversized group spacing", functio
 await test("editor toolbar separators follow adjacent group rows", function () {
   assert.match(editorBundleSource, /previousGroup\.offsetTop\s*===\s*nextGroup\.offsetTop/);
   assert.doesNotMatch(editorBundleSource, /previousGroup\.offsetTop\s*===\s*separator\.offsetTop/);
+});
+
+await test("fullscreen source textarea captures Tab as source indentation", function () {
+  assert.match(editorBundleSource, /sourceTextarea\.addEventListener\("keydown",\s*handleSourceKeydown\)/);
+  assert.match(editorBundleSource, /event\.key\s*!==\s*"Tab"/);
+  assert.match(editorBundleSource, /event\.preventDefault\(\)/);
+  assert.match(editorBundleSource, /sourceTextarea\.setRangeText\("\\t"/);
+  assert.match(vendoredEditorBundleSource, /addEventListener\("keydown"/);
+  assert.match(vendoredEditorBundleSource, /setRangeText\("\\t"|setRangeText\("\t"/);
 });
 
 await test("styled span classes and styles round-trip through the extracted extension layer", function () {
@@ -808,6 +821,20 @@ await test("wikiCallout Backspace shortcut unwraps a callout from an empty parag
 
   assert.doesNotMatch(rendered, /wiki-callout/);
   assert.match(rendered, /<p><strong>Compatibility<\/strong><\/p>/);
+  editor.destroy();
+});
+
+await test("Backspace after a list removes the trailing empty paragraph instead of creating extra gaps", function () {
+  const editor = createEditor("<ul><li><p>Forums</p></li><li><p>Discord Server</p></li></ul><p></p>");
+
+  editor.commands.setTextSelection(editor.state.doc.content.size - 1);
+  for (let i = 0; i < 5; i += 1) {
+    editor.commands.keyboardShortcut("Backspace");
+  }
+  const rendered = editor.getHTML();
+
+  assert.equal(rendered, "<ul><li><p>Forums</p></li><li><p>Discord Server</p></li></ul><p></p>");
+  assert.doesNotMatch(rendered, /<li><p>Discord Server<\/p><p><\/p><\/li>/);
   editor.destroy();
 });
 

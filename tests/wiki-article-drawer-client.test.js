@@ -17,7 +17,8 @@ function test(name, fn) {
 
 const script = fs.readFileSync(path.join(__dirname, "..", "public/wiki-article-toc.js"), "utf8");
 
-function createDom(articleBody) {
+function createDom(articleBody, options = {}) {
+  const smallViewport = options.smallViewport !== false;
   const dom = new JSDOM(`<!doctype html><html><body>
     <div class="wiki-page-shell-with-transform" style="transform: translateZ(0);">
       <div class="westgate-wiki">
@@ -45,7 +46,7 @@ function createDom(articleBody) {
 
   dom.window.matchMedia = function (query) {
     return {
-      matches: query.indexOf("1199.98px") !== -1,
+      matches: smallViewport && query.indexOf("1199.98px") !== -1,
       media: query,
       addEventListener: function () {},
       removeEventListener: function () {},
@@ -54,8 +55,10 @@ function createDom(articleBody) {
       dispatchEvent: function () { return false; }
     };
   };
-  Object.defineProperty(dom.window, "innerWidth", { configurable: true, value: 1024 });
-  dom.window.HTMLElement.prototype.scrollIntoView = function () {};
+  Object.defineProperty(dom.window, "innerWidth", { configurable: true, value: smallViewport ? 1024 : 1280 });
+  dom.window.HTMLElement.prototype.scrollIntoView = function () {
+    this.setAttribute("data-scrolled-into-view", "1");
+  };
   dom.window.jQuery = function () {
     return {
       on: function () {}
@@ -108,4 +111,20 @@ test("ToC drawer stays hidden when the article has no headings", function () {
 
   assert.equal(tocDrawer.hasAttribute("hidden"), true);
   assert.equal(tocDrawer.getAttribute("aria-hidden"), "true");
+});
+
+test("desktop ToC link scrolls and releases focus so focus-within does not pin drawer open", function () {
+  const dom = createDom("<h2>Alpha section</h2><p>Text</p>", { smallViewport: false });
+  const { document } = dom.window;
+  const anchor = document.querySelector(".wiki-article-toc__link");
+  const heading = document.getElementById("alpha-section");
+
+  anchor.focus();
+  assert.equal(document.activeElement, anchor);
+
+  anchor.click();
+
+  assert.equal(heading.getAttribute("data-scrolled-into-view"), "1");
+  assert.equal(dom.window.location.hash, "#alpha-section");
+  assert.notEqual(document.activeElement, anchor);
 });

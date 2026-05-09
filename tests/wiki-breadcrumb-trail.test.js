@@ -34,3 +34,43 @@ assert.deepStrictEqual(
   ["Shadows Over Westgate Wiki"],
   "section breadcrumbs should start with the concrete namespace"
 );
+
+assert.deepStrictEqual(
+  texts(wikiBreadcrumbTrail.forArticleView({
+    ancestorSections: [],
+    category: {
+      name: "Shadows Over Westgate Wiki",
+      wikiPath: "/wiki/shadows-over-westgate-wiki"
+    },
+    sectionNavigation: {
+      wikiPath: "/wiki/shadows-over-westgate-wiki"
+    },
+    topic: {
+      title: "asdf/zxcv"
+    },
+    pageTitlePath: ["asdf/zxcv"],
+    parentPages: []
+  })),
+  ["Shadows Over Westgate Wiki", "asdf/zxcv"],
+  "literal slashes in article titles should not create parent breadcrumbs"
+);
+
+assert.deepStrictEqual(
+  texts(wikiBreadcrumbTrail.forArticleView({
+    ancestorSections: [],
+    category: {
+      name: "Shadows Over Westgate Wiki",
+      wikiPath: "/wiki/shadows-over-westgate-wiki"
+    },
+    sectionNavigation: {
+      wikiPath: "/wiki/shadows-over-westgate-wiki"
+    },
+    topic: {
+      title: "asdf :: zxcv"
+    },
+    pageTitlePath: ["asdf", "zxcv"],
+    parentPages: [{ text: "asdf", url: "/wiki/shadows-over-westgate-wiki/asdf" }]
+  })),
+  ["Shadows Over Westgate Wiki", "asdf", "zxcv"],
+  "explicit subpage delimiter should create parent breadcrumbs"
+);

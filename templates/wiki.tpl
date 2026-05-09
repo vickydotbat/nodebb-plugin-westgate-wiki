@@ -102,10 +102,16 @@
 
         <ul class="wiki-topic-list">
           <!-- BEGIN ./topics -->
-          <li>
+          <li<!-- IF ./hasParentPath --> class="wiki-topic-list__item--subpage" style="--wiki-title-depth: {./titleDepth};"<!-- ENDIF ./hasParentPath -->>
             <a href="{config.relative_path}{./wikiPath}">
               <!-- IF ./hasParentPath -->
-              <span class="wiki-topic-parent-path">{./parentTitlePathText}</span>
+              <span class="wiki-topic-parent-path">
+                <!-- BEGIN ./parentTitlePathSegments -->
+                <!-- IF ./hasSeparatorBefore --><span class="wiki-topic-title-separator" aria-hidden="true">/</span><!-- ENDIF ./hasSeparatorBefore -->
+                <span class="wiki-topic-parent-path__part">{./text}</span>
+                <!-- END ./parentTitlePathSegments -->
+              </span>
+              <span class="wiki-topic-title-separator" aria-hidden="true">/</span>
               <!-- ENDIF ./hasParentPath -->
               <span class="wiki-topic-title-leaf">{./titleLeaf}</span>
             </a>

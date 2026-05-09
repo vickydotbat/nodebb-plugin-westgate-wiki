@@ -85,7 +85,13 @@
             <li class="wiki-search-result wiki-search-result--page">
               <a class="wiki-search-result__title" href="{config.relative_path}{pageResults.wikiPath}">
                 <!-- IF pageResults.hasParentPath -->
-                <span class="wiki-topic-parent-path">{pageResults.parentTitlePathText}</span>
+                <span class="wiki-topic-parent-path">
+                  <!-- BEGIN ./parentTitlePathSegments -->
+                  <!-- IF ./hasSeparatorBefore --><span class="wiki-topic-title-separator" aria-hidden="true">/</span><!-- ENDIF ./hasSeparatorBefore -->
+                  <span class="wiki-topic-parent-path__part">{./text}</span>
+                  <!-- END ./parentTitlePathSegments -->
+                </span>
+                <span class="wiki-topic-title-separator" aria-hidden="true">/</span>
                 <!-- ENDIF pageResults.hasParentPath -->
                 <span class="wiki-topic-title-leaf">{pageResults.titleLeaf}</span>
               </a>

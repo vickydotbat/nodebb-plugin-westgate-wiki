@@ -30,6 +30,7 @@ import SlashCommand from "./extensions/slash-command.mjs";
 import StyledSpan from "./extensions/styled-span.mjs";
 import WikiCallout from "./extensions/wiki-callout.mjs";
 import WikiCodeBlock, { CODE_BLOCK_LANGUAGE_OPTIONS } from "./extensions/wiki-code-block.mjs";
+import WikiEditingKeymap from "./extensions/wiki-editing-keymap.mjs";
 import { WikiFootnote, WikiNamespaceLink, WikiPageLink, WikiUserMention } from "./extensions/wiki-entities.mjs";
 import WikiLink from "./extensions/wiki-link.mjs";
 import {
@@ -438,6 +439,7 @@ function openWikiEntityDialog({ editor, type, options, initial, replaceMark }) {
       params.set("context", "wiki");
       params.set("cid", String((options && options.cid) || ""));
       params.set("scope", type === "namespace" ? "all-wiki" : "current-namespace");
+      params.set("type", type === "namespace" ? "namespace" : "page");
       url = `${(options && options.linkAutocompleteUrl) || getRelativeApiPath(options, "link-autocomplete")}?${params.toString()}`;
     }
     status.textContent = "Searching...";
@@ -2211,10 +2213,22 @@ function createFullscreenSourceMode(root, editor, sourcePanel, sourceTextarea, s
     document.addEventListener("pointerup", onUp);
   }
 
+  function handleSourceKeydown(event) {
+    if (event.key !== "Tab") {
+      return;
+    }
+    event.preventDefault();
+    sourceTextarea.setRangeText("\t", sourceTextarea.selectionStart, sourceTextarea.selectionEnd, "end");
+    clearScheduledSourceSync();
+    setSourceDirty(true);
+    renderSourceHighlight();
+  }
+
   sourceTextarea.addEventListener("input", function () {
     clearScheduledSourceSync();
     setSourceDirty(true);
   });
+  sourceTextarea.addEventListener("keydown", handleSourceKeydown);
   sourceTextarea.addEventListener("scroll", syncSourceScroll);
   if (sourceApply) {
     sourceApply.addEventListener("click", applySourceToEditor);
@@ -2261,6 +2275,7 @@ function createFullscreenSourceMode(root, editor, sourcePanel, sourceTextarea, s
       editor.off("create", syncSourceFromEditor);
       editor.off("update", scheduleSourceFromEditor);
       root.removeEventListener("wiki-editor-toc-navigate", handleTocNavigate);
+      sourceTextarea.removeEventListener("keydown", handleSourceKeydown);
       document.documentElement.classList.remove("wiki-editor-fullscreen-source-active");
       exitActionsPortal();
       exitPortal();
@@ -2445,6 +2460,7 @@ export async function createWikiEditor(element, options) {
       ImageFigure,
       WikiCodeBlock,
       WikiCallout,
+      WikiEditingKeymap,
       WikiPageLink,
       WikiNamespaceLink,
       WikiUserMention,

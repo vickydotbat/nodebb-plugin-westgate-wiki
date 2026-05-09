@@ -3,7 +3,18 @@
     <!-- IMPORT partials/wiki/breadcrumb-trail.tpl -->
     <!-- IMPORT partials/wiki/search-chrome.tpl -->
     <div class="wiki-page-heading">
+      <!-- IF hasPageTitleSegments -->
+      <h1 class="wiki-page-heading__title wiki-page-heading__title--subpage" aria-label="{pageTitle}">
+        <!-- BEGIN pageTitleSegments -->
+        <!-- IF ./hasSeparatorBefore -->
+        <span class="wiki-page-heading__title-separator" aria-hidden="true">/</span>
+        <!-- ENDIF ./hasSeparatorBefore -->
+        <span class="wiki-page-heading__title-part <!-- IF ./isParent -->wiki-page-heading__title-part--parent<!-- ENDIF ./isParent --><!-- IF ./isLeaf -->wiki-page-heading__title-part--leaf<!-- ENDIF ./isLeaf -->">{./text}</span>
+        <!-- END pageTitleSegments -->
+      </h1>
+      <!-- ELSE -->
       <h1 class="wiki-page-heading__title">{pageTitle}</h1>
+      <!-- ENDIF hasPageTitleSegments -->
       <!-- IF mainPost -->
       <div class="wiki-page-heading__meta wiki-page-byline wiki-page-byline--attribution">
         <!-- IF mainPost.wikiLastRevisionUser -->
@@ -94,7 +105,13 @@
                   <li class="wiki-sidebar-nav-row wiki-sidebar-nav-row--page" data-wiki-nav-tid="{./tid}">
                     <a class="wiki-sidebar-nav-page" href="{config.relative_path}{./wikiPath}">
                       <!-- IF ./hasParentPath -->
-                      <span class="wiki-sidebar-parent-path">{./parentTitlePathText}</span>
+                      <span class="wiki-sidebar-parent-path">
+                        <!-- BEGIN ./parentTitlePathSegments -->
+                        <!-- IF ./hasSeparatorBefore --><span class="wiki-topic-title-separator" aria-hidden="true">/</span><!-- ENDIF ./hasSeparatorBefore -->
+                        <span class="wiki-sidebar-parent-path__part">{./text}</span>
+                        <!-- END ./parentTitlePathSegments -->
+                      </span>
+                      <span class="wiki-topic-title-separator" aria-hidden="true">/</span>
                       <!-- ENDIF ./hasParentPath -->
                       <span class="wiki-sidebar-page-title">{./titleLeaf}</span>
                     </a>

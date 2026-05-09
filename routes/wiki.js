@@ -9,6 +9,7 @@ const wikiNamespaceCreateController = require("../lib/controllers/wiki-namespace
 const config = require("../lib/config");
 const wikiNamespaceCreators = require("../lib/wiki-namespace-creators");
 const wikiAlphabeticalIndex = require("../lib/wiki-alphabetical-index");
+const serializer = require("../lib/serializer");
 const wikiService = require("../lib/wiki-service");
 const topicService = require("../lib/topic-service");
 const wikiSearchService = require("../lib/wiki-search-service");
@@ -24,10 +25,25 @@ function appendQueryString(path, req) {
   return queryString ? `${path}?${queryString}` : path;
 }
 
+function buildPageTitleSegments(pageTitlePath) {
+  const path = Array.isArray(pageTitlePath) ? pageTitlePath.filter(Boolean) : [];
+  if (path.length <= 1) {
+    return [];
+  }
+  return path.map((segment, index) => ({
+    text: segment,
+    hasSeparatorBefore: index > 0,
+    isParent: index < path.length - 1,
+    isLeaf: index === path.length - 1
+  }));
+}
+
 function buildWikiPageRenderData(wikiPage, { isWikiHome }) {
   const trail = wikiBreadcrumbTrail.forArticleView(wikiPage);
 
   const wikiSidebarPageRows = (wikiPage.sectionNavigation && wikiPage.sectionNavigation.topics) || [];
+  const pageTitle = serializer.getTitleDisplay(wikiPage.pageTitlePath, wikiPage.topic.titleRaw || wikiPage.topic.title);
+  const pageTitleSegments = buildPageTitleSegments(wikiPage.pageTitlePath);
 
   return {
     title: wikiPage.topic.title,
@@ -36,8 +52,10 @@ function buildWikiPageRenderData(wikiPage, { isWikiHome }) {
     isWikiHome: !!isWikiHome,
     discussionDisabled: !!wikiPage.discussionDisabled,
     showWikiDiscussionLink: !isWikiHome && !wikiPage.discussionDisabled,
-    pageTitle: wikiPage.pageTitlePath.length ? wikiPage.pageTitlePath[wikiPage.pageTitlePath.length - 1] : wikiPage.topic.title,
+    pageTitle,
     pageTitlePath: wikiPage.pageTitlePath,
+    pageTitleSegments,
+    hasPageTitleSegments: pageTitleSegments.length > 0,
     hasPageParents: wikiPage.parentPages.length > 0,
     parentPages: wikiPage.parentPages,
     category: wikiPage.category,

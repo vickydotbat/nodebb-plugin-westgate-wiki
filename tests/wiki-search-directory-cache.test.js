@@ -122,6 +122,7 @@ require.main.require = function requireNodebbStub(id) {
 const wikiDirectory = require("../lib/wiki-directory-service");
 const wikiSearch = require("../lib/wiki-search-service");
 const wikiLinkAutocomplete = require("../lib/wiki-link-autocomplete");
+const config = require("../lib/config");
 
 (async () => {
   wikiDirectory.invalidateAllWikiCaches();
@@ -143,6 +144,69 @@ const wikiLinkAutocomplete = require("../lib/wiki-link-autocomplete");
 
   assert.strictEqual(state.dbRevRangeCalls, 1, "search and autocomplete should reuse warm directory summaries");
   assert.strictEqual(state.topicFieldCalls, 1, "search and autocomplete should not perform extra topic field scans");
+
+  setTopics([
+    { tid: 20, cid: 2, title: "Asdf", titleRaw: "Asdf", slug: "20/asdf", deleted: 0, scheduled: 0, lastposttime: 8000 },
+    { tid: 21, cid: 2, title: "Asdf :: A sub page", titleRaw: "Asdf :: A sub page", slug: "21/asdf-a-sub-page", deleted: 0, scheduled: 0, lastposttime: 9000 },
+    { tid: 22, cid: 2, title: "Asdf :: A sub page :: Baby page", titleRaw: "Asdf :: A sub page :: Baby page", slug: "22/asdf-a-sub-page-baby-page", deleted: 0, scheduled: 0, lastposttime: 10000 }
+  ]);
+  state.categories.set(2, { ...state.categories.get(2), topic_count: 3 });
+  state.readableTopics = new Set([20, 21, 22]);
+  wikiDirectory.invalidateAllWikiCaches();
+
+  const subpageAutocomplete = await wikiLinkAutocomplete.search({
+    q: "Baby",
+    cid: 2,
+    scope: "current-namespace",
+    context: "wiki",
+    limit: 10,
+    uid: 1
+  });
+  const babyPage = subpageAutocomplete.find((row) => row.tid === 22);
+  assert(babyPage, "subpage should be returned by link autocomplete");
+  assert.strictEqual(
+    babyPage.insertText,
+    "[[Asdf :: A sub page :: Baby page|Baby page]]",
+    "subpage autocomplete should preserve the full title path in the inserted target"
+  );
+
+  wikiDirectory.invalidateAllWikiCaches();
+  state.settings = {
+    categoryIds: "1, 2, 3",
+    includeChildCategories: "0"
+  };
+  config.invalidateSettingsCache();
+  require("../lib/wiki-paths").invalidateNamespaceIndexCache({ skipSettingsInvalidation: true });
+  setCategories([
+    { cid: 1, name: "Wiki", slug: "1/wiki", parentCid: 0, topic_count: 0 },
+    { cid: 2, name: "General", slug: "2/general", parentCid: 1, topic_count: 30 },
+    { cid: 3, name: "Feats", slug: "3/feats", parentCid: 1, topic_count: 0 }
+  ]);
+  setTopics(Array.from({ length: 30 }, (_, index) => ({
+    tid: 100 + index,
+    cid: 2,
+    title: `Feats Reference ${index + 1}`,
+    titleRaw: `Feats Reference ${index + 1}`,
+    slug: `${100 + index}/feats-reference-${index + 1}`,
+    deleted: 0,
+    scheduled: 0,
+    lastposttime: 1000 + index
+  })));
+  state.readableCategories = new Set([1, 2, 3]);
+  state.readableTopics = new Set(Array.from({ length: 30 }, (_, index) => 100 + index));
+
+  const namespaceAutocomplete = await wikiLinkAutocomplete.search({
+    q: "feats",
+    cid: 2,
+    scope: "all-wiki",
+    context: "wiki",
+    limit: 25,
+    uid: 1
+  });
+  assert(
+    namespaceAutocomplete.some((row) => row.type === "namespace" && row.wikiPath === "/wiki/feats"),
+    "namespace autocomplete should include a matching namespace even when earlier page matches exceed the limit"
+  );
 
   console.log("wiki search directory cache tests passed");
 })().catch((err) => {

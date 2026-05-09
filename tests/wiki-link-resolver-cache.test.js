@@ -115,6 +115,7 @@ const config = require("../lib/config");
       "[[development:Map Creation Guide]]",
       "[[development:Map Creation Guide|Map guide]]",
       "[[ns:development]]",
+      "[[Development]]",
       '<span class="wiki-entity wiki-entity--page" data-wiki-entity="page" data-wiki-target="development/Map Creation Guide" data-wiki-label="Guide entity">Guide entity</span>',
       "[[New Redlink]]"
     ].join(" "),
@@ -125,11 +126,45 @@ const config = require("../lib/config");
   assert.match(html, /href="\/wiki\/development\/map-creation-guide"/);
   assert.match(html, />Map guide<\/a>/);
   assert.match(html, /class="wiki-internal-link wiki-namespace-link" href="\/wiki\/development"/);
+  assert.strictEqual(
+    (html.match(/class="wiki-internal-link wiki-namespace-link" href="\/wiki\/development"/g) || []).length,
+    2,
+    "bare links that uniquely match a namespace should resolve like ns: links when no page exists"
+  );
   assert.match(html, /Guide entity<\/a>/);
   assert.match(html, /class="wiki-redlink" href="\/wiki\/development\?create=New%20Redlink&amp;redlink=1&amp;cid=2"/);
   assert.strictEqual(state.sortedSetRangeCalls, 1, "per-post resolver should scan each target namespace once");
   assert.strictEqual(state.topicFieldCalls, 1, "per-post resolver should hydrate each target namespace once");
   assert(state.categoryDataCalls <= 2, "per-post resolver should reuse effective category rows and namespace paths");
+
+  state.topics.set(12, {
+    tid: 12,
+    cid: 2,
+    title: "Asdf :: A sub page :: Baby page",
+    titleRaw: "Asdf :: A sub page :: Baby page",
+    slug: "12/asdf-a-sub-page-baby-page",
+    deleted: 0,
+    scheduled: 0
+  });
+  state.tidsByCid.set(2, [10, 11, 12]);
+  require("../lib/wiki-directory-service").invalidateAllWikiCaches();
+  const subpageHtml = await wikiLinks.replaceWikiLinks(
+    "[[Asdf :: A sub page :: Baby page|Baby page]]",
+    2,
+    settings
+  );
+  assert.match(subpageHtml, /<a class="wiki-internal-link wiki-subpage-link" href="\/wiki\/development\/asdf-a-sub-page-baby-page">Baby page<\/a>/);
+
+  const bareLeafSubpageHtml = await wikiLinks.replaceWikiLinks(
+    "[[Baby page]]",
+    2,
+    settings
+  );
+  assert.match(
+    bareLeafSubpageHtml,
+    /<a class="wiki-internal-link wiki-subpage-link" href="\/wiki\/development\/asdf-a-sub-page-baby-page"><span class="wiki-topic-parent-path"><span class="wiki-topic-title-parent">Asdf<\/span><span class="wiki-topic-title-separator" aria-hidden="true">\/<\/span><span class="wiki-topic-title-parent">A sub page<\/span><span class="wiki-topic-title-separator" aria-hidden="true">\/<\/span><\/span><span class="wiki-topic-title-leaf">Baby page<\/span><\/a>/,
+    "bare leaf links should resolve to a unique subpage leaf and render with segmented title-path markup"
+  );
 
   console.log("wiki-link resolver cache tests passed");
 })().catch((err) => {

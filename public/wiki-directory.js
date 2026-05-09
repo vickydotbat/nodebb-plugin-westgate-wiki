@@ -35,13 +35,35 @@
       .replace(/"/g, "&quot;");
   }
 
+  function renderParentPath(page, className) {
+    if (!page || !page.hasParentPath) {
+      return "";
+    }
+    var segments = Array.isArray(page.parentTitlePathSegments) && page.parentTitlePathSegments.length ?
+      page.parentTitlePathSegments :
+      String(page.parentTitlePathText || "").split(/\s*::\s*/).filter(Boolean).map(function (text, index) {
+        return { text: text, hasSeparatorBefore: index > 0 };
+      });
+    if (!segments.length) {
+      return "";
+    }
+    var inner = segments.map(function (segment) {
+      var separator = segment.hasSeparatorBefore ?
+        "<span class=\"wiki-topic-title-separator\" aria-hidden=\"true\">/</span>" :
+        "";
+      return separator + "<span class=\"" + className + "__part\">" + escapeHtml(segment.text || "") + "</span>";
+    }).join("");
+    return "<span class=\"" + className + "\">" + inner + "</span><span class=\"wiki-topic-title-separator\" aria-hidden=\"true\">/</span>";
+  }
+
   function renderPageRow(page, rel) {
-    var parent = page.hasParentPath ?
-      "<span class=\"wiki-topic-parent-path\">" + escapeHtml(page.parentTitlePathText || "") + "</span>" :
-      "";
+    var parent = renderParentPath(page, "wiki-topic-parent-path");
     var leaf = "<span class=\"wiki-topic-title-leaf\">" + escapeHtml(page.titleLeaf || page.title || "") + "</span>";
+    var subpageClass = page.hasParentPath ? " wiki-index-entry--subpage" : "";
+    var depth = parseInt(page.titleDepth, 10);
+    var depthStyle = Number.isInteger(depth) && depth > 0 ? " style=\"--wiki-title-depth: " + escapeHtml(String(depth)) + ";\"" : "";
     return (
-      "<li class=\"wiki-index-entry wiki-directory-row\">" +
+      "<li class=\"wiki-index-entry wiki-directory-row" + subpageClass + "\"" + depthStyle + ">" +
       "<div class=\"wiki-index-entry-main\">" +
       "<a class=\"wiki-index-entry-title\" href=\"" + escapeHtml(rel + (page.wikiPath || "")) + "\">" +
       parent + leaf +
@@ -50,9 +72,7 @@
   }
 
   function renderNavRow(page, rel) {
-    var parent = page.hasParentPath ?
-      "<span class=\"wiki-sidebar-parent-path\">" + escapeHtml(page.parentTitlePathText || "") + "</span>" :
-      "";
+    var parent = renderParentPath(page, "wiki-sidebar-parent-path");
     var leaf = "<span class=\"wiki-sidebar-page-title\">" + escapeHtml(page.titleLeaf || page.title || "") + "</span>";
     var active = page.isActive ? " is-active" : "";
     var tidAttr = page.tid != null ? " data-wiki-nav-tid=\"" + escapeHtml(String(page.tid)) + "\"" : "";

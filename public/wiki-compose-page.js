@@ -422,6 +422,7 @@ async function initWikiComposePage() {
         context: "wiki",
         cid: String(payload.cid),
         scope: "current-namespace",
+        type: "page",
         limit: "25"
       });
       const url = payload.linkAutocompleteUrl ?
