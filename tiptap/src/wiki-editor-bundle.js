@@ -439,6 +439,7 @@ function openWikiEntityDialog({ editor, type, options, initial, replaceMark }) {
       params.set("context", "wiki");
       params.set("cid", String((options && options.cid) || ""));
       params.set("scope", type === "namespace" ? "all-wiki" : "current-namespace");
+      params.set("type", type === "namespace" ? "namespace" : "page");
       url = `${(options && options.linkAutocompleteUrl) || getRelativeApiPath(options, "link-autocomplete")}?${params.toString()}`;
     }
     status.textContent = "Searching...";
