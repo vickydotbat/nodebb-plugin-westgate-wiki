@@ -1771,7 +1771,7 @@ a[href*="/wiki/"][href*="redlink=1"] {
   }
 
   .wiki-search-chrome__control {
-    align-items: stretch;
+    align-items: center;
   }
 
   .wiki-search-chrome__button {
