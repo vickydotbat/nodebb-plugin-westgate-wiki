@@ -143,6 +143,9 @@
           /* ignore */
         }
       }
+      if (!isSmallDrawerViewport() && typeof anchor.blur === "function") {
+        anchor.blur();
+      }
     });
   }
 
@@ -219,6 +222,10 @@
     [].slice.call(document.querySelectorAll("[" + DRAWER_ATTR + "]")).forEach(function (drawer) {
       setDrawerOpen(drawer, false);
     });
+    const active = document.activeElement;
+    if (active && active.closest && active.closest("[" + DRAWER_ATTR + "]") && typeof active.blur === "function") {
+      active.blur();
+    }
     syncBackdrop();
   }
 
