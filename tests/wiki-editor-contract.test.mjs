@@ -72,6 +72,7 @@ const wikiJsSource = readFileSync(new URL("../public/wiki.js", import.meta.url),
 const editorCss = readFileSync(new URL("../tiptap/src/wiki-editor.css", import.meta.url), "utf8");
 const vendoredEditorCss = readFileSync(new URL("../public/vendor/tiptap/wiki-tiptap.css", import.meta.url), "utf8");
 const editorBundleSource = readFileSync(new URL("../tiptap/src/wiki-editor-bundle.js", import.meta.url), "utf8");
+const vendoredEditorBundleSource = readFileSync(new URL("../public/vendor/tiptap/wiki-tiptap.bundle.js", import.meta.url), "utf8");
 
 function createEditor(content) {
   const mount = document.createElement("div");
@@ -248,6 +249,15 @@ await test("editor toolbar labels do not force oversized group spacing", functio
 await test("editor toolbar separators follow adjacent group rows", function () {
   assert.match(editorBundleSource, /previousGroup\.offsetTop\s*===\s*nextGroup\.offsetTop/);
   assert.doesNotMatch(editorBundleSource, /previousGroup\.offsetTop\s*===\s*separator\.offsetTop/);
+});
+
+await test("fullscreen source textarea captures Tab as source indentation", function () {
+  assert.match(editorBundleSource, /sourceTextarea\.addEventListener\("keydown",\s*handleSourceKeydown\)/);
+  assert.match(editorBundleSource, /event\.key\s*!==\s*"Tab"/);
+  assert.match(editorBundleSource, /event\.preventDefault\(\)/);
+  assert.match(editorBundleSource, /sourceTextarea\.setRangeText\("\\t"/);
+  assert.match(vendoredEditorBundleSource, /addEventListener\("keydown"/);
+  assert.match(vendoredEditorBundleSource, /setRangeText\("\\t"|setRangeText\("\t"/);
 });
 
 await test("styled span classes and styles round-trip through the extracted extension layer", function () {
