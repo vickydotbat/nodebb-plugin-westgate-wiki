@@ -4,12 +4,13 @@ const assert = require("node:assert/strict");
 
 const state = {
   settings: {
-    categoryIds: "1, 2",
+    categoryIds: "1, 2, 3",
     includeChildCategories: "0"
   },
   categories: new Map([
     [1, { cid: 1, name: "Wiki", slug: "1/wiki", parentCid: 0, topic_count: 0 }],
-    [2, { cid: 2, name: "Development", slug: "2/development", parentCid: 1, topic_count: 2 }]
+    [2, { cid: 2, name: "Development", slug: "2/development", parentCid: 1, topic_count: 2 }],
+    [3, { cid: 3, name: "Item Types", slug: "3/item-types", parentCid: 1, topic_count: 0 }]
   ]),
   topics: new Map([
     [10, { tid: 10, cid: 2, title: "Map Creation Guide", titleRaw: "Map Creation Guide", slug: "10/map-creation-guide", deleted: 0, scheduled: 0 }],
@@ -116,6 +117,8 @@ const config = require("../lib/config");
       "[[development:Map Creation Guide|Map guide]]",
       "[[ns:development]]",
       "[[Development]]",
+      "[[ns:itemtypes]]",
+      "[[Itemtypes]]",
       '<span class="wiki-entity wiki-entity--page" data-wiki-entity="page" data-wiki-target="development/Map Creation Guide" data-wiki-label="Guide entity">Guide entity</span>',
       "[[New Redlink]]"
     ].join(" "),
@@ -131,11 +134,16 @@ const config = require("../lib/config");
     2,
     "bare links that uniquely match a namespace should resolve like ns: links when no page exists"
   );
+  assert.strictEqual(
+    (html.match(/class="wiki-internal-link wiki-namespace-link" href="\/wiki\/item-types"/g) || []).length,
+    2,
+    "namespace links should resolve compact typed aliases like itemtypes to item-types namespaces"
+  );
   assert.match(html, /Guide entity<\/a>/);
   assert.match(html, /class="wiki-redlink" href="\/wiki\/development\?create=New%20Redlink&amp;redlink=1&amp;cid=2"/);
   assert.strictEqual(state.sortedSetRangeCalls, 1, "per-post resolver should scan each target namespace once");
   assert.strictEqual(state.topicFieldCalls, 1, "per-post resolver should hydrate each target namespace once");
-  assert(state.categoryDataCalls <= 2, "per-post resolver should reuse effective category rows and namespace paths");
+  assert(state.categoryDataCalls <= 3, "per-post resolver should reuse effective category rows and namespace paths");
 
   state.topics.set(12, {
     tid: 12,
