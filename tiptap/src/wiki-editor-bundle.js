@@ -40,11 +40,11 @@ import {
   normalizeLegacyHtmlForTiptap
 } from "./normalization/legacy-html.mjs";
 import {
-  findNodeSelectionPos,
   focusMediaCell,
   getActiveImageNodeName,
   isImageLayoutActive,
   isImageSizeActive,
+  selectClickedImageNode,
   setSelectedImageLayout,
   setSelectedImageSize
 } from "./selection/media-selection.mjs";
@@ -2704,8 +2704,6 @@ export async function createWikiEditor(element, options) {
         click: function (_view, event) {
           const target = event.target;
           const entity = target && typeof target.closest === "function" ? target.closest("[data-wiki-entity]") : null;
-          const imageFigure = target && typeof target.closest === "function" ? target.closest('[data-wiki-node="image-figure"]') : null;
-          const imageNode = target && typeof target.closest === "function" ? target.closest('img[data-wiki-node="image"]') : null;
           const mediaCell = target && typeof target.closest === "function" ? target.closest('[data-wiki-node="media-cell"]') : null;
           if (handleEditorLinkClick({
             editor,
@@ -2723,14 +2721,10 @@ export async function createWikiEditor(element, options) {
             return true;
           }
 
-          if (target && target.tagName && target.tagName.toLowerCase() === "img") {
-            const selectionPos = findNodeSelectionPos(editor, imageFigure || imageNode || target, ["imageFigure", "image"]);
-            if (selectionPos != null) {
-              event.preventDefault();
-              event.stopPropagation();
-              editor.chain().focus().setNodeSelection(selectionPos).run();
-              return true;
-            }
+          if (selectClickedImageNode(editor, target, editorMount)) {
+            event.preventDefault();
+            event.stopPropagation();
+            return true;
           }
 
           if (mediaCell && target === mediaCell) {

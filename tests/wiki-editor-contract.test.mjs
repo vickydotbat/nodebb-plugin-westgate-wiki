@@ -21,7 +21,7 @@ function test(name, fn) {
 
 installJsdomGlobals();
 
-const [{ Editor }, StarterKitModule, HighlightModule, ImageModule, TableModule, TableCellModule, TableHeaderModule, TableRowModule, PreservedNodeAttributesModule, StyledSpanModule, ContainerBlockModule, MediaRowModule, ImageFigureModule, WikiCalloutModule, WikiEditingKeymapModule, SlashCommandModule, WikiCodeBlockModule, WikiBlockBackgroundModule, WikiLinkModule, WikiEntitiesModule, toolbarSchemaModule, editorTocModule, linkInteractionsModule, imageResizeModule, legacyHtmlModule, sanitizerContractModule, colorContrastModule] = await Promise.all([
+const [{ Editor }, StarterKitModule, HighlightModule, ImageModule, TableModule, TableCellModule, TableHeaderModule, TableRowModule, PreservedNodeAttributesModule, StyledSpanModule, ContainerBlockModule, MediaRowModule, ImageFigureModule, WikiCalloutModule, WikiEditingKeymapModule, SlashCommandModule, WikiCodeBlockModule, WikiBlockBackgroundModule, WikiLinkModule, WikiEntitiesModule, toolbarSchemaModule, editorTocModule, linkInteractionsModule, imageResizeModule, mediaSelectionModule, legacyHtmlModule, sanitizerContractModule, colorContrastModule] = await Promise.all([
   import("@tiptap/core"),
   import("@tiptap/starter-kit"),
   import("../tiptap/src/extensions/wiki-highlight.mjs"),
@@ -46,6 +46,7 @@ const [{ Editor }, StarterKitModule, HighlightModule, ImageModule, TableModule, 
   import("../tiptap/src/toolbar/editor-toc.mjs"),
   import("../tiptap/src/selection/link-interactions.mjs"),
   import("../tiptap/src/selection/image-resize.mjs"),
+  import("../tiptap/src/selection/media-selection.mjs"),
   import("../tiptap/src/normalization/legacy-html.mjs"),
   import("../tiptap/src/shared/sanitizer-contract.mjs"),
   import("../tiptap/src/shared/color-contrast.mjs")
@@ -74,6 +75,7 @@ const { IMAGE_CONTEXT_BUTTON_IDS, TABLE_CONTEXT_BUTTON_IDS, TOP_TOOLBAR_BUTTON_I
 const { buildHeadingToc, navigateToHeading } = editorTocModule;
 const { installEditorLinkNavigationGuard, selectEditorLink } = linkInteractionsModule;
 const { calculateResizedImageWidth, setSelectedImageWidth } = imageResizeModule;
+const { selectClickedImageNode } = mediaSelectionModule;
 const {
   detectUnsupportedContent,
   getNormalizationNotice,
@@ -433,6 +435,16 @@ await test("selected image figure width updates through the same resize contract
   assert.match(rendered, /<figure class="image" data-wiki-node="image-figure">/);
   assert.match(rendered, /<img src="\/figure\.png" alt="Figure" width="260">/);
   assert.doesNotMatch(rendered, /wiki-image-size-lg/);
+  editor.destroy();
+});
+
+await test("full-width image figures can be reselected by clicking the figure surface", function () {
+  const editor = createEditor('<figure class="image image-style-block wiki-image-size-full"><img src="/full.png" alt="Full"><figcaption><p>Caption</p></figcaption></figure><p>After</p>');
+  const figure = editor.view.dom.querySelector('[data-wiki-node="image-figure"]');
+
+  editor.commands.setTextSelection(editor.state.doc.content.size);
+  assert.equal(selectClickedImageNode(editor, figure, editor.view.dom), true);
+  assert.equal(editor.state.selection.node.type.name, "imageFigure");
   editor.destroy();
 });
 
