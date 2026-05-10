@@ -50,6 +50,11 @@ assert.match(
   /\.wiki-page-heading__title\s*\{[\s\S]*font-weight:\s*var\(--wiki-chrome-page-title-font-weight,\s*500\);[\s\S]*\}/,
   "wiki page titles should default to medium weight instead of theme-heavy headings"
 );
+assert.match(
+  articleBodyCss,
+  /\.wiki-article-prose :where\(a\.wiki-external-link, \.wiki-editor-link\.wiki-external-link\)::before\s*\{[\s\S]*content:\s*var\(--wiki-prose-external-link-icon,[\s\S]*\);[\s\S]*\}/,
+  "external article and editor links should render a leading icon"
+);
 
 assert.match(libraryJs, /const wikiArticleCss = require\("\.\/lib\/wiki-article-css"\)/);
 assert.match(libraryJs, /"\/westgate-wiki\/article-css"/);

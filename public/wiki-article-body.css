@@ -114,6 +114,19 @@
   cursor: pointer;
 }
 
+.wiki-article-prose :where(a.wiki-external-link, .wiki-editor-link.wiki-external-link)::before {
+  content: var(--wiki-prose-external-link-icon, "\f35d");
+  display: inline-block;
+  font-family: var(--wiki-prose-external-link-icon-font-family, "Font Awesome 6 Free");
+  font-size: var(--wiki-prose-external-link-icon-size, 0.78em);
+  font-weight: var(--wiki-prose-external-link-icon-weight, 900);
+  line-height: 1;
+  margin-inline-end: var(--wiki-prose-external-link-icon-gap, 0.28em);
+  opacity: var(--wiki-prose-external-link-icon-opacity, 0.78);
+  text-decoration: none;
+  transform: translateY(-0.08em);
+}
+
 .wiki-article-prose mark {
   background: var(--wiki-prose-highlight-bg, #f2cf63);
   border-radius: var(--bs-border-radius-sm, 0.25rem);

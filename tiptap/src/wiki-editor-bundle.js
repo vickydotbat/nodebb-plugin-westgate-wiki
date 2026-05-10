@@ -97,7 +97,6 @@ const BUTTON_ICONS = {
   link: "fa-link",
   unlink: "fa-chain-broken",
   "wiki-page-link": "fa-book",
-  "wiki-namespace-link": "fa-folder-open",
   "wiki-user-mention": "fa-user",
   "wiki-footnote": "fa-sticky-note-o",
   "image-upload": "fa-image",
@@ -848,13 +847,6 @@ function createToolbar(root, editor, uploadImage) {
       title: "Insert wiki page link",
       action: function () {
         openWikiEntityDialog({ editor, type: "page", options: root.__wikiEditorOptions || {} });
-      }
-    },
-    {
-      id: "wiki-namespace-link",
-      title: "Insert namespace link",
-      action: function () {
-        openWikiEntityDialog({ editor, type: "namespace", options: root.__wikiEditorOptions || {} });
       }
     },
     {

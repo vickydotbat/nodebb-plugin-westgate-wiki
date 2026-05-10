@@ -363,7 +363,7 @@ await test("wiki link mark stores regular links as inert spans in the editor con
   const editor = createEditor('<p>A <a target="_blank" rel="noopener noreferrer" href="https://google.com">regular link</a>.</p>');
   const rendered = editor.getHTML();
 
-  assert.match(rendered, /<span class="wiki-editor-link" data-wiki-link-href="https:\/\/google\.com"/);
+  assert.match(rendered, /<span class="wiki-editor-link wiki-external-link" data-wiki-link-href="https:\/\/google\.com"/);
   assert.match(rendered, /data-wiki-link-target="_blank"/);
   assert.match(rendered, /data-wiki-link-rel="noopener noreferrer"/);
   assert.doesNotMatch(rendered, /<a\b[^>]*href="https:\/\/google\.com"/);
@@ -963,7 +963,8 @@ await test("top toolbar schema keeps wiki entity tools and only table creation i
   const view = TOP_TOOLBAR_GROUPS.find(function (group) { return group.id === "view"; });
 
   assert.deepEqual(history.buttonIds, ["undo", "redo"]);
-  assert.deepEqual(media.buttonIds, ["link", "wiki-page-link", "wiki-namespace-link", "wiki-user-mention", "wiki-footnote", "image-upload", "media-row-2", "media-row-3"]);
+  assert.deepEqual(media.buttonIds, ["link", "wiki-page-link", "wiki-user-mention", "wiki-footnote", "image-upload", "media-row-2", "media-row-3"]);
+  assert.equal(TOP_TOOLBAR_BUTTON_IDS.includes("wiki-namespace-link"), false);
   assert.deepEqual(tables.buttonIds, ["table-insert"]);
   assert.deepEqual(view.buttonIds, ["fullscreen-source"]);
   assert.equal(TOP_TOOLBAR_BUTTON_IDS.includes("fullscreen-source"), true);
