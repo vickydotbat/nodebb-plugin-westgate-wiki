@@ -700,38 +700,45 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 -1px 0 rgba(0, 0, 0, 0.16), 0 0.65rem 1.35rem rgba(0, 0, 0, 0.22);
   color: var(--wiki-callout-text);
   margin: 1rem 0;
-  padding: 0.95rem 1.1rem 0.95rem 5.15rem;
+  padding: 0.95rem 1.1rem;
 }
 
 .wiki-article-prose .wiki-callout::before {
   content: "";
-  position: absolute;
-  top: 0.45rem;
-  left: 1rem;
-  width: 2.75rem;
-  height: 2.75rem;
+  float: left;
+  width: 3.5rem;
+  height: 3.5rem;
+  margin: 0 1rem 0.45rem 0;
   background: color-mix(in srgb, var(--wiki-callout-icon-bg) 86%, #000 14%);
 }
 
 .wiki-article-prose .wiki-callout::after {
-  content: "";
+content: "";
   position: absolute;
-  top: 0.95rem;
-  left: 1.5rem;
-  width: 1.75rem;
-  height: 1.75rem;
+  top: 1.25rem;
+  left: 1.45rem;
+  width: 3rem;
+  height: 3rem;
   background: rgba(255, 255, 255, 0.94);
   mask: var(--wiki-callout-icon) center / 1.75rem 1.75rem no-repeat;
   -webkit-mask: var(--wiki-callout-icon) center / 1.75rem 1.75rem no-repeat;
 }
 
 .wiki-article-prose .wiki-callout > p {
-  display: inline;
+  display: block;
   margin: 0;
 }
 
-.wiki-article-prose .wiki-callout > p + p::before {
-  content: " ";
+.wiki-article-prose .wiki-callout > p + p {
+  margin-top: 0.35rem;
+}
+
+.wiki-article-prose .wiki-callout > p:empty {
+  min-height: 1.68em;
+}
+
+.wiki-article-prose .wiki-callout > p:empty::before {
+  content: "\00a0";
 }
 
 .wiki-article-prose .wiki-callout > :where(p, strong, b) {
