@@ -741,6 +741,38 @@ content: "";
   content: "\00a0";
 }
 
+.wiki-article-prose .wiki-callout > :where(ul, ol) {
+  margin: 0.35rem 0 0.35rem 1.1rem;
+  padding-left: 1.15rem;
+}
+
+.wiki-article-prose .wiki-callout > :where(ul, ol) > li {
+  padding-left: 0.15rem;
+}
+
+.wiki-article-prose .wiki-callout :where(li, li > p) {
+  color: inherit;
+}
+
+.wiki-article-prose .wiki-callout > :where(ul, ol) > li + li {
+  margin-top: 0.28rem;
+}
+
+.wiki-article-prose .wiki-callout > :where(ul, ol) > li::marker {
+  color: currentColor;
+  opacity: 0.9;
+}
+
+.wiki-article-prose .wiki-callout li > p {
+  display: inline;
+  margin: 0;
+}
+
+.wiki-article-prose .wiki-callout li > p + p {
+  display: block;
+  margin-top: 0.28rem;
+}
+
 .wiki-article-prose .wiki-callout > :where(p, strong, b) {
   color: inherit;
 }

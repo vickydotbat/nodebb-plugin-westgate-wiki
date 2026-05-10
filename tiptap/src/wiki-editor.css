@@ -1094,6 +1094,38 @@ content: "";
   content: "\00a0";
 }
 
+.westgate-wiki-compose .wiki-editor__content .wiki-callout > :where(ul, ol) {
+  margin: 0.35rem 0 0.35rem 1.1rem;
+  padding-left: 1.15rem;
+}
+
+.westgate-wiki-compose .wiki-editor__content .wiki-callout > :where(ul, ol) > li {
+  padding-left: 0.15rem;
+}
+
+.westgate-wiki-compose .wiki-editor__content .wiki-callout :where(li, li > p) {
+  color: inherit;
+}
+
+.westgate-wiki-compose .wiki-editor__content .wiki-callout > :where(ul, ol) > li + li {
+  margin-top: 0.28rem;
+}
+
+.westgate-wiki-compose .wiki-editor__content .wiki-callout > :where(ul, ol) > li::marker {
+  color: currentColor;
+  opacity: 0.9;
+}
+
+.westgate-wiki-compose .wiki-editor__content .wiki-callout li > p {
+  display: inline;
+  margin: 0;
+}
+
+.westgate-wiki-compose .wiki-editor__content .wiki-callout li > p + p {
+  display: block;
+  margin-top: 0.28rem;
+}
+
 .westgate-wiki-compose .wiki-editor__content .wiki-callout > :where(p, strong, b) {
   color: inherit;
 }

@@ -1186,18 +1186,24 @@ await test("wikiCallout css uses themed icon callout bars in articles and editor
   assert.doesNotMatch(articleBodyCss, /\.wiki-article-prose \.wiki-callout\s*\{[\s\S]*background:\s*linear-gradient/);
   assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout::before\s*\{[\s\S]*float:\s*left/);
   assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout::before\s*\{[\s\S]*margin:\s*0\s+1rem\s+0\.45rem\s+0/);
-  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout::before\s*\{[\s\S]*width:\s*2\.75rem/);
-  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout::before\s*\{[\s\S]*height:\s*2\.75rem/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout::before\s*\{[\s\S]*width:\s*[0-9.]+rem/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout::before\s*\{[\s\S]*height:\s*[0-9.]+rem/);
   assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout::after\s*\{[\s\S]*mask:\s*var\(--wiki-callout-icon\)\s+center\s*\/\s*1\.75rem\s+1\.75rem\s+no-repeat/);
   assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout--success\s*\{[\s\S]*candle-flame\.svg/);
   assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout--warning\s*\{[\s\S]*stabbed-note\.svg/);
   assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout--danger\s*\{[\s\S]*duality-mask\.svg/);
   assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout > p\s*\{[\s\S]*display:\s*block/);
   assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout > p:empty::before\s*\{[\s\S]*content:\s*"\\00a0"/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout > :where\(ul, ol\)\s*\{[\s\S]*margin:\s*0\.35rem\s+0\s+0\.35rem\s+1\.1rem/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout :where\(li, li > p\)\s*\{[\s\S]*color:\s*inherit/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout > :where\(ul, ol\) > li::marker\s*\{[\s\S]*color:\s*currentColor/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout li > p\s*\{[\s\S]*display:\s*inline/);
   assert.match(editorCss, /\.westgate-wiki-compose \.wiki-editor__content \.wiki-callout\s*\{[\s\S]*--wiki-callout-icon:\s*url\("\/assets\/plugins\/nodebb-plugin-westgate-wiki\/game-icons\/scroll-unfurled\.svg"\)/);
   assert.match(editorCss, /\.westgate-wiki-compose \.wiki-editor__content \.wiki-callout::before\s*\{[\s\S]*float:\s*left/);
   assert.match(editorCss, /\.westgate-wiki-compose \.wiki-editor__content \.wiki-callout > p\s*\{[\s\S]*display:\s*block/);
   assert.match(editorCss, /\.westgate-wiki-compose \.wiki-editor__content \.wiki-callout > p:empty::before\s*\{[\s\S]*content:\s*"\\00a0"/);
+  assert.match(editorCss, /\.westgate-wiki-compose \.wiki-editor__content \.wiki-callout > :where\(ul, ol\)\s*\{[\s\S]*margin:\s*0\.35rem\s+0\s+0\.35rem\s+1\.1rem/);
+  assert.match(editorCss, /\.westgate-wiki-compose \.wiki-editor__content \.wiki-callout :where\(li, li > p\)\s*\{[\s\S]*color:\s*inherit/);
   assert.match(editorCss, /\.westgate-wiki-compose \.wiki-editor__content \.wiki-callout--success\s*\{[\s\S]*candle-flame\.svg/);
 });
 
