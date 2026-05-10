@@ -52,8 +52,8 @@ assert.match(
 );
 assert.match(
   articleBodyCss,
-  /\.wiki-article-prose :where\(a\.wiki-external-link, \.wiki-editor-link\.wiki-external-link\)::before\s*\{[\s\S]*content:\s*var\(--wiki-prose-external-link-icon,[\s\S]*\);[\s\S]*\}/,
-  "external article and editor links should render a leading icon"
+  /\.wiki-article-prose :where\(a\.wiki-external-link, \.wiki-editor-link\.wiki-external-link\)::after\s*\{[\s\S]*content:\s*var\(--wiki-prose-external-link-icon,[\s\S]*\);[\s\S]*margin-inline-start:\s*var\(--wiki-prose-external-link-icon-gap,[\s\S]*\);[\s\S]*\}/,
+  "external article and editor links should render a trailing icon"
 );
 assert.match(
   articleBodyCss,
