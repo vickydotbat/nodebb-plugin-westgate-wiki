@@ -183,11 +183,12 @@ await test("normalizeLegacyHtmlForTiptap keeps supported image figures and norma
 
 await test("normalizeLegacyHtmlForTiptap converts legacy wiki inline syntax into entity spans", function () {
   const normalized = normalizeLegacyHtmlForTiptap(
-    '<p>See [[Guides/Map Creation Guide|Map guide]], [[ns:Guides]], @xtul, and ((Important note)). <code>[[Raw]] @raw ((raw))</code></p>'
+    '<p>See [[Guides/Map Creation Guide|Map guide]], [[Guides/Map Creation Guide#Advanced Setup|setup]], [[ns:Guides]], @xtul, and ((Important note)). <code>[[Raw]] @raw ((raw))</code></p>'
   );
 
   assert.match(normalized, /data-wiki-entity="page"/);
   assert.match(normalized, /data-wiki-target="Guides\/Map Creation Guide"/);
+  assert.match(normalized, /data-wiki-target="Guides\/Map Creation Guide#Advanced Setup"/);
   assert.match(normalized, /data-wiki-entity="namespace"/);
   assert.match(normalized, /data-wiki-target="Guides"/);
   assert.match(normalized, /data-wiki-entity="user"/);
@@ -639,7 +640,7 @@ await test("wiki entity marks and nodes round-trip as inert editor spans", funct
 await test("wiki entity insert commands create page, namespace, user, and footnote entities", function () {
   const editor = createEditor("<p>Start</p>");
 
-  editor.commands.insertWikiPageLink({ target: "Guides/Map Creation Guide", label: "Map guide" });
+  editor.commands.insertWikiPageLink({ target: "Guides/Map Creation Guide#Advanced Setup", label: "Map guide" });
   editor.commands.insertContent(" ");
   editor.commands.insertWikiNamespaceLink({ target: "Guides", label: "Guides" });
   editor.commands.insertContent(" ");
@@ -649,6 +650,7 @@ await test("wiki entity insert commands create page, namespace, user, and footno
 
   const rendered = editor.getHTML();
   assert.match(rendered, /data-wiki-entity="page"[^>]*>Map guide<\/span>/);
+  assert.match(rendered, /data-wiki-target="Guides\/Map Creation Guide#Advanced Setup"/);
   assert.match(rendered, /data-wiki-entity="namespace"[^>]*>Guides<\/span>/);
   assert.match(rendered, /data-wiki-entity="user"[^>]*>@xtul<\/span>/);
   assert.match(rendered, /wiki-entity--user-good/);
@@ -674,6 +676,25 @@ await test("page link dialog can discover and insert namespace autocomplete resu
   assert.match(
     vendoredEditorBundleSource,
     /==="page"[\s\S]*\.type==="namespace"[\s\S]*insertWikiNamespaceLink/
+  );
+});
+
+await test("page link dialog fetches selected article sections and appends the chosen fragment", function () {
+  assert.match(
+    editorBundleSource,
+    /pageTocUrl[\s\S]*page-toc/
+  );
+  assert.match(
+    editorBundleSource,
+    /fetchPageSectionsForResult[\s\S]*selected\.tid[\s\S]*URLSearchParams\(\{ tid: String\(selected\.tid\) \}\)/
+  );
+  assert.match(
+    editorBundleSource,
+    /appendWikiSectionFragment\(target, selectedSection\)/
+  );
+  assert.match(
+    vendoredEditorBundleSource,
+    /pageTocUrl[\s\S]*page-toc/
   );
 });
 
@@ -1102,7 +1123,7 @@ await test("wikiPoetryQuote insert command creates an attributed quote", functio
   assert.match(rendered, /<figure class="wiki-poetry-quote" data-wiki-node="poetry-quote">/);
   assert.match(rendered, /<blockquote class="wiki-poetry-quote__body">/);
   assert.match(rendered, /<p>I am nothing\. I am the empty room\.<\/p>/);
-  assert.match(rendered, /<p class="wiki-poetry-quote__attribution">- Shar<\/p>/);
+  assert.match(rendered, /<p class="wiki-poetry-quote__attribution">— Shar<\/p>/);
   editor.destroy();
 });
 
@@ -1117,7 +1138,7 @@ await test("wikiPoetryQuote insert command moves selected text into the quote bo
   const rendered = editor.getHTML();
 
   assert.match(rendered, /<p>selected words<\/p>/);
-  assert.match(rendered, /<p class="wiki-poetry-quote__attribution">- Speaker<\/p>/);
+  assert.match(rendered, /<p class="wiki-poetry-quote__attribution">— Speaker<\/p>/);
   assert.doesNotMatch(rendered, /Spoken words/);
   editor.destroy();
 });
@@ -1175,8 +1196,8 @@ await test("poetry quote css renders a speech-like quote panel with attribution"
   assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote--plain\s*\{[\s\S]*position:\s*relative/);
   assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote--plain\s*\{[\s\S]*overflow:\s*hidden/);
   assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote--plain::before\s*\{[\s\S]*content:\s*""/);
-  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote--plain::before\s*\{[\s\S]*inset:\s*-20%/);
-  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote--plain::before\s*\{[\s\S]*background:\s*#2a2a2a/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote--plain::before\s*\{[\s\S]*inset:\s*-5%\s+1%/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote--plain::before\s*\{[\s\S]*background:\s*#00000059/);
   assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote--plain::before\s*\{[\s\S]*filter:\s*blur\(60px\)/);
   assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote--plain \.wiki-poetry-quote__body\s*\{[\s\S]*border:\s*0/);
   assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote--plain \.wiki-poetry-quote__body\s*\{[\s\S]*background:\s*transparent/);

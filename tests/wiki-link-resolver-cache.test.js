@@ -114,12 +114,15 @@ const config = require("../lib/config");
   const html = await wikiLinks.replaceWikiLinks(
     [
       "[[development:Map Creation Guide]]",
+      "[[development:Map Creation Guide#Basics]]",
+      "[[development:Map Creation Guide#Advanced Setup|advanced setup]]",
       "[[development:Map Creation Guide|Map guide]]",
       "[[ns:development]]",
       "[[Development]]",
       "[[ns:itemtypes]]",
       "[[Itemtypes]]",
       '<span class="wiki-entity wiki-entity--page" data-wiki-entity="page" data-wiki-target="development/Map Creation Guide" data-wiki-label="Guide entity">Guide entity</span>',
+      '<span class="wiki-entity wiki-entity--page" data-wiki-entity="page" data-wiki-target="development/Map Creation Guide#Using DCs" data-wiki-label="Guide section entity">Guide section entity</span>',
       "[[New Redlink]]"
     ].join(" "),
     2,
@@ -127,6 +130,8 @@ const config = require("../lib/config");
   );
 
   assert.match(html, /href="\/wiki\/development\/map-creation-guide"/);
+  assert.match(html, /href="\/wiki\/development\/map-creation-guide#basics"/);
+  assert.match(html, /href="\/wiki\/development\/map-creation-guide#advanced-setup">advanced setup<\/a>/);
   assert.match(html, />Map guide<\/a>/);
   assert.match(html, /class="wiki-internal-link wiki-namespace-link" href="\/wiki\/development"/);
   assert.strictEqual(
@@ -140,6 +145,7 @@ const config = require("../lib/config");
     "namespace links should resolve compact typed aliases like itemtypes to item-types namespaces"
   );
   assert.match(html, /Guide entity<\/a>/);
+  assert.match(html, /href="\/wiki\/development\/map-creation-guide#using-dcs">Guide section entity<\/a>/);
   assert.match(html, /class="wiki-redlink" href="\/wiki\/development\?create=New%20Redlink&amp;redlink=1&amp;cid=2"/);
   assert.strictEqual(state.sortedSetRangeCalls, 1, "per-post resolver should scan each target namespace once");
   assert.strictEqual(state.topicFieldCalls, 1, "per-post resolver should hydrate each target namespace once");

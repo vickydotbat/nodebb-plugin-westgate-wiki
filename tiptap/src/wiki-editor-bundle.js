@@ -268,6 +268,14 @@ function wikiEntityTargetFromInsertText(insertText, entityType) {
   return entityType === "namespace" ? source.replace(/^ns:/i, "").trim() : source;
 }
 
+function appendWikiSectionFragment(target, section) {
+  const id = section && String(section.id || "").trim();
+  if (!id) {
+    return target;
+  }
+  return `${String(target || "").split("#")[0]}#${id}`;
+}
+
 async function fetchJson(url) {
   const res = await fetch(url, { credentials: "same-origin" });
   const body = await res.json();
@@ -468,6 +476,17 @@ function openWikiEntityDialog({ editor, type, options, initial, replaceMark }) {
     form.appendChild(select);
   }
 
+  const sectionLabel = type === "page" ? document.createElement("label") : null;
+  const sectionSelect = type === "page" ? document.createElement("select") : null;
+  if (sectionLabel && sectionSelect) {
+    sectionLabel.className = "wiki-editor-entity-dialog__label";
+    sectionLabel.textContent = "Section";
+    sectionLabel.hidden = true;
+    sectionSelect.className = "form-select form-select-sm";
+    sectionLabel.appendChild(sectionSelect);
+    form.appendChild(sectionLabel);
+  }
+
   const status = document.createElement("p");
   status.className = "wiki-editor-entity-dialog__status small text-muted";
   status.setAttribute("aria-live", "polite");
@@ -488,6 +507,8 @@ function openWikiEntityDialog({ editor, type, options, initial, replaceMark }) {
   form.appendChild(actions);
 
   let results = [];
+  let sections = [];
+  let sectionRequestId = 0;
   function closeDialog() {
     shell.remove();
     document.removeEventListener("keydown", handleDialogKeydown);
@@ -537,6 +558,60 @@ function openWikiEntityDialog({ editor, type, options, initial, replaceMark }) {
       type === "page" ? "No exact match. The typed target can be inserted as a redlink." :
         (type === "user" ? "No matching user. A typed mention will be marked unresolved." : "No matches.")
     );
+    if (type === "page") {
+      await fetchPageSectionsForResult(results[parseInt(select.value, 10)]);
+    }
+  }
+
+  function clearPageSections() {
+    sections = [];
+    if (sectionLabel) {
+      sectionLabel.hidden = true;
+    }
+    if (sectionSelect) {
+      sectionSelect.innerHTML = "";
+    }
+  }
+
+  async function fetchPageSectionsForResult(selected) {
+    if (type !== "page" || !sectionSelect || !sectionLabel) {
+      return;
+    }
+    const requestId = sectionRequestId + 1;
+    sectionRequestId = requestId;
+    clearPageSections();
+
+    if (!selected || selected.type !== "page" || !selected.tid) {
+      return;
+    }
+
+    const params = new URLSearchParams({ tid: String(selected.tid) });
+    const url = `${(options && options.pageTocUrl) || getRelativeApiPath(options, "page-toc")}?${params.toString()}`;
+    const response = await fetchJson(url);
+    if (requestId !== sectionRequestId) {
+      return;
+    }
+
+    sections = Array.isArray(response.headings) ? response.headings.filter(function (heading) {
+      return heading && heading.id && heading.text;
+    }) : [];
+    if (!sections.length) {
+      return;
+    }
+
+    const none = document.createElement("option");
+    none.value = "";
+    none.textContent = "No section";
+    sectionSelect.appendChild(none);
+
+    sections.forEach(function (heading, index) {
+      const opt = document.createElement("option");
+      opt.value = String(index);
+      const level = Math.max(1, parseInt(heading.level, 10) || 1);
+      opt.textContent = `${"  ".repeat(Math.max(0, level - 1))}${heading.text}`;
+      sectionSelect.appendChild(opt);
+    });
+    sectionLabel.hidden = false;
   }
 
   let searchTimer = null;
@@ -554,6 +629,10 @@ function openWikiEntityDialog({ editor, type, options, initial, replaceMark }) {
       if (labelInput && result) {
         labelInput.value = result.titleLeaf || result.title || "";
       }
+      fetchPageSectionsForResult(result).catch(function (err) {
+        clearPageSections();
+        status.textContent = (err && err.message) || String(err);
+      });
     });
     runSearch().catch(function () {});
   }
@@ -578,11 +657,15 @@ function openWikiEntityDialog({ editor, type, options, initial, replaceMark }) {
       }
       const target = selected ? wikiEntityTargetFromInsertText(selected.insertText, "page") : typed;
       if (target) {
+        const selectedSection = sectionSelect && sectionSelect.value !== "" ? sections[parseInt(sectionSelect.value, 10)] : null;
         let chain = editor.chain().focus();
         if (replaceMark) {
           chain = chain.extendMarkRange("wikiPageLink").unsetMark("wikiPageLink");
         }
-        chain.insertWikiPageLink({ target, label: label || (selected && (selected.titleLeaf || selected.title)) || typed }).run();
+        chain.insertWikiPageLink({
+          target: appendWikiSectionFragment(target, selectedSection),
+          label: label || (selected && (selected.titleLeaf || selected.title)) || typed
+        }).run();
       }
     } else if (type === "namespace") {
       const target = selected ? wikiEntityTargetFromInsertText(selected.insertText, "namespace") : typed.replace(/^ns:/i, "");
