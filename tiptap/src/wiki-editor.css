@@ -1074,7 +1074,7 @@ content: "";
   height: 3rem;
   background: rgba(255, 255, 255, 0.94);
   mask: var(--wiki-callout-icon) center / 1.75rem 1.75rem no-repeat;
-  -webkit-mask: var(--wiki-callout-icon) center / 1.75rem 1.75rem no-repeat;
+  -webkit-mask: var(--wiki-callout-icon) center / 2.5rem 2.5rem no-repeat;
 }
 
 .westgate-wiki-compose .wiki-editor__content .wiki-callout > p {
