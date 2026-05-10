@@ -114,6 +114,7 @@ const BUTTON_ICONS = {
   "code-block": "fa-file-code-o",
   "horizontal-rule": "fa-minus",
   "callout-info": "fa-info-circle",
+  "callout-success": "fa-check-circle",
   "callout-warning": "fa-exclamation-triangle",
   "callout-danger": "fa-ban",
   "align-left": "fa-align-left",
@@ -1619,6 +1620,20 @@ function createToolbar(root, editor, uploadImage) {
       },
       applyState: function (button) {
         button.classList.toggle("active", editor.isActive("wikiCallout", { type: "info" }));
+      }
+    },
+    {
+      id: "callout-success",
+      title: "Toggle success callout",
+      action: function () {
+        if (editor.isActive("wikiCallout", { type: "success" })) {
+          editor.chain().focus().unsetWikiCallout().run();
+          return;
+        }
+        editor.chain().focus().insertWikiCallout({ type: "success", title: "Remember" }).run();
+      },
+      applyState: function (button) {
+        button.classList.toggle("active", editor.isActive("wikiCallout", { type: "success" }));
       }
     },
     {

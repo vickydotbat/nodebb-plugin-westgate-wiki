@@ -680,23 +680,99 @@
 }
 
 .wiki-article-prose .wiki-callout {
-  border-left: 0.28rem solid var(--wiki-callout-border, var(--bs-info, #0dcaf0));
-  border-radius: var(--bs-border-radius, 0.5rem);
-  background: color-mix(in srgb, var(--wiki-callout-border, var(--bs-info, #0dcaf0)) 10%, transparent);
+  --wiki-callout-bg: #443b49;
+  --wiki-callout-border: #766f7d;
+  --wiki-callout-rail: #111015;
+  --wiki-callout-icon-bg: #332c38;
+  --wiki-callout-icon: url("/assets/plugins/nodebb-plugin-westgate-wiki/game-icons/scroll-unfurled.svg");
+  --wiki-callout-text: #ece7df;
+  position: relative;
+  display: block;
+  min-height: 3.25rem;
+  box-sizing: border-box;
+  border: 0;
+  border-left: 0.85rem solid var(--wiki-callout-rail);
+  border-top: 1px solid color-mix(in srgb, var(--wiki-callout-border) 74%, #fff 26%);
+  border-right: 1px solid rgba(255, 244, 214, 0.08);
+  border-bottom: 1px solid color-mix(in srgb, var(--wiki-callout-bg) 58%, #000 42%);
+  border-radius: 0;
+  background: var(--wiki-callout-bg);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 -1px 0 rgba(0, 0, 0, 0.16), 0 0.65rem 1.35rem rgba(0, 0, 0, 0.22);
+  color: var(--wiki-callout-text);
   margin: 1rem 0;
-  padding: 0.85rem 1rem;
+  padding: 0.95rem 1.1rem 0.95rem 5.15rem;
 }
 
-.wiki-article-prose .wiki-callout--warning {
-  --wiki-callout-border: var(--bs-warning, #ffc107);
+.wiki-article-prose .wiki-callout::before {
+  content: "";
+  position: absolute;
+  top: 0.45rem;
+  left: 1rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  background: color-mix(in srgb, var(--wiki-callout-icon-bg) 86%, #000 14%);
 }
 
-.wiki-article-prose .wiki-callout--danger {
-  --wiki-callout-border: var(--bs-danger, #dc3545);
+.wiki-article-prose .wiki-callout::after {
+  content: "";
+  position: absolute;
+  top: 0.95rem;
+  left: 1.5rem;
+  width: 1.75rem;
+  height: 1.75rem;
+  background: rgba(255, 255, 255, 0.94);
+  mask: var(--wiki-callout-icon) center / 1.75rem 1.75rem no-repeat;
+  -webkit-mask: var(--wiki-callout-icon) center / 1.75rem 1.75rem no-repeat;
+}
+
+.wiki-article-prose .wiki-callout > p {
+  display: inline;
+  margin: 0;
+}
+
+.wiki-article-prose .wiki-callout > p + p::before {
+  content: " ";
+}
+
+.wiki-article-prose .wiki-callout > :where(p, strong, b) {
+  color: inherit;
+}
+
+.wiki-article-prose .wiki-callout > p > strong:first-child {
+  font-weight: 700;
+}
+
+.wiki-article-prose .wiki-callout--note,
+.wiki-article-prose .wiki-callout--info {
+  --wiki-callout-bg: #443b49;
+  --wiki-callout-border: #766f7d;
+  --wiki-callout-rail: #111015;
+  --wiki-callout-icon-bg: #332c38;
+  --wiki-callout-icon: url("/assets/plugins/nodebb-plugin-westgate-wiki/game-icons/scroll-unfurled.svg");
 }
 
 .wiki-article-prose .wiki-callout--success {
-  --wiki-callout-border: var(--bs-success, #198754);
+  --wiki-callout-bg: #365b47;
+  --wiki-callout-border: #5f876e;
+  --wiki-callout-rail: #14251d;
+  --wiki-callout-icon-bg: #254233;
+  --wiki-callout-icon: url("/assets/plugins/nodebb-plugin-westgate-wiki/game-icons/candle-flame.svg");
+}
+
+.wiki-article-prose .wiki-callout--warning {
+  --wiki-callout-bg: #855d33;
+  --wiki-callout-border: #ac8554;
+  --wiki-callout-rail: #2a1b0c;
+  --wiki-callout-icon-bg: #624321;
+  --wiki-callout-icon: url("/assets/plugins/nodebb-plugin-westgate-wiki/game-icons/stabbed-note.svg");
+}
+
+.wiki-article-prose .wiki-callout--danger {
+  --wiki-callout-bg: #793131;
+  --wiki-callout-border: #a25a57;
+  --wiki-callout-rail: #10080a;
+  --wiki-callout-icon-bg: #552121;
+  --wiki-callout-icon: url("/assets/plugins/nodebb-plugin-westgate-wiki/game-icons/duality-mask.svg");
 }
 
 .wiki-article-prose .wiki-poetry-quote {

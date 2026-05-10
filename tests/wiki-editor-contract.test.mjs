@@ -88,6 +88,7 @@ const {
 const { sanitizeHtml } = sanitizerContractModule;
 const { getReadableTextColor, normalizeHexColor } = colorContrastModule;
 const articleBodyCss = readFileSync(new URL("../public/wiki-article-body.css", import.meta.url), "utf8");
+const pluginJsonSource = readFileSync(new URL("../plugin.json", import.meta.url), "utf8");
 const wikiJsSource = readFileSync(new URL("../public/wiki.js", import.meta.url), "utf8");
 const editorCss = readFileSync(new URL("../tiptap/src/wiki-editor.css", import.meta.url), "utf8");
 const vendoredEditorCss = readFileSync(new URL("../public/vendor/tiptap/wiki-tiptap.css", import.meta.url), "utf8");
@@ -1174,6 +1175,26 @@ await test("wikiCallout Backspace shortcut unwraps a callout from an empty parag
   editor.destroy();
 });
 
+await test("wikiCallout css uses themed icon callout bars in articles and editor", function () {
+  const pluginJson = JSON.parse(pluginJsonSource);
+  assert.equal(pluginJson.staticDirs["game-icons"], "public/game-icons");
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout\s*\{[\s\S]*--wiki-callout-icon:\s*url\("\/assets\/plugins\/nodebb-plugin-westgate-wiki\/game-icons\/scroll-unfurled\.svg"\)/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout\s*\{[\s\S]*display:\s*block/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout\s*\{[\s\S]*border-left:\s*0\.85rem\s+solid\s+var\(--wiki-callout-rail\)/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout\s*\{[\s\S]*background:\s*var\(--wiki-callout-bg\)/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout\s*\{[\s\S]*padding:\s*0\.95rem\s+1\.1rem\s+0\.95rem\s+5\.15rem/);
+  assert.doesNotMatch(articleBodyCss, /\.wiki-article-prose \.wiki-callout\s*\{[\s\S]*background:\s*linear-gradient/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout::before\s*\{[\s\S]*width:\s*2\.75rem/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout::before\s*\{[\s\S]*height:\s*2\.75rem/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout::after\s*\{[\s\S]*mask:\s*var\(--wiki-callout-icon\)\s+center\s*\/\s*1\.75rem\s+1\.75rem\s+no-repeat/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout--success\s*\{[\s\S]*candle-flame\.svg/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout--warning\s*\{[\s\S]*stabbed-note\.svg/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout--danger\s*\{[\s\S]*duality-mask\.svg/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout > p\s*\{[\s\S]*display:\s*inline/);
+  assert.match(editorCss, /\.westgate-wiki-compose \.wiki-editor__content \.wiki-callout\s*\{[\s\S]*--wiki-callout-icon:\s*url\("\/assets\/plugins\/nodebb-plugin-westgate-wiki\/game-icons\/scroll-unfurled\.svg"\)/);
+  assert.match(editorCss, /\.westgate-wiki-compose \.wiki-editor__content \.wiki-callout--success\s*\{[\s\S]*candle-flame\.svg/);
+});
+
 await test("wikiPoetryQuote insert command creates an attributed quote", function () {
   const editor = createEditor("<p>Start</p>");
 
@@ -1397,11 +1418,13 @@ await test("top toolbar schema keeps wiki entity tools and table creation tools 
   ]);
 
   const history = TOP_TOOLBAR_GROUPS.find(function (group) { return group.id === "history"; });
+  const callouts = TOP_TOOLBAR_GROUPS.find(function (group) { return group.id === "callouts"; });
   const media = TOP_TOOLBAR_GROUPS.find(function (group) { return group.id === "links-media"; });
   const tables = TOP_TOOLBAR_GROUPS.find(function (group) { return group.id === "tables"; });
   const view = TOP_TOOLBAR_GROUPS.find(function (group) { return group.id === "view"; });
 
   assert.deepEqual(history.buttonIds, ["undo", "redo"]);
+  assert.deepEqual(callouts.buttonIds, ["callout-info", "callout-success", "callout-warning", "callout-danger"]);
   assert.deepEqual(media.buttonIds, ["link", "wiki-page-link", "wiki-user-mention", "wiki-footnote", "image-upload", "media-row-2", "media-row-3"]);
   assert.equal(TOP_TOOLBAR_BUTTON_IDS.includes("wiki-namespace-link"), false);
   assert.deepEqual(tables.buttonIds, ["table-insert", "dnd-alignment-table"]);

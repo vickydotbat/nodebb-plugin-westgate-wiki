@@ -27,7 +27,7 @@ export const TOP_TOOLBAR_GROUPS = [
   {
     id: "callouts",
     label: "Callouts",
-    buttonIds: ["callout-info", "callout-warning", "callout-danger"]
+    buttonIds: ["callout-info", "callout-success", "callout-warning", "callout-danger"]
   },
   {
     id: "alignment",
