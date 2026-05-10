@@ -14,6 +14,7 @@ const wikiService = require("../lib/wiki-service");
 const topicService = require("../lib/topic-service");
 const wikiSearchService = require("../lib/wiki-search-service");
 const wikiBreadcrumbTrail = require("../lib/wiki-breadcrumb-trail");
+const wikiMissingPageCreate = require("../lib/wiki-missing-page-create");
 const wikiPaths = require("../lib/wiki-paths");
 
 function getCreateIntentTitle(req) {
@@ -220,9 +221,12 @@ function register(params) {
     }
   });
 
-  async function renderSection(req, res, next, wikiSection) {
+  async function renderSection(req, res, next, wikiSection, options = {}) {
     const createIntentTitle = getCreateIntentTitle(req);
-    const hasCreateIntent = !!(createIntentTitle && wikiSection.section.privileges.canCreatePage);
+    const directCreateIntentTitle = String(options.createIntentTitle || "").trim();
+    const effectiveCreateIntentTitle = createIntentTitle || directCreateIntentTitle;
+    const hasCreateIntent = !!(effectiveCreateIntentTitle && wikiSection.section.privileges.canCreatePage);
+    const createIntentAutoload = !!(createIntentTitle && String((req.query && req.query.redlink) || "") === "1");
 
     const sectionTrail = wikiBreadcrumbTrail.forSectionView(wikiSection.section);
 
@@ -250,7 +254,8 @@ function register(params) {
       hasMultipleWikiIndexLetterGroups: false,
       canCreatePage,
       hasCreateIntent,
-      createIntentTitle,
+      createIntentTitle: effectiveCreateIntentTitle,
+      createIntentAutoload,
       canCreateWikiNamespaces
     });
   }
@@ -341,6 +346,19 @@ function register(params) {
     }
 
     const article = await wikiPaths.resolveArticlePath(pathSegments, req.uid);
+    if (article.status === "page-not-found" && article.cid) {
+      const wikiSection = await wikiService.getSection(article.cid, req.uid);
+      if (wikiSection.status === "forbidden") {
+        return helpers.notAllowed(req, res);
+      }
+      if (wikiSection.status === "ok" && wikiSection.section.privileges.canCreatePage) {
+        const createIntentTitle = wikiMissingPageCreate.titleFromPageSlug(article.pageSlug);
+        if (createIntentTitle) {
+          return renderSection(req, res, next, wikiSection, { createIntentTitle });
+        }
+      }
+      return next();
+    }
     if (article.status !== "ok") {
       return next();
     }
