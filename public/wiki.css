@@ -49,6 +49,7 @@
     --wiki-chrome-page-title-font-family,
     var(--bs-heading-font-family, inherit)
   );
+  font-weight: var(--wiki-chrome-page-title-font-weight, 500);
   margin: 0;
   min-width: 0;
 }
