@@ -411,6 +411,25 @@ await test("wiki entity insert commands create page, namespace, user, and footno
   editor.destroy();
 });
 
+await test("page link dialog can discover and insert namespace autocomplete results", function () {
+  assert.doesNotMatch(
+    editorBundleSource,
+    /params\.set\("scope",\s*type === "namespace" \? "all-wiki" : "current-namespace"\)/
+  );
+  assert.doesNotMatch(
+    editorBundleSource,
+    /params\.set\("type",\s*type === "namespace" \? "namespace" : "page"\)/
+  );
+  assert.match(
+    editorBundleSource,
+    /if \(type === "page"\) \{[\s\S]*selected && selected\.type === "namespace"[\s\S]*insertWikiNamespaceLink/
+  );
+  assert.match(
+    vendoredEditorBundleSource,
+    /==="page"[\s\S]*\.type==="namespace"[\s\S]*insertWikiNamespaceLink/
+  );
+});
+
 await test("typed wiki user mentions render as unresolved until autocomplete confirms them", function () {
   const editor = createEditor("<p>Start</p>");
 

@@ -4,13 +4,14 @@ const assert = require("node:assert/strict");
 
 const state = {
   settings: {
-    categoryIds: "1, 2, 3",
+    categoryIds: "1, 2, 3, 4",
     includeChildCategories: "0"
   },
   categories: new Map([
     [1, { cid: 1, name: "Wiki", slug: "1/wiki", parentCid: 0, topic_count: 0 }],
-    [2, { cid: 2, name: "Feats", slug: "2/feats", parentCid: 1, topic_count: 0 }],
-    [3, { cid: 3, name: "Item Types", slug: "3/item-types", parentCid: 1, topic_count: 0 }]
+    [2, { cid: 2, name: "Mechanics", slug: "2/mechanics", parentCid: 1, topic_count: 0 }],
+    [3, { cid: 3, name: "Feats", slug: "3/feats", parentCid: 2, topic_count: 0 }],
+    [4, { cid: 4, name: "Item Types", slug: "4/item-types", parentCid: 1, topic_count: 0 }]
   ])
 };
 
@@ -104,9 +105,10 @@ const wikiLinkAutocomplete = require("../lib/wiki-link-autocomplete");
 
   assert.deepStrictEqual(
     directSlugResults.map((row) => row.wikiPath),
-    ["/wiki/feats"],
-    "namespace autocomplete should still match direct namespace route leaves"
+    ["/wiki/mechanics/feats"],
+    "namespace autocomplete should match nested namespace route leaves"
   );
+  assert.strictEqual(directSlugResults[0].insertText, "[[ns:mechanics/feats]]");
 
   console.log("wiki-link autocomplete tests passed");
 })().catch((err) => {

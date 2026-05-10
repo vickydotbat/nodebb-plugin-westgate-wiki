@@ -193,6 +193,19 @@ function optionLabel(result) {
   return `${result.titleLeaf || result.title} · ${String(result.namespacePath || "").replace(/^\/wiki\/?/, "") || "wiki"}`;
 }
 
+function wikiEntityTargetFromInsertText(insertText, entityType) {
+  const source = String(insertText || "").trim();
+  const namespaceMatch = source.match(/^\[\[ns:([^[\]|]+(?:\/[^[\]|]+)*)(?:\|[^[\]]+)?\]\]$/i);
+  if (namespaceMatch) {
+    return namespaceMatch[1].trim();
+  }
+  const pageMatch = source.match(/^\[\[([^[\]|]+(?:\/[^[\]|]+)*)(?:\|[^[\]]+)?\]\]$/);
+  if (pageMatch) {
+    return pageMatch[1].trim();
+  }
+  return entityType === "namespace" ? source.replace(/^ns:/i, "").trim() : source;
+}
+
 async function fetchJson(url) {
   const res = await fetch(url, { credentials: "same-origin" });
   const body = await res.json();
@@ -438,14 +451,18 @@ function openWikiEntityDialog({ editor, type, options, initial, replaceMark }) {
     } else {
       params.set("context", "wiki");
       params.set("cid", String((options && options.cid) || ""));
-      params.set("scope", type === "namespace" ? "all-wiki" : "current-namespace");
-      params.set("type", type === "namespace" ? "namespace" : "page");
+      params.set("scope", type === "namespace" || type === "page" ? "all-wiki" : "current-namespace");
+      if (type === "namespace") {
+        params.set("type", "namespace");
+      }
       url = `${(options && options.linkAutocompleteUrl) || getRelativeApiPath(options, "link-autocomplete")}?${params.toString()}`;
     }
     status.textContent = "Searching...";
     const response = await fetchJson(url);
     results = (response.results || []).filter(function (result) {
-      return type === "user" ? true : result.type === type;
+      return type === "user" ? true : (
+        type === "page" ? result.type === "page" || result.type === "namespace" : result.type === type
+      );
     });
     select.innerHTML = "";
     results.forEach(function (result, index) {
@@ -485,7 +502,19 @@ function openWikiEntityDialog({ editor, type, options, initial, replaceMark }) {
     const typed = searchInput.value.trim();
     const label = labelInput && labelInput.value.trim();
     if (type === "page") {
-      const target = selected ? String(selected.insertText || "").replace(/^\[\[|\]\]$/g, "").split("|")[0] : typed;
+      if (selected && selected.type === "namespace") {
+        const target = wikiEntityTargetFromInsertText(selected.insertText, "namespace");
+        if (target) {
+          let chain = editor.chain().focus();
+          if (replaceMark) {
+            chain = chain.extendMarkRange("wikiPageLink").unsetMark("wikiPageLink");
+          }
+          chain.insertWikiNamespaceLink({ target, label: label || selected.title || target }).run();
+        }
+        closeDialog();
+        return;
+      }
+      const target = selected ? wikiEntityTargetFromInsertText(selected.insertText, "page") : typed;
       if (target) {
         let chain = editor.chain().focus();
         if (replaceMark) {
@@ -494,7 +523,7 @@ function openWikiEntityDialog({ editor, type, options, initial, replaceMark }) {
         chain.insertWikiPageLink({ target, label: label || (selected && (selected.titleLeaf || selected.title)) || typed }).run();
       }
     } else if (type === "namespace") {
-      const target = selected ? String(selected.insertText || "").replace(/^\[\[ns:|\]\]$/g, "").split("|")[0] : typed.replace(/^ns:/i, "");
+      const target = selected ? wikiEntityTargetFromInsertText(selected.insertText, "namespace") : typed.replace(/^ns:/i, "");
       if (target) {
         let chain = editor.chain().focus();
         if (replaceMark) {
