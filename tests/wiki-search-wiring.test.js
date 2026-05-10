@@ -52,6 +52,36 @@ assert.match(
 );
 assert.match(
   wikiCss,
+  /\.wiki-search-suggestions\s*\{[\s\S]*background:\s*var\(--wiki-search-suggestions-bg,\s*var\(--bs-dropdown-bg,\s*var\(--bs-body-bg,\s*#fff\)\)\);[\s\S]*\}/,
+  "search suggestions dropdown should use an opaque dropdown background instead of translucent panel chrome"
+);
+assert.match(
+  wikiCss,
+  /\.wiki-search-suggestions\s*\{[\s\S]*z-index:\s*var\(--wiki-search-suggestions-layer,\s*1045\);[\s\S]*\}/,
+  "search suggestions dropdown should sit above mobile drawers and page tools"
+);
+assert.doesNotMatch(
+  wikiCss.match(/\.wiki-search-suggestions\s*\{[\s\S]*?\}/)[0],
+  /--wiki-chrome-surface-bg/,
+  "search suggestions dropdown should not inherit generic wiki panel background"
+);
+assert.match(
+  wikiCss,
+  /@media\s*\(max-width:\s*767\.98px\)[\s\S]*?\.wiki-search-chrome\s*{[^}]*z-index:\s*var\(--wiki-search-mobile-layer,\s*1046\)/,
+  "mobile search chrome should create a high stacking context"
+);
+assert.match(
+  wikiCss,
+  /@media\s*\(max-width:\s*767\.98px\)[\s\S]*?\.wiki-search-suggestions\s*{[^}]*max-height:\s*min\(60vh,\s*28rem\)/,
+  "mobile search suggestions should stay bounded inside the viewport"
+);
+assert.match(
+  wikiCss,
+  /@media\s*\(max-width:\s*767\.98px\)[\s\S]*?\.wiki-search-suggestions\s*{[^}]*background:\s*var\(--wiki-search-suggestions-bg,\s*var\(--bs-dropdown-bg,\s*var\(--bs-body-bg,\s*#fff\)\)\)/,
+  "mobile search suggestions should keep the same opaque dropdown background"
+);
+assert.match(
+  wikiCss,
   /\.wiki-page-header--search \.wiki-page-heading__title\s*\{[\s\S]*overflow: hidden;[\s\S]*text-overflow: ellipsis;[\s\S]*white-space: nowrap;[\s\S]*\}/,
   "search page heading should stay on one line with ellipsis"
 );

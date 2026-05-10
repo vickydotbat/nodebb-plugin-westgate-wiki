@@ -2,6 +2,7 @@ import Link from "@tiptap/extension-link";
 import { mergeAttributes } from "@tiptap/core";
 
 const INERT_LINK_CLASS = "wiki-editor-link";
+const EXTERNAL_LINK_CLASS = "wiki-external-link";
 
 function appendClass(existingClass, nextClass) {
   const tokens = String(`${existingClass || ""} ${nextClass || ""}`)
@@ -15,6 +16,10 @@ function appendClass(existingClass, nextClass) {
 
 function readLinkAttribute(element, attrName) {
   return element.getAttribute(attrName) || element.getAttribute(`data-wiki-link-${attrName}`) || null;
+}
+
+function isExternalHref(href) {
+  return /^(?:https?:)?\/\//i.test(String(href || "").trim());
 }
 
 const WikiLink = Link.extend({
@@ -65,7 +70,10 @@ const WikiLink = Link.extend({
   renderHTML({ HTMLAttributes }) {
     const { href, target, rel, class: className, title } = HTMLAttributes;
     const attrs = {
-      class: appendClass(className, INERT_LINK_CLASS)
+      class: appendClass(
+        appendClass(className, INERT_LINK_CLASS),
+        isExternalHref(href) ? EXTERNAL_LINK_CLASS : ""
+      )
     };
 
     if (href) {

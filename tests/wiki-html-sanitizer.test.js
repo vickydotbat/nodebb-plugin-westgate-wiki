@@ -39,7 +39,22 @@ test("renderReadOnlyWikiHtml converts stored inert editor links into anchors", f
   const html = '<p>A <span class="wiki-editor-link" data-wiki-link-href="https://google.com" data-wiki-link-target="_blank" data-wiki-link-rel="noopener noreferrer">regular link</span>.</p>';
   const rendered = wikiHtmlSanitizer.renderReadOnlyWikiHtml(html);
 
-  assert.equal(rendered, '<p>A <a href="https://google.com" target="_blank" rel="noopener noreferrer">regular link</a>.</p>');
+  assert.equal(rendered, '<p>A <a href="https://google.com" target="_blank" rel="noopener noreferrer" class="wiki-external-link">regular link</a>.</p>');
+});
+
+test("renderReadOnlyWikiHtml marks external inert editor links", function () {
+  const html = '<p>A <span class="wiki-editor-link" data-wiki-link-href="https://example.com/path">regular link</span>.</p>';
+  const rendered = wikiHtmlSanitizer.renderReadOnlyWikiHtml(html);
+
+  assert.equal(rendered, '<p>A <a href="https://example.com/path" rel="noopener noreferrer" class="wiki-external-link">regular link</a>.</p>');
+});
+
+test("renderReadOnlyWikiHtml marks raw external anchors but leaves wiki links plain", function () {
+  const html = '<p><a href="https://example.com">External</a> <a class="wiki-internal-link" href="/wiki/player-guide">Guide</a></p>';
+  const rendered = wikiHtmlSanitizer.renderReadOnlyWikiHtml(html);
+
+  assert.match(rendered, /<a href="https:\/\/example\.com" rel="noopener noreferrer" class="wiki-external-link">External<\/a>/);
+  assert.match(rendered, /<a class="wiki-internal-link" href="\/wiki\/player-guide" rel="noopener noreferrer">Guide<\/a>/);
 });
 
 test("sanitizeWikiHtml keeps stored inert editor links inert", function () {

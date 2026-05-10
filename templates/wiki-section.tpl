@@ -31,7 +31,9 @@
               data-wiki-create-page="1"
               data-cid="{section.cid}"
               data-title="{createIntentTitle}"
+              <!-- IF createIntentAutoload -->
               data-wiki-create-autoload="1"
+              <!-- ENDIF createIntentAutoload -->
             >
               Create {createIntentTitle}
             </a>

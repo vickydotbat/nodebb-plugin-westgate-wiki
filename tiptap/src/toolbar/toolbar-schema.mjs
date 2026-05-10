@@ -17,7 +17,7 @@ export const TOP_TOOLBAR_GROUPS = [
   {
     id: "links-media",
     label: "Links and media",
-    buttonIds: ["link", "wiki-page-link", "wiki-namespace-link", "wiki-user-mention", "wiki-footnote", "image-upload", "media-row-2", "media-row-3"]
+    buttonIds: ["link", "wiki-page-link", "wiki-user-mention", "wiki-footnote", "image-upload", "media-row-2", "media-row-3"]
   },
   {
     id: "blocks",

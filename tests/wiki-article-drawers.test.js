@@ -78,10 +78,21 @@ test("drawer CSS defines desktop hover drawers and mobile off-canvas drawers", f
   assert.match(wikiCss, /env\(safe-area-inset-right,\s*0px\)/);
 });
 
-test("mobile drawer tabs sit above floating page tools", function () {
-  assert.match(wikiCss, /@media\s*\(max-width:\s*767\.98px\)[\s\S]*?\.wiki-article-drawer__tab\s*{[^}]*top:\s*clamp\(/);
-  assert.match(wikiCss, /@media\s*\(max-width:\s*767\.98px\)[\s\S]*?\.wiki-article-drawer__tab\s*{[^}]*bottom:\s*auto/);
-  assert.doesNotMatch(wikiCss, /@media\s*\(max-width:\s*767\.98px\)[\s\S]*?\.wiki-article-drawer__tab\s*{[^}]*bottom:\s*0\.75rem/);
+test("mobile drawers become bottom sheets with horizontal trigger buttons", function () {
+  assert.match(wikiCss, /@media\s*\(max-width:\s*767\.98px\)[\s\S]*?\.wiki-article-drawer\s*{[^}]*inset:\s*0/);
+  assert.match(wikiCss, /@media\s*\(max-width:\s*767\.98px\)[\s\S]*?\.wiki-article-drawer--nav,\s*\.wiki-article-drawer--toc\s*{[^}]*transform:\s*none/);
+  assert.match(wikiCss, /@media\s*\(max-width:\s*767\.98px\)[\s\S]*?\.wiki-article-drawer__panel\s*{[^}]*bottom:\s*0/);
+  assert.match(wikiCss, /@media\s*\(max-width:\s*767\.98px\)[\s\S]*?\.wiki-article-drawer__panel\s*{[^}]*transform:\s*translateY\(100%\)/);
+  assert.match(wikiCss, /@media\s*\(max-width:\s*767\.98px\)[\s\S]*?\.wiki-article-drawer--open\s+\.wiki-article-drawer__panel\s*{[^}]*transform:\s*translateY\(0\)/);
+  assert.match(wikiCss, /@media\s*\(max-width:\s*767\.98px\)[\s\S]*?--wiki-article-drawer-trigger-bottom:\s*max\(0\.75rem,\s*env\(safe-area-inset-bottom,\s*0px\)\)/);
+  assert.match(wikiCss, /@media\s*\(max-width:\s*767\.98px\)[\s\S]*?--wiki-article-drawer-trigger-gap:\s*0\.35rem/);
+  assert.match(wikiCss, /@media\s*\(max-width:\s*767\.98px\)[\s\S]*?--wiki-article-drawer-trigger-width:\s*calc\(\(100vw\s*-\s*\(var\(--wiki-article-drawer-sheet-gutter\)\s*\*\s*2\)\s*-\s*var\(--wiki-article-drawer-trigger-gap\)\)\s*\/\s*2\)/);
+  assert.match(wikiCss, /@media\s*\(max-width:\s*767\.98px\)[\s\S]*?\.wiki-article-drawer__tab\s*{[^}]*bottom:\s*var\(--wiki-article-drawer-trigger-bottom\)/);
+  assert.match(wikiCss, /@media\s*\(max-width:\s*767\.98px\)[\s\S]*?\.wiki-article-drawer__tab\s*{[^}]*width:\s*var\(--wiki-article-drawer-trigger-width\)/);
+  assert.match(wikiCss, /@media\s*\(max-width:\s*767\.98px\)[\s\S]*?\.wiki-article-drawer--nav\s+\.wiki-article-drawer__tab\s*{[^}]*left:\s*var\(--wiki-article-drawer-sheet-gutter\)/);
+  assert.match(wikiCss, /@media\s*\(max-width:\s*767\.98px\)[\s\S]*?\.wiki-article-drawer--toc\s+\.wiki-article-drawer__tab\s*{[^}]*left:\s*calc\(var\(--wiki-article-drawer-sheet-gutter\)\s*\+\s*var\(--wiki-article-drawer-trigger-width\)\s*\+\s*var\(--wiki-article-drawer-trigger-gap\)\)/);
+  assert.match(wikiCss, /@media\s*\(max-width:\s*767\.98px\)[\s\S]*?html\.wiki-article-drawer-modal-open\s+\.wiki-article-drawer__tab\s*{[^}]*visibility:\s*hidden/);
+  assert.match(wikiCss, /@media\s*\(max-width:\s*767\.98px\)[\s\S]*?\.wiki-article-drawer__tab-label\s*{[^}]*writing-mode:\s*horizontal-tb/);
 });
 
 test("ToC client owns drawer state and accessibility updates", function () {

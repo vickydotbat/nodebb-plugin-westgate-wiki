@@ -9,6 +9,7 @@ const pageTemplate = fs.readFileSync(path.join(__dirname, "..", "templates/wiki-
 const composeController = fs.readFileSync(path.join(__dirname, "..", "lib/controllers/compose.js"), "utf8");
 const composePageJs = fs.readFileSync(path.join(__dirname, "..", "public/wiki-compose-page.js"), "utf8");
 const wikiCss = fs.readFileSync(path.join(__dirname, "..", "public/wiki.css"), "utf8");
+const articleBodyCss = fs.readFileSync(path.join(__dirname, "..", "public/wiki-article-body.css"), "utf8");
 const libraryJs = fs.readFileSync(path.join(__dirname, "..", "library.js"), "utf8");
 const topicService = fs.readFileSync(path.join(__dirname, "..", "lib/topic-service.js"), "utf8");
 
@@ -34,6 +35,26 @@ assert.match(wikiCss, /\.wiki-compose-css-editor\s*{/);
 assert.match(wikiCss, /\.wiki-compose-css-lines\s*{/);
 assert.match(wikiCss, /\.wiki-compose-css-highlight\s*{/);
 assert.match(wikiCss, /\.wiki-compose-css-input\s*{/);
+assert.match(
+  articleBodyCss,
+  /\.wiki-article-prose :where\(h1, h2, h3, h4, h5, h6\)\s*\{[\s\S]*font-weight:\s*var\(--wiki-prose-heading-font-weight,\s*500\);[\s\S]*\}/,
+  "article headings should default to medium weight so bold formatting remains visible"
+);
+assert.match(
+  articleBodyCss,
+  /\.wiki-article-prose :where\(h1, h2, h3, h4, h5, h6\) :where\(strong, b\)\s*\{[\s\S]*font-weight:\s*var\(--wiki-prose-heading-bold-font-weight,\s*700\);[\s\S]*\}/,
+  "bold text inside article headings should have a distinct heavier weight"
+);
+assert.match(
+  wikiCss,
+  /\.wiki-page-heading__title\s*\{[\s\S]*font-weight:\s*var\(--wiki-chrome-page-title-font-weight,\s*500\);[\s\S]*\}/,
+  "wiki page titles should default to medium weight instead of theme-heavy headings"
+);
+assert.match(
+  articleBodyCss,
+  /\.wiki-article-prose :where\(a\.wiki-external-link, \.wiki-editor-link\.wiki-external-link\)::before\s*\{[\s\S]*content:\s*var\(--wiki-prose-external-link-icon,[\s\S]*\);[\s\S]*\}/,
+  "external article and editor links should render a leading icon"
+);
 
 assert.match(libraryJs, /const wikiArticleCss = require\("\.\/lib\/wiki-article-css"\)/);
 assert.match(libraryJs, /"\/westgate-wiki\/article-css"/);

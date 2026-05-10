@@ -10,7 +10,7 @@
  *   --wiki-prose-font-family, --wiki-prose-heading-font-family
  *   --wiki-prose-font-size, --wiki-prose-line-height
  *   --wiki-prose-color, --wiki-prose-heading-color
- *   --wiki-prose-heading-font-weight, --wiki-prose-heading-text-shadow
+ *   --wiki-prose-heading-font-weight, --wiki-prose-heading-bold-font-weight, --wiki-prose-heading-text-shadow
  *   --wiki-prose-link-color, --wiki-prose-link-hover-color
  *   --wiki-prose-blockquote-bg, --wiki-prose-blockquote-border, --wiki-prose-blockquote-color
  *   --wiki-prose-code-font-family, --wiki-prose-code-bg, --wiki-prose-code-border, --wiki-prose-code-color
@@ -67,12 +67,16 @@
 .wiki-article-prose :where(h1, h2, h3, h4, h5, h6) {
   color: var(--wiki-prose-heading-color, var(--bs-heading-color, var(--bs-emphasis-color, inherit)));
   font-family: var(--wiki-prose-heading-font-family, var(--bs-heading-font-family, inherit));
-  font-weight: var(--wiki-prose-heading-font-weight, 600);
+  font-weight: var(--wiki-prose-heading-font-weight, 500);
   letter-spacing: 0;
   line-height: 1.25;
   margin-top: 0.85em;
   margin-bottom: 0.4em;
   text-shadow: var(--wiki-prose-heading-text-shadow, none);
+}
+
+.wiki-article-prose :where(h1, h2, h3, h4, h5, h6) :where(strong, b) {
+  font-weight: var(--wiki-prose-heading-bold-font-weight, 700);
 }
 
 /* !important: Harmony/Bootstrap may set `#content h1` etc. with higher specificity than two classes */
@@ -108,6 +112,19 @@
 
 .wiki-article-prose .wiki-editor-link {
   cursor: pointer;
+}
+
+.wiki-article-prose :where(a.wiki-external-link, .wiki-editor-link.wiki-external-link)::before {
+  content: var(--wiki-prose-external-link-icon, "\f35d");
+  display: inline-block;
+  font-family: var(--wiki-prose-external-link-icon-font-family, "Font Awesome 6 Free");
+  font-size: var(--wiki-prose-external-link-icon-size, 0.78em);
+  font-weight: var(--wiki-prose-external-link-icon-weight, 900);
+  line-height: 1;
+  margin-inline-end: var(--wiki-prose-external-link-icon-gap, 0.28em);
+  opacity: var(--wiki-prose-external-link-icon-opacity, 0.78);
+  text-decoration: none;
+  transform: translateY(-0.08em);
 }
 
 .wiki-article-prose mark {
