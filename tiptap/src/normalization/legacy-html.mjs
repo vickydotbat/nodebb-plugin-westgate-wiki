@@ -290,6 +290,22 @@ export function hasBlockDescendantChildren(element) {
   });
 }
 
+function isPoetryQuoteFigure(element) {
+  return !!(
+    element &&
+    element.tagName &&
+    element.tagName.toLowerCase() === "figure" &&
+    (
+      element.getAttribute("data-wiki-node") === "poetry-quote" ||
+      (element.classList && element.classList.contains("wiki-poetry-quote"))
+    )
+  );
+}
+
+function isInsidePluginOwnedStructure(element) {
+  return !!(element && element.closest && element.closest('[data-wiki-node="alignment-table"], figure.wiki-poetry-quote, [data-wiki-node="poetry-quote"]'));
+}
+
 export function normalizeLegacyPresentationalTags(document, root) {
   [
     ["abbr", "span"],
@@ -635,6 +651,10 @@ export function normalizeLegacyHtmlForTiptap(html) {
   }
 
   root.querySelectorAll("article, section, div").forEach(function (element) {
+    if (isInsidePluginOwnedStructure(element)) {
+      return;
+    }
+
     if (isPlainWrapperElement(element)) {
       unwrapElement(element);
       return;
@@ -659,6 +679,9 @@ export function normalizeLegacyHtmlForTiptap(html) {
 
   root.querySelectorAll("figcaption").forEach(function (element) {
     const parentTag = element.parentElement && element.parentElement.tagName ? element.parentElement.tagName.toLowerCase() : "";
+    if (parentTag === "figure" && isPoetryQuoteFigure(element.parentElement)) {
+      return;
+    }
     if (parentTag === "figure" && isSupportedImageFigure(element.parentElement)) {
       return;
     }
@@ -666,7 +689,7 @@ export function normalizeLegacyHtmlForTiptap(html) {
   });
 
   root.querySelectorAll("figure").forEach(function (element) {
-    if (!isSupportedImageFigure(element)) {
+    if (!isSupportedImageFigure(element) && !isPoetryQuoteFigure(element)) {
       unwrapElement(element);
     }
   });
@@ -726,7 +749,7 @@ export function detectUnsupportedContent(html) {
       return `Legacy HTML uses <${tag}>, which this Tiptap surface does not preserve safely yet.`;
     }
 
-    if (tag === "figure" && !isSupportedImageFigure(element)) {
+    if (tag === "figure" && !isSupportedImageFigure(element) && !isPoetryQuoteFigure(element)) {
       return "Legacy HTML uses a figure layout that this Tiptap surface does not preserve safely yet.";
     }
 

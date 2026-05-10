@@ -19,6 +19,7 @@ const script = fs.readFileSync(path.join(__dirname, "..", "public/wiki-article-t
 
 function createDom(articleBody, options = {}) {
   const smallViewport = options.smallViewport !== false;
+  const url = options.url || "https://example.test/wiki/example";
   const dom = new JSDOM(`<!doctype html><html><body>
     <div class="wiki-page-shell-with-transform" style="transform: translateZ(0);">
       <div class="westgate-wiki">
@@ -41,7 +42,7 @@ function createDom(articleBody, options = {}) {
   </body></html>`, {
     pretendToBeVisual: true,
     runScripts: "outside-only",
-    url: "https://example.test/wiki/example"
+    url
   });
 
   dom.window.matchMedia = function (query) {
@@ -127,4 +128,13 @@ test("desktop ToC link scrolls and releases focus so focus-within does not pin d
   assert.equal(heading.getAttribute("data-scrolled-into-view"), "1");
   assert.equal(dom.window.location.hash, "#alpha-section");
   assert.notEqual(document.activeElement, anchor);
+});
+
+test("article headings scroll to the current hash after generated ids are assigned", function () {
+  const dom = createDom("<h2>Alpha section</h2><p>Text</p>", {
+    url: "https://example.test/wiki/example#alpha-section"
+  });
+  const heading = dom.window.document.getElementById("alpha-section");
+
+  assert.equal(heading.getAttribute("data-scrolled-into-view"), "1");
 });

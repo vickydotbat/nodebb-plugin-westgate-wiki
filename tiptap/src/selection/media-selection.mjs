@@ -38,6 +38,34 @@ export function findNodeSelectionPos(editor, domNode, typeNames) {
   return null;
 }
 
+export function selectClickedImageNode(editor, target, editorMount) {
+  if (!editor || !target || typeof target.closest !== "function") {
+    return false;
+  }
+
+  const caption = target.closest("figcaption");
+  if (caption && editorMount && editorMount.contains(caption)) {
+    return false;
+  }
+
+  const imageFigure = target.closest('[data-wiki-node="image-figure"]');
+  const figureImage = target.closest('[data-wiki-node="image-figure"] img');
+  const imageNode = target.closest('img[data-wiki-node="image"]');
+  const plainImage = target.tagName && target.tagName.toLowerCase() === "img" ? target : null;
+  const clickedFigureSurface = imageFigure && target === imageFigure;
+  const selectableNode = imageFigure && (figureImage || clickedFigureSurface) ? imageFigure : (imageNode || plainImage);
+  if (!selectableNode || (editorMount && !editorMount.contains(selectableNode))) {
+    return false;
+  }
+
+  const selectionPos = findNodeSelectionPos(editor, selectableNode, ["imageFigure", "image"]);
+  if (selectionPos == null) {
+    return false;
+  }
+
+  return editor.chain().focus().setNodeSelection(selectionPos).run();
+}
+
 export function focusMediaCell(editor, cellElement) {
   if (!editor || !cellElement) {
     return false;

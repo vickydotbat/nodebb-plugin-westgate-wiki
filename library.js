@@ -52,6 +52,7 @@ plugin.init = async function (params) {
 plugin.registerApiRoutes = async function ({ router, middleware }) {
   const wikiNamespaceSearch = require("./lib/wiki-namespace-search");
   const wikiHomepage = require("./lib/wiki-homepage");
+  const wikiPageToc = require("./lib/wiki-page-toc");
   const wikiNamespaceCreateController = require("./lib/controllers/wiki-namespace-create");
   routeHelpers.setupApiRoute(
     router,
@@ -80,6 +81,13 @@ plugin.registerApiRoutes = async function ({ router, middleware }) {
     "/westgate-wiki/user-autocomplete",
     [],
     wikiUserAutocomplete.apiSearch
+  );
+  routeHelpers.setupApiRoute(
+    router,
+    "get",
+    "/westgate-wiki/page-toc",
+    [],
+    wikiPageToc.apiGetPageToc
   );
   routeHelpers.setupApiRoute(
     router,

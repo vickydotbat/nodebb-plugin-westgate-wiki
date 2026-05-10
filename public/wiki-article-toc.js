@@ -149,6 +149,31 @@
     });
   }
 
+  function scrollToCurrentHash() {
+    const hash = window.location && window.location.hash;
+    if (!hash || hash.charAt(0) !== "#") {
+      return;
+    }
+    let id;
+    try {
+      id = decodeURIComponent(hash.slice(1));
+    } catch (eDecode) {
+      id = hash.slice(1);
+    }
+    if (!id) {
+      return;
+    }
+    let target;
+    try {
+      target = document.getElementById(id);
+    } catch (eId) {
+      return;
+    }
+    if (target && typeof target.scrollIntoView === "function") {
+      target.scrollIntoView({ block: "start" });
+    }
+  }
+
   function isSmallDrawerViewport() {
     return typeof window.matchMedia === "function" &&
       window.matchMedia("(max-width: 1199.98px)").matches;
@@ -334,6 +359,7 @@
     }
 
     ensureHeadingIds(raw);
+    scrollToCurrentHash();
     const list = buildNestedList(raw);
     mount.innerHTML = "";
     if (truncated) {

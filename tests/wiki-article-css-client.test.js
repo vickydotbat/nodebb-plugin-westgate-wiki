@@ -42,6 +42,11 @@ assert.match(
 );
 assert.match(
   articleBodyCss,
+  /\.wiki-article-prose :where\(h1, h2, h3, h4, h5, h6\)\s*\{[\s\S]*text-shadow:\s*var\(--wiki-prose-heading-text-shadow,\s*2px\s+2px\s+10px\s+rgb\(0,\s*0,\s*0\)\);[\s\S]*\}/,
+  "article headings should default to the Westgate shadow treatment"
+);
+assert.match(
+  articleBodyCss,
   /\.wiki-article-prose :where\(h1, h2, h3, h4, h5, h6\) :where\(strong, b\)\s*\{[\s\S]*font-weight:\s*var\(--wiki-prose-heading-bold-font-weight,\s*700\);[\s\S]*\}/,
   "bold text inside article headings should have a distinct heavier weight"
 );
@@ -52,8 +57,13 @@ assert.match(
 );
 assert.match(
   articleBodyCss,
-  /\.wiki-article-prose :where\(a\.wiki-external-link, \.wiki-editor-link\.wiki-external-link\)::before\s*\{[\s\S]*content:\s*var\(--wiki-prose-external-link-icon,[\s\S]*\);[\s\S]*\}/,
-  "external article and editor links should render a leading icon"
+  /\.wiki-article-prose :where\(a\.wiki-external-link, \.wiki-editor-link\.wiki-external-link\)::after\s*\{[\s\S]*content:\s*var\(--wiki-prose-external-link-icon,[\s\S]*\);[\s\S]*margin-inline-start:\s*var\(--wiki-prose-external-link-icon-gap,[\s\S]*\);[\s\S]*\}/,
+  "external article and editor links should render a trailing icon"
+);
+assert.match(
+  articleBodyCss,
+  /\.wiki-article-prose hr\s*\{[\s\S]*background:\s*var\(\s*--wiki-prose-heading-rule,[\s\S]*var\(--wiki-prose-hr-color,[\s\S]*\);[\s\S]*\}/,
+  "article and editor horizontal rules should use the same ornamental rule token as major headings"
 );
 
 assert.match(libraryJs, /const wikiArticleCss = require\("\.\/lib\/wiki-article-css"\)/);

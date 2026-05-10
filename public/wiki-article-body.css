@@ -15,7 +15,7 @@
  *   --wiki-prose-blockquote-bg, --wiki-prose-blockquote-border, --wiki-prose-blockquote-color
  *   --wiki-prose-code-font-family, --wiki-prose-code-bg, --wiki-prose-code-border, --wiki-prose-code-color
  *   --wiki-prose-pre-bg, --wiki-prose-pre-border, --wiki-prose-pre-color
- *   --wiki-prose-hr-color
+ *   --wiki-prose-heading-rule, --wiki-prose-hr-color, --wiki-prose-hr-width
  *   --wiki-prose-table-border, --wiki-prose-table-head-color, --wiki-prose-table-hover-bg, --wiki-prose-table-hover-color
  *   --wiki-prose-caption-bg, --wiki-prose-caption-color, --wiki-prose-caption-font-family
  *   --wiki-prose-caption-font-size, --wiki-prose-caption-padding
@@ -72,7 +72,7 @@
   line-height: 1.25;
   margin-top: 0.85em;
   margin-bottom: 0.4em;
-  text-shadow: var(--wiki-prose-heading-text-shadow, none);
+  text-shadow: var(--wiki-prose-heading-text-shadow, 2px 2px 10px rgb(0, 0, 0));
 }
 
 .wiki-article-prose :where(h1, h2, h3, h4, h5, h6) :where(strong, b) {
@@ -114,14 +114,14 @@
   cursor: pointer;
 }
 
-.wiki-article-prose :where(a.wiki-external-link, .wiki-editor-link.wiki-external-link)::before {
+.wiki-article-prose :where(a.wiki-external-link, .wiki-editor-link.wiki-external-link)::after {
   content: var(--wiki-prose-external-link-icon, "\f35d");
   display: inline-block;
   font-family: var(--wiki-prose-external-link-icon-font-family, "Font Awesome 6 Free");
   font-size: var(--wiki-prose-external-link-icon-size, 0.78em);
   font-weight: var(--wiki-prose-external-link-icon-weight, 900);
   line-height: 1;
-  margin-inline-end: var(--wiki-prose-external-link-icon-gap, 0.28em);
+  margin-inline-start: var(--wiki-prose-external-link-icon-gap, 0.28em);
   opacity: var(--wiki-prose-external-link-icon-opacity, 0.78);
   text-decoration: none;
   transform: translateY(-0.08em);
@@ -134,6 +134,13 @@
   -webkit-box-decoration-break: clone;
   color: var(--wiki-prose-highlight-color, #241a05);
   padding: 0.02em 0.16em;
+}
+
+.wiki-article-prose p[style*="background-color"] {
+  display: table;
+  max-width: 100%;
+  padding: 0.08rem 0.22rem;
+  width: fit-content;
 }
 
 .wiki-article-prose .wiki-entity {
@@ -233,9 +240,19 @@
 }
 
 .wiki-article-prose hr {
+  background: var(
+    --wiki-prose-heading-rule,
+    linear-gradient(
+      90deg,
+      var(--wiki-prose-hr-color, var(--bs-border-color, #dee2e6)),
+      color-mix(in srgb, var(--wiki-prose-hr-color, var(--bs-border-color, #dee2e6)) 25%, transparent) 54%,
+      transparent
+    )
+  );
   border: 0;
-  border-top: 1px solid var(--wiki-prose-hr-color, var(--bs-border-color, #dee2e6));
-  margin: 1.5rem 0;
+  block-size: 1px;
+  inline-size: var(--wiki-prose-hr-width, min(14rem, 48%));
+  margin: 1.65rem 0;
 }
 
 .wiki-article-prose .wiki-footnote-ref {
@@ -401,9 +418,31 @@
   border-collapse: collapse;
 }
 
+.wiki-article-prose table.wiki-table-layout-auto {
+  table-layout: auto;
+}
+
+.wiki-article-prose table.wiki-table-layout-fixed {
+  table-layout: fixed;
+}
+
 .wiki-article-prose :where(th, td) {
   border: 1px solid var(--wiki-prose-table-border, var(--bs-border-color-translucent, var(--bs-border-color, #dee2e6)));
   padding: 0.5rem 0.65rem;
+}
+
+.wiki-article-prose table[style*="border-color"] :where(th, td) {
+  border-color: inherit;
+}
+
+.wiki-article-prose table.wiki-table-borderless,
+.wiki-article-prose table.wiki-table-borderless :where(th, td) {
+  border-color: transparent;
+  border-width: 0;
+}
+
+.wiki-article-prose :where(td, th)[style*="color"] :where(p, li) {
+  color: inherit;
 }
 
 .wiki-article-prose thead th {
@@ -430,6 +469,66 @@
 
 .wiki-article-prose .wiki-legacy-table-caption + table {
   margin-top: 0;
+}
+
+.wiki-article-prose .wiki-alignment-table {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.18rem;
+  margin: 1rem 0;
+}
+
+.wiki-article-prose .wiki-alignment-table--compact {
+  width: min(10rem, 100%);
+}
+
+.wiki-article-prose .wiki-alignment-table--full {
+  grid-template-columns: repeat(3, max-content);
+  max-width: 100%;
+  overflow-x: auto;
+  width: max-content;
+}
+
+.wiki-article-prose .wiki-alignment-table__cell {
+  align-items: center;
+  border: 1px solid var(--wiki-prose-table-border, var(--bs-border-color-translucent, var(--bs-border-color, #dee2e6)));
+  display: inline-flex;
+  justify-content: center;
+  padding: 0.45rem 0.55rem;
+  text-align: center;
+  font-size: 0.86rem;
+}
+
+.wiki-article-prose .wiki-alignment-table--compact .wiki-alignment-table__cell {
+  aspect-ratio: 1 / 1;
+  padding: 0.28rem 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.wiki-article-prose .wiki-alignment-table--full .wiki-alignment-table__cell {
+  min-width: 7.2rem;
+  white-space: nowrap;
+}
+
+.wiki-article-prose .wiki-alignment-table .wiki-alignment-table__cell > p {
+  margin-block: 0 !important;
+  padding: 0 !important;
+  line-height: inherit;
+}
+
+#content .wiki-article-prose .wiki-alignment-table .wiki-alignment-table__cell > p {
+  margin-block: 0 !important;
+  padding: 0 !important;
+  line-height: inherit;
+}
+
+.wiki-article-prose .wiki-alignment-table__cell--active {
+  border-color: var(--wiki-prose-table-highlight-border, var(--bs-warning, #ffc107));
+  background: color-mix(in srgb, var(--wiki-prose-table-highlight-bg, var(--bs-warning, #ffc107)) 24%, transparent);
+  color: var(--wiki-prose-table-highlight-color, var(--wiki-prose-color, inherit));
+  font-weight: 700;
 }
 
 .wiki-article-prose figure.image > figcaption {
@@ -581,23 +680,192 @@
 }
 
 .wiki-article-prose .wiki-callout {
-  border-left: 0.28rem solid var(--wiki-callout-border, var(--bs-info, #0dcaf0));
-  border-radius: var(--bs-border-radius, 0.5rem);
-  background: color-mix(in srgb, var(--wiki-callout-border, var(--bs-info, #0dcaf0)) 10%, transparent);
+  --wiki-callout-bg: #443b49;
+  --wiki-callout-border: #766f7d;
+  --wiki-callout-rail: #111015;
+  --wiki-callout-icon-bg: #332c38;
+  --wiki-callout-icon: url("/assets/plugins/nodebb-plugin-westgate-wiki/game-icons/scroll-unfurled.svg");
+  --wiki-callout-text: #ece7df;
+  position: relative;
+  display: block;
+  min-height: 3.25rem;
+  box-sizing: border-box;
+  border: 0;
+  border-left: 0.85rem solid var(--wiki-callout-rail);
+  border-top: 1px solid color-mix(in srgb, var(--wiki-callout-border) 74%, #fff 26%);
+  border-right: 1px solid rgba(255, 244, 214, 0.08);
+  border-bottom: 1px solid color-mix(in srgb, var(--wiki-callout-bg) 58%, #000 42%);
+  border-radius: 0;
+  background: var(--wiki-callout-bg);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 -1px 0 rgba(0, 0, 0, 0.16), 0 0.65rem 1.35rem rgba(0, 0, 0, 0.22);
+  color: var(--wiki-callout-text);
   margin: 1rem 0;
-  padding: 0.85rem 1rem;
+  padding: 0.95rem 1.1rem 0.95rem 5.15rem;
 }
 
-.wiki-article-prose .wiki-callout--warning {
-  --wiki-callout-border: var(--bs-warning, #ffc107);
+.wiki-article-prose .wiki-callout::before {
+  content: "";
+  position: absolute;
+  top: 0.45rem;
+  left: 1rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  background: color-mix(in srgb, var(--wiki-callout-icon-bg) 86%, #000 14%);
 }
 
-.wiki-article-prose .wiki-callout--danger {
-  --wiki-callout-border: var(--bs-danger, #dc3545);
+.wiki-article-prose .wiki-callout::after {
+  content: "";
+  position: absolute;
+  top: 0.95rem;
+  left: 1.5rem;
+  width: 1.75rem;
+  height: 1.75rem;
+  background: rgba(255, 255, 255, 0.94);
+  mask: var(--wiki-callout-icon) center / 1.75rem 1.75rem no-repeat;
+  -webkit-mask: var(--wiki-callout-icon) center / 1.75rem 1.75rem no-repeat;
+}
+
+.wiki-article-prose .wiki-callout > p {
+  display: inline;
+  margin: 0;
+}
+
+.wiki-article-prose .wiki-callout > p + p::before {
+  content: " ";
+}
+
+.wiki-article-prose .wiki-callout > :where(p, strong, b) {
+  color: inherit;
+}
+
+.wiki-article-prose .wiki-callout > p > strong:first-child {
+  font-weight: 700;
+}
+
+.wiki-article-prose .wiki-callout--note,
+.wiki-article-prose .wiki-callout--info {
+  --wiki-callout-bg: #443b49;
+  --wiki-callout-border: #766f7d;
+  --wiki-callout-rail: #111015;
+  --wiki-callout-icon-bg: #332c38;
+  --wiki-callout-icon: url("/assets/plugins/nodebb-plugin-westgate-wiki/game-icons/scroll-unfurled.svg");
 }
 
 .wiki-article-prose .wiki-callout--success {
-  --wiki-callout-border: var(--bs-success, #198754);
+  --wiki-callout-bg: #365b47;
+  --wiki-callout-border: #5f876e;
+  --wiki-callout-rail: #14251d;
+  --wiki-callout-icon-bg: #254233;
+  --wiki-callout-icon: url("/assets/plugins/nodebb-plugin-westgate-wiki/game-icons/candle-flame.svg");
+}
+
+.wiki-article-prose .wiki-callout--warning {
+  --wiki-callout-bg: #855d33;
+  --wiki-callout-border: #ac8554;
+  --wiki-callout-rail: #2a1b0c;
+  --wiki-callout-icon-bg: #624321;
+  --wiki-callout-icon: url("/assets/plugins/nodebb-plugin-westgate-wiki/game-icons/stabbed-note.svg");
+}
+
+.wiki-article-prose .wiki-callout--danger {
+  --wiki-callout-bg: #793131;
+  --wiki-callout-border: #a25a57;
+  --wiki-callout-rail: #10080a;
+  --wiki-callout-icon-bg: #552121;
+  --wiki-callout-icon: url("/assets/plugins/nodebb-plugin-westgate-wiki/game-icons/duality-mask.svg");
+}
+
+.wiki-article-prose .wiki-poetry-quote {
+  display: table;
+  margin: 1rem 0;
+  max-width: 100%;
+  width: fit-content;
+}
+
+.wiki-article-prose .wiki-poetry-quote__body {
+  position: relative;
+  border: 1px solid var(--wiki-poetry-quote-border, rgba(194, 163, 90, 0.46));
+  border-radius: var(--wiki-poetry-quote-radius, var(--bs-border-radius, 0.5rem));
+  background: var(--wiki-poetry-quote-bg, linear-gradient(145deg, #1b101d 0%, #100d14 62%, #08070a 100%));
+  box-shadow: var(--wiki-poetry-quote-shadow, inset 0 1px 0 rgba(255, 244, 214, 0.06), 0 0.85rem 2rem rgba(0, 0, 0, 0.24));
+  color: var(--wiki-poetry-quote-color, var(--wiki-prose-color, var(--bs-body-color, #d8d0c5)));
+  margin: 0;
+  padding: 0.85rem 3rem 0.95rem;
+  text-align: var(--wiki-poetry-quote-text-align, left);
+}
+
+.wiki-article-prose .wiki-poetry-quote__body::before,
+.wiki-article-prose .wiki-poetry-quote__body::after {
+  position: absolute;
+  color: var(--wiki-poetry-quote-mark-color, var(--wiki-prose-link-color, #c2a35a));
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 2.4rem;
+  font-weight: 700;
+  line-height: 1;
+  opacity: 0.74;
+  pointer-events: none;
+  text-shadow: 0 0 12px rgba(194, 163, 90, 0.24);
+}
+
+.wiki-article-prose .wiki-poetry-quote__body::before {
+  content: "\201C";
+  top: 0.62rem;
+  left: 1.35rem;
+}
+
+.wiki-article-prose .wiki-poetry-quote__body::after {
+  content: "\201D";
+  right: 1.35rem;
+  bottom: 0.35rem;
+}
+
+.wiki-article-prose .wiki-poetry-quote--plain {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.wiki-article-prose .wiki-poetry-quote--plain::before {
+  content: "";
+  position: absolute;
+  inset: -5% 1%;
+  background: #00000059;
+  filter: blur(60px);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.wiki-article-prose .wiki-poetry-quote--plain .wiki-poetry-quote__body {
+  position: relative;
+  z-index: 1;
+  border: 0;
+  background: transparent;
+  box-shadow: none !important;
+  text-shadow: 0 0.35rem 0.7rem rgba(0, 0, 0, 0.72);
+  padding-inline: 2.35rem;
+}
+
+.wiki-article-prose .wiki-poetry-quote--plain .wiki-poetry-quote__body::before {
+  left: 0.5rem;
+}
+
+.wiki-article-prose .wiki-poetry-quote--plain .wiki-poetry-quote__body::after {
+  right: 0.5rem;
+}
+
+.wiki-article-prose .wiki-poetry-quote__body > :first-child {
+  margin-top: 0;
+}
+
+.wiki-article-prose .wiki-poetry-quote__body > :last-child {
+  margin-bottom: 0;
+}
+
+.wiki-article-prose .wiki-poetry-quote__attribution {
+  color: var(--wiki-poetry-quote-attribution-color, var(--wiki-prose-heading-color, #d4b764));
+  font-size: 0.95em;
+  margin-top: 0.35rem;
+  text-align: left;
 }
 
 /* Center simple imported image paragraphs without affecting images placed inside custom div/flex layouts. */

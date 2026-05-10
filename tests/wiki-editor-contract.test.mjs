@@ -21,53 +21,74 @@ function test(name, fn) {
 
 installJsdomGlobals();
 
-const [{ Editor }, StarterKitModule, ImageModule, PreservedNodeAttributesModule, StyledSpanModule, ContainerBlockModule, MediaRowModule, ImageFigureModule, WikiCalloutModule, WikiEditingKeymapModule, SlashCommandModule, WikiCodeBlockModule, WikiLinkModule, WikiEntitiesModule, toolbarSchemaModule, editorTocModule, linkInteractionsModule, imageResizeModule, legacyHtmlModule, sanitizerContractModule] = await Promise.all([
+const [{ Editor }, StarterKitModule, HighlightModule, ImageModule, TableModule, TableCellModule, TableHeaderModule, TableRowModule, PreservedNodeAttributesModule, StyledSpanModule, ContainerBlockModule, MediaRowModule, ImageFigureModule, WikiAlignmentTableModule, WikiCalloutModule, WikiPoetryQuoteModule, WikiEditingKeymapModule, SlashCommandModule, WikiCodeBlockModule, WikiBlockBackgroundModule, WikiLinkModule, WikiEntitiesModule, toolbarSchemaModule, editorTocModule, linkInteractionsModule, imageResizeModule, mediaSelectionModule, legacyHtmlModule, sanitizerContractModule, colorContrastModule] = await Promise.all([
   import("@tiptap/core"),
   import("@tiptap/starter-kit"),
+  import("../tiptap/src/extensions/wiki-highlight.mjs"),
   import("@tiptap/extension-image"),
+  import("@tiptap/extension-table"),
+  import("@tiptap/extension-table-cell"),
+  import("@tiptap/extension-table-header"),
+  import("@tiptap/extension-table-row"),
   import("../tiptap/src/extensions/preserved-node-attributes.mjs"),
   import("../tiptap/src/extensions/styled-span.mjs"),
   import("../tiptap/src/extensions/container-block.mjs"),
   import("../tiptap/src/extensions/media-row.mjs"),
   import("../tiptap/src/extensions/image-figure.mjs"),
+  import("../tiptap/src/extensions/wiki-alignment-table.mjs"),
   import("../tiptap/src/extensions/wiki-callout.mjs"),
+  import("../tiptap/src/extensions/wiki-poetry-quote.mjs"),
   import("../tiptap/src/extensions/wiki-editing-keymap.mjs"),
   import("../tiptap/src/extensions/slash-command.mjs"),
   import("../tiptap/src/extensions/wiki-code-block.mjs"),
+  import("../tiptap/src/extensions/wiki-block-background.mjs"),
   import("../tiptap/src/extensions/wiki-link.mjs"),
   import("../tiptap/src/extensions/wiki-entities.mjs"),
   import("../tiptap/src/toolbar/toolbar-schema.mjs"),
   import("../tiptap/src/toolbar/editor-toc.mjs"),
   import("../tiptap/src/selection/link-interactions.mjs"),
   import("../tiptap/src/selection/image-resize.mjs"),
+  import("../tiptap/src/selection/media-selection.mjs"),
   import("../tiptap/src/normalization/legacy-html.mjs"),
-  import("../tiptap/src/shared/sanitizer-contract.mjs")
+  import("../tiptap/src/shared/sanitizer-contract.mjs"),
+  import("../tiptap/src/shared/color-contrast.mjs")
 ]);
 
 const StarterKit = StarterKitModule.default;
+const Highlight = HighlightModule.default;
 const Image = ImageModule.default;
+const { Table } = TableModule;
+const { TableCell } = TableCellModule;
+const { TableHeader } = TableHeaderModule;
+const { TableRow } = TableRowModule;
 const PreservedNodeAttributes = PreservedNodeAttributesModule.default;
 const StyledSpan = StyledSpanModule.default;
 const ContainerBlock = ContainerBlockModule.default;
 const { MediaCell, MediaRow } = MediaRowModule;
 const ImageFigure = ImageFigureModule.default;
+const WikiAlignmentTable = WikiAlignmentTableModule.default;
 const WikiCallout = WikiCalloutModule.default;
+const WikiPoetryQuote = WikiPoetryQuoteModule.default;
 const WikiEditingKeymap = WikiEditingKeymapModule.default;
 const SlashCommand = SlashCommandModule.default;
 const WikiCodeBlock = WikiCodeBlockModule.default;
+const WikiBlockBackground = WikiBlockBackgroundModule.default;
 const WikiLink = WikiLinkModule.default;
 const { WikiFootnote, WikiNamespaceLink, WikiPageLink, WikiUserMention } = WikiEntitiesModule;
 const { IMAGE_CONTEXT_BUTTON_IDS, TABLE_CONTEXT_BUTTON_IDS, TOP_TOOLBAR_BUTTON_IDS, TOP_TOOLBAR_GROUPS } = toolbarSchemaModule;
 const { buildHeadingToc, navigateToHeading } = editorTocModule;
 const { installEditorLinkNavigationGuard, selectEditorLink } = linkInteractionsModule;
-const { calculateResizedImageWidth, setSelectedImageWidth } = imageResizeModule;
+const { calculateResizedImageWidth, getSelectedImageElement, setSelectedImageWidth } = imageResizeModule;
+const { selectClickedImageNode } = mediaSelectionModule;
 const {
   detectUnsupportedContent,
   getNormalizationNotice,
   normalizeLegacyHtmlForTiptap
 } = legacyHtmlModule;
 const { sanitizeHtml } = sanitizerContractModule;
+const { getReadableTextColor, normalizeHexColor } = colorContrastModule;
 const articleBodyCss = readFileSync(new URL("../public/wiki-article-body.css", import.meta.url), "utf8");
+const pluginJsonSource = readFileSync(new URL("../plugin.json", import.meta.url), "utf8");
 const wikiJsSource = readFileSync(new URL("../public/wiki.js", import.meta.url), "utf8");
 const editorCss = readFileSync(new URL("../tiptap/src/wiki-editor.css", import.meta.url), "utf8");
 const vendoredEditorCss = readFileSync(new URL("../public/vendor/tiptap/wiki-tiptap.css", import.meta.url), "utf8");
@@ -94,9 +115,15 @@ function createEditor(content) {
       MediaCell,
       MediaRow,
       ImageFigure,
+      WikiAlignmentTable,
       WikiCallout,
+      WikiPoetryQuote,
       WikiEditingKeymap,
       WikiCodeBlock,
+      WikiBlockBackground,
+      Highlight.configure({
+        multicolor: true
+      }),
       WikiPageLink,
       WikiNamespaceLink,
       WikiUserMention,
@@ -125,7 +152,11 @@ function createEditor(content) {
         HTMLAttributes: {
           "data-wiki-node": "image"
         }
-      })
+      }),
+      Table,
+      TableRow,
+      TableHeader,
+      TableCell
     ],
     content: content || ""
   });
@@ -153,11 +184,12 @@ await test("normalizeLegacyHtmlForTiptap keeps supported image figures and norma
 
 await test("normalizeLegacyHtmlForTiptap converts legacy wiki inline syntax into entity spans", function () {
   const normalized = normalizeLegacyHtmlForTiptap(
-    '<p>See [[Guides/Map Creation Guide|Map guide]], [[ns:Guides]], @xtul, and ((Important note)). <code>[[Raw]] @raw ((raw))</code></p>'
+    '<p>See [[Guides/Map Creation Guide|Map guide]], [[Guides/Map Creation Guide#Advanced Setup|setup]], [[ns:Guides]], @xtul, and ((Important note)). <code>[[Raw]] @raw ((raw))</code></p>'
   );
 
   assert.match(normalized, /data-wiki-entity="page"/);
   assert.match(normalized, /data-wiki-target="Guides\/Map Creation Guide"/);
+  assert.match(normalized, /data-wiki-target="Guides\/Map Creation Guide#Advanced Setup"/);
   assert.match(normalized, /data-wiki-entity="namespace"/);
   assert.match(normalized, /data-wiki-target="Guides"/);
   assert.match(normalized, /data-wiki-entity="user"/);
@@ -226,6 +258,7 @@ await test("editor image resize handles are scoped and draggable from the corner
     assert.match(css, /\.westgate-wiki-compose \.wiki-editor-image-resize__handle--nw\s*{[^}]*cursor:\s*nwse-resize/);
     assert.match(css, /\.westgate-wiki-compose \.wiki-editor-image-resize__handle--ne\s*{[^}]*cursor:\s*nesw-resize/);
     assert.match(css, /\.wiki-editor--resizing-image\s*{[^}]*user-select:\s*none/);
+    assert.match(css, /figure\.image \.wiki-image-figure__media\s*{[^}]*cursor:\s*pointer;[^}]*user-select:\s*none/);
   });
 });
 
@@ -268,15 +301,225 @@ await test("styled span classes and styles round-trip through the extracted exte
   editor.destroy();
 });
 
+await test("highlight colors render as sanitized multicolor marks", function () {
+  const editor = createEditor("<p>Colored highlight</p>");
+
+  editor.commands.setTextSelection({ from: 1, to: 8 });
+  editor.commands.toggleHighlight({ color: "#bfdbfe" });
+  const rendered = editor.getHTML();
+
+  assert.match(rendered, /<mark[^>]*style="[^"]*background-color: rgb\(191, 219, 254\);[^"]*"[^>]*>Colored<\/mark>/);
+  assert.match(rendered, /<mark[^>]*style="[^"]*color: rgb\(17, 24, 39\);[^"]*"[^>]*>Colored<\/mark>/);
+  editor.destroy();
+});
+
+await test("highlight colors auto-select a legible foreground for custom dark backgrounds", function () {
+  const editor = createEditor("<p>Custom highlight</p>");
+
+  editor.commands.setTextSelection({ from: 1, to: 7 });
+  editor.commands.toggleHighlight({ color: "#3b0764" });
+  const rendered = editor.getHTML();
+
+  assert.match(rendered, /<mark[^>]*style="[^"]*background-color: rgb\(59, 7, 100\);[^"]*"[^>]*>Custom<\/mark>/);
+  assert.match(rendered, /<mark[^>]*style="[^"]*color: rgb\(249, 250, 251\);[^"]*"[^>]*>Custom<\/mark>/);
+  editor.destroy();
+});
+
+await test("block background command applies and removes sanitized text block color styles", function () {
+  const editor = createEditor('<p style="text-align: center">Block background</p>');
+
+  editor.commands.setTextSelection(3);
+  assert.equal(editor.commands.setWikiBlockBackground({ backgroundColor: "#dcfce7" }), true);
+  assert.match(editor.getHTML(), /<p style="text-align: center; background-color: rgb\(220, 252, 231\); color: rgb\(17, 24, 39\);?">Block background<\/p>/);
+
+  assert.equal(editor.commands.unsetWikiBlockBackground(), true);
+  assert.match(editor.getHTML(), /<p style="text-align: center;">Block background<\/p>/);
+  editor.destroy();
+});
+
+await test("block background command auto-selects a legible foreground for custom dark backgrounds", function () {
+  const editor = createEditor("<p>Dark block</p>");
+
+  editor.commands.setTextSelection(3);
+  assert.equal(editor.commands.setWikiBlockBackground({ backgroundColor: "#111827" }), true);
+  assert.match(editor.getHTML(), /<p style="background-color: rgb\(17, 24, 39\); color: rgb\(249, 250, 251\);?">Dark block<\/p>/);
+  editor.destroy();
+});
+
+await test("editor color contrast helpers normalize custom hex colors and choose readable text", function () {
+  assert.equal(normalizeHexColor("abc"), "#aabbcc");
+  assert.equal(normalizeHexColor("#3B0764"), "#3b0764");
+  assert.equal(normalizeHexColor("not-a-color"), "");
+  assert.equal(getReadableTextColor("#3b0764"), "#f9fafb");
+  assert.equal(getReadableTextColor("#fef08a"), "#111827");
+});
+
+await test("editor toolbar exposes highlight and text block background color palettes", function () {
+  assert.match(editorBundleSource, /const HIGHLIGHT_COLOR_OPTIONS = \[/);
+  assert.match(editorBundleSource, /label:\s*"Magenta"[\s\S]*backgroundColor:\s*"#f5d0fe"/);
+  assert.match(editorBundleSource, /Highlight\.configure\(\{[\s\S]*multicolor:\s*true[\s\S]*\}\)/);
+  assert.match(editorBundleSource, /getReadableTextColor\(backgroundColor\)/);
+  assert.match(editorBundleSource, /normalizeHexColor\(customColor\.value\)/);
+  assert.match(editorBundleSource, /toggleHighlight\(\{ color: backgroundColor, textColor \}\)/);
+  assert.match(editorBundleSource, /const BLOCK_BACKGROUND_COLOR_OPTIONS = \[/);
+  assert.match(editorBundleSource, /setWikiBlockBackground\(\{ backgroundColor, textColor \}\)/);
+  assert.match(editorBundleSource, /unsetWikiBlockBackground\(\)/);
+  assert.match(editorCss, /\.wiki-editor-color-menu\s*\{/);
+  assert.match(editorCss, /\.wiki-editor-color-swatch\s*\{/);
+  assert.match(editorCss, /\.wiki-editor-color-custom\s*\{/);
+  assert.match(vendoredEditorCss, /\.wiki-editor-color-menu\s*\{/);
+  assert.match(vendoredEditorCss, /\.wiki-editor-color-swatch\s*\{/);
+  assert.match(vendoredEditorCss, /\.wiki-editor-color-custom\s*\{/);
+});
+
+await test("paragraph block backgrounds shrink to the text width in article and editor prose", function () {
+  assert.match(articleBodyCss, /\.wiki-article-prose p\[style\*="background-color"\]\s*\{[^}]*display:\s*table/s);
+  assert.match(articleBodyCss, /\.wiki-article-prose p\[style\*="background-color"\]\s*\{[^}]*width:\s*fit-content/s);
+});
+
+await test("table cell block backgrounds keep their paired foreground color", function () {
+  const editor = createEditor("<table><tbody><tr><td><p>Cell background</p></td></tr></tbody></table>");
+
+  editor.commands.setTextSelection(5);
+  assert.equal(editor.commands.setWikiBlockBackground({ backgroundColor: "#dbeafe" }), true);
+  assert.match(editor.getHTML(), /<td[^>]*style="background-color: rgb\(219, 234, 254\); color: rgb\(17, 24, 39\);"[^>]*><p>Cell background<\/p><\/td>/);
+  assert.match(articleBodyCss, /\.wiki-article-prose :where\(td, th\)\[style\*="color"\] :where\(p, li\)\s*\{[^}]*color:\s*inherit/s);
+  editor.destroy();
+});
+
+await test("table styles preserve flexible size and border controls", function () {
+  const editor = createEditor('<table><tbody><tr><td><p>Flexible</p></td></tr></tbody></table>');
+
+  editor.commands.setTextSelection(5);
+  assert.equal(editor.commands.updateAttributes("table", {
+    class: "wiki-table-borderless wiki-table-layout-auto",
+    style: "width: 50%; border-color: #caa55a"
+  }), true);
+  assert.equal(editor.commands.updateAttributes("tableCell", {
+    style: "width: 12rem; border-color: #caa55a"
+  }), true);
+  assert.equal(editor.commands.updateAttributes("tableRow", {
+    style: "height: 3rem"
+  }), true);
+
+  const rendered = editor.getHTML();
+  assert.match(rendered, /<table[^>]*class="wiki-table-borderless wiki-table-layout-auto"[^>]*style="width: 50%; border-color: rgb\(202, 165, 90\);?"/);
+  assert.match(rendered, /<tr style="height: 3rem;?">/);
+  assert.match(rendered, /<td[^>]*style="width: 12rem; border-color: rgb\(202, 165, 90\);?"/);
+  assert.match(sanitizeHtml(rendered), /border-color: rgb\(202, 165, 90\)/);
+  [editorCss, vendoredEditorCss].forEach(function (css) {
+    assert.match(css, /\.westgate-wiki-compose\s+\.wiki-editor__content\s+table\.wiki-table-layout-fixed\s*\{[^}]*table-layout:\s*fixed/s);
+    assert.match(css, /\.westgate-wiki-compose\s+\.wiki-editor__content\s+table\[style\*=(?:"border-color"|border-color)\]\s+:where\(th,\s*td\)\s*\{[^}]*border-color:\s*inherit/s);
+    assert.match(css, /\.westgate-wiki-compose\s+\.wiki-editor__content\s+\.column-resize-handle\s*\{[^}]*cursor:\s*col-resize/s);
+    assert.match(css, /\.westgate-wiki-compose\s+\.wiki-editor-table-resize-handle--width\s*\{[^}]*cursor:\s*ew-resize/s);
+    assert.match(css, /\.westgate-wiki-compose\s+\.wiki-editor-table-resize-handle--row\s*\{[^}]*cursor:\s*ns-resize/s);
+  });
+  assert.match(editorBundleSource, /applyStyleToTableColumnCells/);
+  assert.match(editorBundleSource, /updateTableElementAttributes/);
+  assert.match(editorBundleSource, /class\s+WestgateTableView\s+extends\s+TableView/);
+  assert.match(editorBundleSource, /applyTableNodeAttributesToView\(this\.table,\s*node\.attrs\)/);
+  assert.match(editorBundleSource, /View:\s*WestgateTableView/);
+  assert.match(editorBundleSource, /createTableDimensionHandles/);
+  assert.match(editorBundleSource, /Resize table width/);
+  assert.match(editorBundleSource, /Resize row \$\{index \+ 1\} height/);
+  editor.destroy();
+});
+
+await test("alignment table node renders selected DnD alignments as a dedicated grid", function () {
+  const editor = createEditor("");
+
+  assert.equal(editor.commands.insertWikiAlignmentTable({ highlighted: ["lg", "tn", "ce", "bad"] }), true);
+  const rendered = editor.getHTML();
+
+  assert.match(rendered, /data-wiki-node="alignment-table"/);
+  assert.match(rendered, /data-alignments="lg tn ce"/);
+  assert.match(rendered, /data-mode="compact"/);
+  assert.match(rendered, />LG<\/div>/);
+  assert.match(rendered, />TN<\/div>/);
+  assert.match(rendered, />CE<\/div>/);
+  assert.doesNotMatch(rendered, /Lawful Good/);
+  assert.match(rendered, /wiki-alignment-table__cell--active/);
+  assert.doesNotMatch(rendered, /<td/);
+  editor.destroy();
+});
+
+await test("alignment table full mode preserves full labels as secondary display", function () {
+  const editor = createEditor("");
+
+  assert.equal(editor.commands.insertWikiAlignmentTable({ highlighted: ["ng"], mode: "full" }), true);
+  const rendered = editor.getHTML();
+
+  assert.match(rendered, /data-mode="full"/);
+  assert.match(rendered, /Neutral Good/);
+  assert.doesNotMatch(rendered, />NG<\/div>/);
+  editor.destroy();
+});
+
+await test("normalizeLegacyHtmlForTiptap preserves saved alignment tables as plugin-owned structures", function () {
+  const savedHtml = '<div class="wiki-alignment-table wiki-alignment-table--compact" data-wiki-node="alignment-table" data-alignments="lg tn" data-mode="compact" contenteditable="false"><div class="wiki-alignment-table__cell wiki-alignment-table__cell--active" data-alignment="lg">LG</div><div class="wiki-alignment-table__cell" data-alignment="ng">NG</div></div>';
+  const normalized = normalizeLegacyHtmlForTiptap(savedHtml);
+
+  assert.match(normalized, /data-wiki-node="alignment-table"/);
+  assert.match(normalized, /<div class="wiki-alignment-table__cell wiki-alignment-table__cell--active" data-alignment="lg">LG<\/div>/);
+  assert.doesNotMatch(normalized, /<p class="wiki-alignment-table__cell/);
+});
+
+await test("normalizeLegacyHtmlForTiptap preserves saved poetry quotes as plugin-owned structures", function () {
+  const savedHtml = '<figure class="wiki-poetry-quote wiki-poetry-quote--plain" data-wiki-node="poetry-quote" data-wiki-quote-container="false"><blockquote class="wiki-poetry-quote__body"><p>Spoken words.</p><p class="wiki-poetry-quote__attribution">- Author</p></blockquote></figure>';
+  const normalized = normalizeLegacyHtmlForTiptap(savedHtml);
+
+  assert.match(normalized, /<figure class="wiki-poetry-quote wiki-poetry-quote--plain" data-wiki-node="poetry-quote" data-wiki-quote-container="false">/);
+  assert.match(normalized, /<blockquote class="wiki-poetry-quote__body">/);
+  assert.match(normalized, /<p class="wiki-poetry-quote__attribution">- Author<\/p>/);
+});
+
+await test("saved containerless poetry quotes reopen as editable quote widgets", function () {
+  const savedHtml = '<figure class="wiki-poetry-quote wiki-poetry-quote--plain" data-wiki-node="poetry-quote" data-wiki-quote-container="false"><blockquote class="wiki-poetry-quote__body"><p>Spoken words.</p><p class="wiki-poetry-quote__attribution">- Author</p></blockquote></figure>';
+  const editor = createEditor(normalizeLegacyHtmlForTiptap(savedHtml));
+  const rendered = editor.getHTML();
+
+  assert.equal(editor.state.doc.child(0).type.name, "wikiPoetryQuote");
+  assert.equal(editor.getJSON().content[0].attrs.container, false);
+  assert.match(rendered, /data-wiki-quote-container="false"/);
+  assert.match(rendered, /wiki-poetry-quote--plain/);
+  editor.destroy();
+});
+
+await test("saved alignment tables reopen as atomic editable widgets", function () {
+  const savedHtml = '<div class="wiki-alignment-table wiki-alignment-table--compact" data-wiki-node="alignment-table" data-alignments="lg tn" data-mode="compact" contenteditable="false"><div class="wiki-alignment-table__cell wiki-alignment-table__cell--active" data-alignment="lg">LG</div><div class="wiki-alignment-table__cell" data-alignment="ng">NG</div></div>';
+  const editor = createEditor(normalizeLegacyHtmlForTiptap(savedHtml));
+  const rendered = editor.getHTML();
+
+  assert.equal(editor.state.doc.child(0).type.name, "wikiAlignmentTable");
+  assert.match(rendered, /data-wiki-node="alignment-table"/);
+  assert.match(rendered, />LG<\/div>/);
+  assert.doesNotMatch(rendered, /<p class="wiki-alignment-table__cell/);
+  editor.destroy();
+});
+
+await test("alignment table css keeps compact cells square and full labels unwrapped", function () {
+  assert.match(articleBodyCss, /\.wiki-article-prose\s+\.wiki-alignment-table--compact\s+\.wiki-alignment-table__cell\s*\{[^}]*aspect-ratio:\s*1\s*\/\s*1/s);
+  assert.match(articleBodyCss, /\.wiki-article-prose\s+\.wiki-alignment-table--full\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*max-content\)/s);
+  assert.match(articleBodyCss, /\.wiki-article-prose\s+\.wiki-alignment-table--full\s+\.wiki-alignment-table__cell\s*\{[^}]*white-space:\s*nowrap/s);
+});
+
+await test("alignment table cells suppress paragraph wrapper spacing in article prose", function () {
+  assert.match(articleBodyCss, /\.wiki-article-prose\s+\.wiki-alignment-table\s+\.wiki-alignment-table__cell\s*>\s*p\s*\{[^}]*margin-block:\s*0\s*!important/s);
+  assert.match(articleBodyCss, /\.wiki-article-prose\s+\.wiki-alignment-table\s+\.wiki-alignment-table__cell\s*>\s*p\s*\{[^}]*padding:\s*0\s*!important/s);
+});
+
 await test("imageFigure parses and renders linked figures with captions intact", function () {
   const editor = createEditor(
     '<figure class="image image-style-align-right wiki-image-size-md" id="hero"><a href="/full.png" target="_blank" rel="noopener noreferrer"><img src="/thumb.png" alt="Thumb" width="240"></a><figcaption><p>Caption</p></figcaption></figure>'
   );
   const rendered = editor.getHTML();
+  const figureDom = editor.view.dom.querySelector('figure[data-wiki-node="image-figure"]');
 
   assert.match(rendered, /<figure class="image image-style-align-right wiki-image-size-md" data-wiki-node="image-figure" id="hero">/);
   assert.match(rendered, /<a href="\/full\.png" target="_blank" rel="noopener noreferrer"><img src="\/thumb\.png" alt="Thumb" width="240"><\/a>/);
   assert.match(rendered, /<figcaption><p>Caption<\/p><\/figcaption>/);
+  assert.equal(figureDom.querySelector(".wiki-image-figure__media").getAttribute("contenteditable"), "false");
+  assert.equal(figureDom.querySelector("figcaption").getAttribute("contenteditable"), null);
   editor.destroy();
 });
 
@@ -292,8 +535,27 @@ await test("regular image can be converted into a plugin-owned image figure", fu
   assert.match(rendered, /<img src="\/plain\.png" alt="Plain" title="Plain title" width="320">/);
   assert.match(rendered, /<figcaption><p><\/p><\/figcaption>/);
   assert.doesNotMatch(rendered, /<p><figure/);
-  assert.equal(editor.state.selection.$from.parent.type.name, "paragraph");
-  assert.equal(editor.state.selection.$from.node(editor.state.selection.$from.depth - 1).type.name, "imageFigure");
+  assert.equal(editor.state.selection.node && editor.state.selection.node.type.name, "imageFigure");
+  assert.equal(setSelectedImageWidth(editor, 280), true);
+  assert.match(editor.getHTML(), /<img src="\/plain\.png" alt="Plain" title="Plain title" width="280">/);
+  editor.destroy();
+});
+
+await test("image figure can be converted back into a regular editable image", function () {
+  const editor = createEditor('<figure class="image image-style-align-right wiki-image-size-md" id="hero"><img src="/plain.png" alt="Plain" title="Plain title" width="320"><figcaption><p>Caption</p></figcaption></figure>');
+  const figure = editor.view.dom.querySelector("figure.image");
+  const selectionPos = editor.view.posAtDOM(figure, 0);
+
+  editor.chain().focus().setNodeSelection(selectionPos).convertFigureToImage().run();
+  const rendered = editor.getHTML();
+
+  assert.match(rendered, /<img[^>]*src="\/plain\.png"[^>]*>/);
+  assert.match(rendered, /<img[^>]*alt="Plain"[^>]*>/);
+  assert.match(rendered, /<img[^>]*title="Plain title"[^>]*>/);
+  assert.match(rendered, /<img[^>]*width="320"[^>]*>/);
+  assert.match(rendered, /class="wiki-image-align-right wiki-image-size-md"/);
+  assert.doesNotMatch(rendered, /<figure/);
+  assert.equal(editor.state.selection.node && editor.state.selection.node.type.name, "image");
   editor.destroy();
 });
 
@@ -326,6 +588,56 @@ await test("selected image figure width updates through the same resize contract
   assert.match(rendered, /<img src="\/figure\.png" alt="Figure" width="260">/);
   assert.doesNotMatch(rendered, /wiki-image-size-lg/);
   editor.destroy();
+});
+
+await test("full-width image figures can be reselected by clicking the figure surface", function () {
+  const editor = createEditor('<figure class="image image-style-block wiki-image-size-full"><img src="/full.png" alt="Full"><figcaption><p>Caption</p></figcaption></figure><p>After</p>');
+  const figure = editor.view.dom.querySelector('[data-wiki-node="image-figure"]');
+
+  editor.commands.setTextSelection(editor.state.doc.content.size);
+  assert.equal(selectClickedImageNode(editor, figure, editor.view.dom), true);
+  assert.equal(editor.state.selection.node.type.name, "imageFigure");
+  editor.destroy();
+});
+
+await test("image figure captions remain editable instead of selecting the whole figure", function () {
+  const editor = createEditor('<figure class="image"><img src="/full.png" alt="Full"><figcaption><p>Caption</p></figcaption></figure><p>After</p>');
+  const captionText = editor.view.dom.querySelector("figcaption p").firstChild;
+  const image = editor.view.dom.querySelector("figure.image img");
+
+  editor.commands.setTextSelection(editor.state.doc.content.size);
+  assert.equal(selectClickedImageNode(editor, captionText, editor.view.dom), false);
+  assert.notEqual(editor.state.selection.node && editor.state.selection.node.type.name, "imageFigure");
+
+  assert.equal(selectClickedImageNode(editor, image, editor.view.dom), true);
+  assert.equal(editor.state.selection.node.type.name, "imageFigure");
+  editor.destroy();
+});
+
+await test("saved aligned image figures can be selected from the image element", function () {
+  const editor = createEditor('<figure class="image image-style-align-right" data-wiki-node="image-figure"><img src="/assets/uploads/files/1778247064628-fire.gif" alt="fire.gif" width="755"><figcaption><p>Figure 1: me irl</p></figcaption></figure>');
+  const image = editor.view.dom.querySelector('figure.image img[width="755"]');
+
+  editor.commands.setTextSelection(editor.state.doc.content.size);
+  assert.equal(selectClickedImageNode(editor, image, editor.view.dom), true);
+  assert.equal(editor.state.selection.node && editor.state.selection.node.type.name, "imageFigure");
+  assert.equal(getSelectedImageElement(editor, editor.view.dom), image);
+  assert.equal(setSelectedImageWidth(editor, 512), true);
+  assert.match(editor.getHTML(), /<img src="\/assets\/uploads\/files\/1778247064628-fire\.gif" alt="fire\.gif" width="512">/);
+  editor.destroy();
+});
+
+await test("image figure selection is handled on mousedown before ProseMirror click selection", function () {
+  assert.match(
+    editorBundleSource,
+    /handleDOMEvents:\s*\{[\s\S]*mousedown:\s*function \(_view, event\)[\s\S]*selectClickedImageNode\(editor, target, editorMount\)[\s\S]*click:\s*function \(_view, event\)/
+  );
+});
+
+await test("image toolbar sync does not reference table-only state", function () {
+  const match = editorBundleSource.match(/function createImageContextToolbar\(surface, editor\) \{[\s\S]*?\nfunction getTableToolDefs/);
+  assert.ok(match, "image context toolbar source should be present");
+  assert.doesNotMatch(match[0], /activeTable\s*=\s*table/);
 });
 
 await test("mediaRow insert command renders bounded two- and three-cell layouts", function () {
@@ -392,7 +704,7 @@ await test("wiki entity marks and nodes round-trip as inert editor spans", funct
 await test("wiki entity insert commands create page, namespace, user, and footnote entities", function () {
   const editor = createEditor("<p>Start</p>");
 
-  editor.commands.insertWikiPageLink({ target: "Guides/Map Creation Guide", label: "Map guide" });
+  editor.commands.insertWikiPageLink({ target: "Guides/Map Creation Guide#Advanced Setup", label: "Map guide" });
   editor.commands.insertContent(" ");
   editor.commands.insertWikiNamespaceLink({ target: "Guides", label: "Guides" });
   editor.commands.insertContent(" ");
@@ -402,6 +714,7 @@ await test("wiki entity insert commands create page, namespace, user, and footno
 
   const rendered = editor.getHTML();
   assert.match(rendered, /data-wiki-entity="page"[^>]*>Map guide<\/span>/);
+  assert.match(rendered, /data-wiki-target="Guides\/Map Creation Guide#Advanced Setup"/);
   assert.match(rendered, /data-wiki-entity="namespace"[^>]*>Guides<\/span>/);
   assert.match(rendered, /data-wiki-entity="user"[^>]*>@xtul<\/span>/);
   assert.match(rendered, /wiki-entity--user-good/);
@@ -427,6 +740,25 @@ await test("page link dialog can discover and insert namespace autocomplete resu
   assert.match(
     vendoredEditorBundleSource,
     /==="page"[\s\S]*\.type==="namespace"[\s\S]*insertWikiNamespaceLink/
+  );
+});
+
+await test("page link dialog fetches selected article sections and appends the chosen fragment", function () {
+  assert.match(
+    editorBundleSource,
+    /pageTocUrl[\s\S]*page-toc/
+  );
+  assert.match(
+    editorBundleSource,
+    /fetchPageSectionsForResult[\s\S]*selected\.tid[\s\S]*URLSearchParams\(\{ tid: String\(selected\.tid\) \}\)/
+  );
+  assert.match(
+    editorBundleSource,
+    /appendWikiSectionFragment\(target, selectedSection\)/
+  );
+  assert.match(
+    vendoredEditorBundleSource,
+    /pageTocUrl[\s\S]*page-toc/
   );
 });
 
@@ -843,6 +1175,134 @@ await test("wikiCallout Backspace shortcut unwraps a callout from an empty parag
   editor.destroy();
 });
 
+await test("wikiCallout css uses themed icon callout bars in articles and editor", function () {
+  const pluginJson = JSON.parse(pluginJsonSource);
+  assert.equal(pluginJson.staticDirs["game-icons"], "public/game-icons");
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout\s*\{[\s\S]*--wiki-callout-icon:\s*url\("\/assets\/plugins\/nodebb-plugin-westgate-wiki\/game-icons\/scroll-unfurled\.svg"\)/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout\s*\{[\s\S]*display:\s*block/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout\s*\{[\s\S]*border-left:\s*0\.85rem\s+solid\s+var\(--wiki-callout-rail\)/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout\s*\{[\s\S]*background:\s*var\(--wiki-callout-bg\)/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout\s*\{[\s\S]*padding:\s*0\.95rem\s+1\.1rem\s+0\.95rem\s+5\.15rem/);
+  assert.doesNotMatch(articleBodyCss, /\.wiki-article-prose \.wiki-callout\s*\{[\s\S]*background:\s*linear-gradient/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout::before\s*\{[\s\S]*width:\s*2\.75rem/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout::before\s*\{[\s\S]*height:\s*2\.75rem/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout::after\s*\{[\s\S]*mask:\s*var\(--wiki-callout-icon\)\s+center\s*\/\s*1\.75rem\s+1\.75rem\s+no-repeat/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout--success\s*\{[\s\S]*candle-flame\.svg/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout--warning\s*\{[\s\S]*stabbed-note\.svg/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout--danger\s*\{[\s\S]*duality-mask\.svg/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-callout > p\s*\{[\s\S]*display:\s*inline/);
+  assert.match(editorCss, /\.westgate-wiki-compose \.wiki-editor__content \.wiki-callout\s*\{[\s\S]*--wiki-callout-icon:\s*url\("\/assets\/plugins\/nodebb-plugin-westgate-wiki\/game-icons\/scroll-unfurled\.svg"\)/);
+  assert.match(editorCss, /\.westgate-wiki-compose \.wiki-editor__content \.wiki-callout--success\s*\{[\s\S]*candle-flame\.svg/);
+});
+
+await test("wikiPoetryQuote insert command creates an attributed quote", function () {
+  const editor = createEditor("<p>Start</p>");
+
+  editor.commands.insertWikiPoetryQuote({
+    quote: "I am nothing. I am the empty room.",
+    attribution: "Shar"
+  });
+  const rendered = editor.getHTML();
+
+  assert.match(rendered, /<figure class="wiki-poetry-quote" data-wiki-node="poetry-quote">/);
+  assert.match(rendered, /<blockquote class="wiki-poetry-quote__body">/);
+  assert.match(rendered, /<p>I am nothing\. I am the empty room\.<\/p>/);
+  assert.match(rendered, /<p class="wiki-poetry-quote__attribution">— Shar<\/p>/);
+  editor.destroy();
+});
+
+await test("wikiPoetryQuote insert command moves selected text into the quote body", function () {
+  const editor = createEditor("<p>Before selected words after.</p>");
+
+  const text = editor.state.doc.textContent;
+  const from = text.indexOf("selected");
+  const to = from + "selected words".length;
+  editor.commands.setTextSelection({ from: from + 1, to: to + 1 });
+  editor.commands.insertWikiPoetryQuote({ attribution: "Speaker" });
+  const rendered = editor.getHTML();
+
+  assert.match(rendered, /<p>selected words<\/p>/);
+  assert.match(rendered, /<p class="wiki-poetry-quote__attribution">— Speaker<\/p>/);
+  assert.doesNotMatch(rendered, /Spoken words/);
+  editor.destroy();
+});
+
+await test("wikiPoetryQuote parses saved quote markup as a plugin-owned node", function () {
+  const editor = createEditor('<figure class="wiki-poetry-quote" data-wiki-node="poetry-quote"><blockquote class="wiki-poetry-quote__body"><p>Spoken words.</p><p class="wiki-poetry-quote__attribution">- Author</p></blockquote></figure>');
+  const rendered = editor.getHTML();
+
+  assert.equal(editor.getJSON().content[0].type, "wikiPoetryQuote");
+  assert.match(rendered, /<figure class="wiki-poetry-quote" data-wiki-node="poetry-quote">/);
+  assert.match(rendered, /<p class="wiki-poetry-quote__attribution">- Author<\/p>/);
+  editor.destroy();
+});
+
+await test("wikiPoetryQuote can toggle its visual container and unwrap its content", function () {
+  const editor = createEditor('<figure class="wiki-poetry-quote" data-wiki-node="poetry-quote"><blockquote class="wiki-poetry-quote__body"><p>Spoken words.</p><p class="wiki-poetry-quote__attribution">- Author</p></blockquote></figure>');
+
+  editor.commands.setTextSelection(3);
+  assert.equal(editor.commands.toggleWikiPoetryQuoteContainer(), true);
+  assert.match(editor.getHTML(), /data-wiki-quote-container="false"/);
+  assert.match(editor.getHTML(), /wiki-poetry-quote--plain/);
+
+  assert.equal(editor.commands.unsetWikiPoetryQuote(), true);
+  const rendered = editor.getHTML();
+  assert.doesNotMatch(rendered, /<figure class="wiki-poetry-quote/);
+  assert.doesNotMatch(rendered, /<blockquote class="wiki-poetry-quote__body"/);
+  assert.match(rendered, /<p>Spoken words\.<\/p>/);
+  assert.match(rendered, /<p class="wiki-poetry-quote__attribution">- Author<\/p>/);
+  editor.destroy();
+});
+
+await test("wikiPoetryQuote preserves and can retoggle container state after reopening saved html", function () {
+  const editor = createEditor('<figure class="wiki-poetry-quote wiki-poetry-quote--plain" data-wiki-node="poetry-quote" data-wiki-quote-container="false"><blockquote class="wiki-poetry-quote__body"><p>Spoken words.</p><p class="wiki-poetry-quote__attribution">- Author</p></blockquote></figure>');
+
+  assert.equal(editor.getJSON().content[0].attrs.container, false);
+  assert.match(editor.getHTML(), /data-wiki-quote-container="false"/);
+
+  editor.commands.setTextSelection(3);
+  assert.equal(editor.commands.toggleWikiPoetryQuoteContainer(), true);
+  const rendered = editor.getHTML();
+  assert.doesNotMatch(rendered, /data-wiki-quote-container="false"/);
+  assert.doesNotMatch(rendered, /wiki-poetry-quote--plain/);
+  assert.match(rendered, /<figure class="wiki-poetry-quote" data-wiki-node="poetry-quote">/);
+  editor.destroy();
+});
+
+await test("poetry quote css renders a speech-like quote panel with attribution", function () {
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote\s*\{[\s\S]*margin:\s*1rem\s+0/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote\s*\{[\s\S]*width:\s*fit-content/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote__body\s*\{[\s\S]*background:\s*var\(--wiki-poetry-quote-bg,[\s\S]*#1b101d/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote__body\s*\{[\s\S]*border:\s*1px\s+solid\s+var\(--wiki-poetry-quote-border/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote__body::before\s*\{[\s\S]*content:\s*"\\201C"/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote__body::after\s*\{[\s\S]*content:\s*"\\201D"/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote__attribution\s*\{[\s\S]*text-align:\s*left/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote--plain\s*\{[\s\S]*position:\s*relative/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote--plain\s*\{[\s\S]*overflow:\s*hidden/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote--plain::before\s*\{[\s\S]*content:\s*""/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote--plain::before\s*\{[\s\S]*inset:\s*-5%\s+1%/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote--plain::before\s*\{[\s\S]*background:\s*#00000059/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote--plain::before\s*\{[\s\S]*filter:\s*blur\(60px\)/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote--plain \.wiki-poetry-quote__body\s*\{[\s\S]*border:\s*0/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote--plain \.wiki-poetry-quote__body\s*\{[\s\S]*background:\s*transparent/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote--plain \.wiki-poetry-quote__body\s*\{[\s\S]*box-shadow:\s*none\s*!important/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote--plain \.wiki-poetry-quote__body\s*\{[\s\S]*z-index:\s*1/);
+});
+
+await test("blockquote toolbar action inserts the attributed quote tool instead of toggling default blockquote", function () {
+  assert.match(editorBundleSource, /id:\s*"blockquote"[\s\S]*title:\s*"Poetry quote"[\s\S]*insertWikiPoetryQuote/);
+  assert.doesNotMatch(editorBundleSource, /id:\s*"blockquote"[\s\S]{0,260}toggleBlockquote/);
+});
+
+await test("poetry quote floating toolbar exposes container toggle and unwrap actions", function () {
+  assert.match(editorBundleSource, /wiki-editor-poetry-quote-tools/);
+  assert.match(editorBundleSource, /toggleWikiPoetryQuoteContainer/);
+  assert.match(editorBundleSource, /unsetWikiPoetryQuote/);
+  assert.match(editorBundleSource, /figure\.wiki-poetry-quote/);
+  assert.match(editorBundleSource, /selectPoetryQuote/);
+  assert.match(editorBundleSource, /closest\("p, h1, h2, h3, h4, h5, h6, li"\)/);
+});
+
 await test("Backspace after a list removes the trailing empty paragraph instead of creating extra gaps", function () {
   const editor = createEditor("<ul><li><p>Forums</p></li><li><p>Discord Server</p></li></ul><p></p>");
 
@@ -941,7 +1401,7 @@ await test("top toolbar schema excludes contextual image layout and size control
   assert.equal(IMAGE_CONTEXT_BUTTON_IDS.includes("image-convert-figure"), true);
 });
 
-await test("top toolbar schema keeps wiki entity tools and only table creation in the always-visible toolbar", function () {
+await test("top toolbar schema keeps wiki entity tools and table creation tools in the always-visible toolbar", function () {
   const groupIds = TOP_TOOLBAR_GROUPS.map(function (group) {
     return group.id;
   });
@@ -958,14 +1418,16 @@ await test("top toolbar schema keeps wiki entity tools and only table creation i
   ]);
 
   const history = TOP_TOOLBAR_GROUPS.find(function (group) { return group.id === "history"; });
+  const callouts = TOP_TOOLBAR_GROUPS.find(function (group) { return group.id === "callouts"; });
   const media = TOP_TOOLBAR_GROUPS.find(function (group) { return group.id === "links-media"; });
   const tables = TOP_TOOLBAR_GROUPS.find(function (group) { return group.id === "tables"; });
   const view = TOP_TOOLBAR_GROUPS.find(function (group) { return group.id === "view"; });
 
   assert.deepEqual(history.buttonIds, ["undo", "redo"]);
+  assert.deepEqual(callouts.buttonIds, ["callout-info", "callout-success", "callout-warning", "callout-danger"]);
   assert.deepEqual(media.buttonIds, ["link", "wiki-page-link", "wiki-user-mention", "wiki-footnote", "image-upload", "media-row-2", "media-row-3"]);
   assert.equal(TOP_TOOLBAR_BUTTON_IDS.includes("wiki-namespace-link"), false);
-  assert.deepEqual(tables.buttonIds, ["table-insert"]);
+  assert.deepEqual(tables.buttonIds, ["table-insert", "dnd-alignment-table"]);
   assert.deepEqual(view.buttonIds, ["fullscreen-source"]);
   assert.equal(TOP_TOOLBAR_BUTTON_IDS.includes("fullscreen-source"), true);
 });
@@ -1080,6 +1542,7 @@ await test("fullscreen source mode css supports resize and source hiding", funct
 
 await test("contextual table schema exposes row, column, cell merge, and delete tools", function () {
   assert.deepEqual(TABLE_CONTEXT_BUTTON_IDS, [
+    "table-properties",
     "table-add-row-before",
     "table-add-row-after",
     "table-delete-row",
@@ -1090,8 +1553,14 @@ await test("contextual table schema exposes row, column, cell merge, and delete 
     "table-split-cell",
     "table-toggle-header-row",
     "table-toggle-header-column",
+    "dnd-alignment-table-edit",
     "table-delete"
   ]);
+  assert.match(editorBundleSource, /openTablePropertiesDialog\(\{ editor, table \}\)/);
+  assert.match(editorBundleSource, /openAlignmentTableDialog\(\{ editor \}\)/);
+  assert.match(editorBundleSource, /wiki-editor-context-tools__group/);
+  assert.match(editorCss, /\.wiki-editor-context-tools__group\s*\{/);
+  assert.match(vendoredEditorCss, /\.wiki-editor-context-tools__group\s*\{/);
 });
 
 await test("buildHeadingToc nests smaller headings under the nearest larger heading", function () {
