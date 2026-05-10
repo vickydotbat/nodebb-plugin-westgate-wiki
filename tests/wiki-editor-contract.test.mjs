@@ -21,7 +21,7 @@ function test(name, fn) {
 
 installJsdomGlobals();
 
-const [{ Editor }, StarterKitModule, HighlightModule, ImageModule, TableModule, TableCellModule, TableHeaderModule, TableRowModule, PreservedNodeAttributesModule, StyledSpanModule, ContainerBlockModule, MediaRowModule, ImageFigureModule, WikiCalloutModule, WikiEditingKeymapModule, SlashCommandModule, WikiCodeBlockModule, WikiBlockBackgroundModule, WikiLinkModule, WikiEntitiesModule, toolbarSchemaModule, editorTocModule, linkInteractionsModule, imageResizeModule, mediaSelectionModule, legacyHtmlModule, sanitizerContractModule, colorContrastModule] = await Promise.all([
+const [{ Editor }, StarterKitModule, HighlightModule, ImageModule, TableModule, TableCellModule, TableHeaderModule, TableRowModule, PreservedNodeAttributesModule, StyledSpanModule, ContainerBlockModule, MediaRowModule, ImageFigureModule, WikiAlignmentTableModule, WikiCalloutModule, WikiEditingKeymapModule, SlashCommandModule, WikiCodeBlockModule, WikiBlockBackgroundModule, WikiLinkModule, WikiEntitiesModule, toolbarSchemaModule, editorTocModule, linkInteractionsModule, imageResizeModule, mediaSelectionModule, legacyHtmlModule, sanitizerContractModule, colorContrastModule] = await Promise.all([
   import("@tiptap/core"),
   import("@tiptap/starter-kit"),
   import("../tiptap/src/extensions/wiki-highlight.mjs"),
@@ -35,6 +35,7 @@ const [{ Editor }, StarterKitModule, HighlightModule, ImageModule, TableModule, 
   import("../tiptap/src/extensions/container-block.mjs"),
   import("../tiptap/src/extensions/media-row.mjs"),
   import("../tiptap/src/extensions/image-figure.mjs"),
+  import("../tiptap/src/extensions/wiki-alignment-table.mjs"),
   import("../tiptap/src/extensions/wiki-callout.mjs"),
   import("../tiptap/src/extensions/wiki-editing-keymap.mjs"),
   import("../tiptap/src/extensions/slash-command.mjs"),
@@ -64,6 +65,7 @@ const StyledSpan = StyledSpanModule.default;
 const ContainerBlock = ContainerBlockModule.default;
 const { MediaCell, MediaRow } = MediaRowModule;
 const ImageFigure = ImageFigureModule.default;
+const WikiAlignmentTable = WikiAlignmentTableModule.default;
 const WikiCallout = WikiCalloutModule.default;
 const WikiEditingKeymap = WikiEditingKeymapModule.default;
 const SlashCommand = SlashCommandModule.default;
@@ -110,6 +112,7 @@ function createEditor(content) {
       MediaCell,
       MediaRow,
       ImageFigure,
+      WikiAlignmentTable,
       WikiCallout,
       WikiEditingKeymap,
       WikiCodeBlock,
@@ -376,6 +379,106 @@ await test("table cell block backgrounds keep their paired foreground color", fu
   assert.match(editor.getHTML(), /<td[^>]*style="background-color: rgb\(219, 234, 254\); color: rgb\(17, 24, 39\);"[^>]*><p>Cell background<\/p><\/td>/);
   assert.match(articleBodyCss, /\.wiki-article-prose :where\(td, th\)\[style\*="color"\] :where\(p, li\)\s*\{[^}]*color:\s*inherit/s);
   editor.destroy();
+});
+
+await test("table styles preserve flexible size and border controls", function () {
+  const editor = createEditor('<table><tbody><tr><td><p>Flexible</p></td></tr></tbody></table>');
+
+  editor.commands.setTextSelection(5);
+  assert.equal(editor.commands.updateAttributes("table", {
+    class: "wiki-table-borderless wiki-table-layout-auto",
+    style: "width: 50%; border-color: #caa55a"
+  }), true);
+  assert.equal(editor.commands.updateAttributes("tableCell", {
+    style: "width: 12rem; border-color: #caa55a"
+  }), true);
+  assert.equal(editor.commands.updateAttributes("tableRow", {
+    style: "height: 3rem"
+  }), true);
+
+  const rendered = editor.getHTML();
+  assert.match(rendered, /<table[^>]*class="wiki-table-borderless wiki-table-layout-auto"[^>]*style="width: 50%; border-color: rgb\(202, 165, 90\);?"/);
+  assert.match(rendered, /<tr style="height: 3rem;?">/);
+  assert.match(rendered, /<td[^>]*style="width: 12rem; border-color: rgb\(202, 165, 90\);?"/);
+  assert.match(sanitizeHtml(rendered), /border-color: rgb\(202, 165, 90\)/);
+  [editorCss, vendoredEditorCss].forEach(function (css) {
+    assert.match(css, /\.westgate-wiki-compose\s+\.wiki-editor__content\s+table\.wiki-table-layout-fixed\s*\{[^}]*table-layout:\s*fixed/s);
+    assert.match(css, /\.westgate-wiki-compose\s+\.wiki-editor__content\s+table\[style\*=(?:"border-color"|border-color)\]\s+:where\(th,\s*td\)\s*\{[^}]*border-color:\s*inherit/s);
+    assert.match(css, /\.westgate-wiki-compose\s+\.wiki-editor__content\s+\.column-resize-handle\s*\{[^}]*cursor:\s*col-resize/s);
+    assert.match(css, /\.westgate-wiki-compose\s+\.wiki-editor-table-resize-handle--width\s*\{[^}]*cursor:\s*ew-resize/s);
+    assert.match(css, /\.westgate-wiki-compose\s+\.wiki-editor-table-resize-handle--row\s*\{[^}]*cursor:\s*ns-resize/s);
+  });
+  assert.match(editorBundleSource, /applyStyleToTableColumnCells/);
+  assert.match(editorBundleSource, /updateTableElementAttributes/);
+  assert.match(editorBundleSource, /class\s+WestgateTableView\s+extends\s+TableView/);
+  assert.match(editorBundleSource, /applyTableNodeAttributesToView\(this\.table,\s*node\.attrs\)/);
+  assert.match(editorBundleSource, /View:\s*WestgateTableView/);
+  assert.match(editorBundleSource, /createTableDimensionHandles/);
+  assert.match(editorBundleSource, /Resize table width/);
+  assert.match(editorBundleSource, /Resize row \$\{index \+ 1\} height/);
+  editor.destroy();
+});
+
+await test("alignment table node renders selected DnD alignments as a dedicated grid", function () {
+  const editor = createEditor("");
+
+  assert.equal(editor.commands.insertWikiAlignmentTable({ highlighted: ["lg", "tn", "ce", "bad"] }), true);
+  const rendered = editor.getHTML();
+
+  assert.match(rendered, /data-wiki-node="alignment-table"/);
+  assert.match(rendered, /data-alignments="lg tn ce"/);
+  assert.match(rendered, /data-mode="compact"/);
+  assert.match(rendered, />LG<\/div>/);
+  assert.match(rendered, />TN<\/div>/);
+  assert.match(rendered, />CE<\/div>/);
+  assert.doesNotMatch(rendered, /Lawful Good/);
+  assert.match(rendered, /wiki-alignment-table__cell--active/);
+  assert.doesNotMatch(rendered, /<td/);
+  editor.destroy();
+});
+
+await test("alignment table full mode preserves full labels as secondary display", function () {
+  const editor = createEditor("");
+
+  assert.equal(editor.commands.insertWikiAlignmentTable({ highlighted: ["ng"], mode: "full" }), true);
+  const rendered = editor.getHTML();
+
+  assert.match(rendered, /data-mode="full"/);
+  assert.match(rendered, /Neutral Good/);
+  assert.doesNotMatch(rendered, />NG<\/div>/);
+  editor.destroy();
+});
+
+await test("normalizeLegacyHtmlForTiptap preserves saved alignment tables as plugin-owned structures", function () {
+  const savedHtml = '<div class="wiki-alignment-table wiki-alignment-table--compact" data-wiki-node="alignment-table" data-alignments="lg tn" data-mode="compact" contenteditable="false"><div class="wiki-alignment-table__cell wiki-alignment-table__cell--active" data-alignment="lg">LG</div><div class="wiki-alignment-table__cell" data-alignment="ng">NG</div></div>';
+  const normalized = normalizeLegacyHtmlForTiptap(savedHtml);
+
+  assert.match(normalized, /data-wiki-node="alignment-table"/);
+  assert.match(normalized, /<div class="wiki-alignment-table__cell wiki-alignment-table__cell--active" data-alignment="lg">LG<\/div>/);
+  assert.doesNotMatch(normalized, /<p class="wiki-alignment-table__cell/);
+});
+
+await test("saved alignment tables reopen as atomic editable widgets", function () {
+  const savedHtml = '<div class="wiki-alignment-table wiki-alignment-table--compact" data-wiki-node="alignment-table" data-alignments="lg tn" data-mode="compact" contenteditable="false"><div class="wiki-alignment-table__cell wiki-alignment-table__cell--active" data-alignment="lg">LG</div><div class="wiki-alignment-table__cell" data-alignment="ng">NG</div></div>';
+  const editor = createEditor(normalizeLegacyHtmlForTiptap(savedHtml));
+  const rendered = editor.getHTML();
+
+  assert.equal(editor.state.doc.child(0).type.name, "wikiAlignmentTable");
+  assert.match(rendered, /data-wiki-node="alignment-table"/);
+  assert.match(rendered, />LG<\/div>/);
+  assert.doesNotMatch(rendered, /<p class="wiki-alignment-table__cell/);
+  editor.destroy();
+});
+
+await test("alignment table css keeps compact cells square and full labels unwrapped", function () {
+  assert.match(articleBodyCss, /\.wiki-article-prose\s+\.wiki-alignment-table--compact\s+\.wiki-alignment-table__cell\s*\{[^}]*aspect-ratio:\s*1\s*\/\s*1/s);
+  assert.match(articleBodyCss, /\.wiki-article-prose\s+\.wiki-alignment-table--full\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*max-content\)/s);
+  assert.match(articleBodyCss, /\.wiki-article-prose\s+\.wiki-alignment-table--full\s+\.wiki-alignment-table__cell\s*\{[^}]*white-space:\s*nowrap/s);
+});
+
+await test("alignment table cells suppress paragraph wrapper spacing in article prose", function () {
+  assert.match(articleBodyCss, /\.wiki-article-prose\s+\.wiki-alignment-table\s+\.wiki-alignment-table__cell\s*>\s*p\s*\{[^}]*margin-block:\s*0\s*!important/s);
+  assert.match(articleBodyCss, /\.wiki-article-prose\s+\.wiki-alignment-table\s+\.wiki-alignment-table__cell\s*>\s*p\s*\{[^}]*padding:\s*0\s*!important/s);
 });
 
 await test("imageFigure parses and renders linked figures with captions intact", function () {
@@ -1061,7 +1164,7 @@ await test("top toolbar schema excludes contextual image layout and size control
   assert.equal(IMAGE_CONTEXT_BUTTON_IDS.includes("image-convert-figure"), true);
 });
 
-await test("top toolbar schema keeps wiki entity tools and only table creation in the always-visible toolbar", function () {
+await test("top toolbar schema keeps wiki entity tools and table creation tools in the always-visible toolbar", function () {
   const groupIds = TOP_TOOLBAR_GROUPS.map(function (group) {
     return group.id;
   });
@@ -1085,7 +1188,7 @@ await test("top toolbar schema keeps wiki entity tools and only table creation i
   assert.deepEqual(history.buttonIds, ["undo", "redo"]);
   assert.deepEqual(media.buttonIds, ["link", "wiki-page-link", "wiki-user-mention", "wiki-footnote", "image-upload", "media-row-2", "media-row-3"]);
   assert.equal(TOP_TOOLBAR_BUTTON_IDS.includes("wiki-namespace-link"), false);
-  assert.deepEqual(tables.buttonIds, ["table-insert"]);
+  assert.deepEqual(tables.buttonIds, ["table-insert", "dnd-alignment-table"]);
   assert.deepEqual(view.buttonIds, ["fullscreen-source"]);
   assert.equal(TOP_TOOLBAR_BUTTON_IDS.includes("fullscreen-source"), true);
 });
@@ -1200,6 +1303,7 @@ await test("fullscreen source mode css supports resize and source hiding", funct
 
 await test("contextual table schema exposes row, column, cell merge, and delete tools", function () {
   assert.deepEqual(TABLE_CONTEXT_BUTTON_IDS, [
+    "table-properties",
     "table-add-row-before",
     "table-add-row-after",
     "table-delete-row",
@@ -1210,8 +1314,14 @@ await test("contextual table schema exposes row, column, cell merge, and delete 
     "table-split-cell",
     "table-toggle-header-row",
     "table-toggle-header-column",
+    "dnd-alignment-table-edit",
     "table-delete"
   ]);
+  assert.match(editorBundleSource, /openTablePropertiesDialog\(\{ editor, table \}\)/);
+  assert.match(editorBundleSource, /openAlignmentTableDialog\(\{ editor \}\)/);
+  assert.match(editorBundleSource, /wiki-editor-context-tools__group/);
+  assert.match(editorCss, /\.wiki-editor-context-tools__group\s*\{/);
+  assert.match(vendoredEditorCss, /\.wiki-editor-context-tools__group\s*\{/);
 });
 
 await test("buildHeadingToc nests smaller headings under the nearest larger heading", function () {

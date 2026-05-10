@@ -37,7 +37,7 @@ export const TOP_TOOLBAR_GROUPS = [
   {
     id: "tables",
     label: "Tables",
-    buttonIds: ["table-insert"]
+    buttonIds: ["table-insert", "dnd-alignment-table"]
   },
   {
     id: "view",
@@ -63,6 +63,7 @@ export const IMAGE_CONTEXT_BUTTON_IDS = [
 ];
 
 export const TABLE_CONTEXT_BUTTON_IDS = [
+  "table-properties",
   "table-add-row-before",
   "table-add-row-after",
   "table-delete-row",
@@ -73,6 +74,7 @@ export const TABLE_CONTEXT_BUTTON_IDS = [
   "table-split-cell",
   "table-toggle-header-row",
   "table-toggle-header-column",
+  "dnd-alignment-table-edit",
   "table-delete"
 ];
 

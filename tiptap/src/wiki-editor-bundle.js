@@ -11,7 +11,7 @@ import Image from "@tiptap/extension-image";
 import Placeholder from "@tiptap/extension-placeholder";
 import Subscript from "@tiptap/extension-subscript";
 import Superscript from "@tiptap/extension-superscript";
-import { Table } from "@tiptap/extension-table";
+import { Table, TableView } from "@tiptap/extension-table";
 import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
 import { TableRow } from "@tiptap/extension-table-row";
@@ -27,6 +27,7 @@ import { MediaCell, MediaRow } from "./extensions/media-row.mjs";
 import PreservedNodeAttributes from "./extensions/preserved-node-attributes.mjs";
 import SlashCommand from "./extensions/slash-command.mjs";
 import StyledSpan from "./extensions/styled-span.mjs";
+import WikiAlignmentTable, { DND_ALIGNMENT_OPTIONS, normalizeAlignmentTableMode, normalizeAlignments } from "./extensions/wiki-alignment-table.mjs";
 import WikiBlockBackground from "./extensions/wiki-block-background.mjs";
 import WikiCallout from "./extensions/wiki-callout.mjs";
 import WikiCodeBlock, { CODE_BLOCK_LANGUAGE_OPTIONS } from "./extensions/wiki-code-block.mjs";
@@ -119,6 +120,8 @@ const BUTTON_ICONS = {
   "align-right": "fa-align-right",
   "align-justify": "fa-align-justify",
   "table-insert": "fa-table",
+  "dnd-alignment-table": "fa-th",
+  "table-properties": "fa-sliders",
   "table-add-row-before": "fa-plus",
   "table-add-row-after": "fa-plus",
   "table-delete-row": "fa-minus",
@@ -129,6 +132,7 @@ const BUTTON_ICONS = {
   "table-split-cell": "fa-expand",
   "table-toggle-header-row": "fa-header",
   "table-toggle-header-column": "fa-header",
+  "dnd-alignment-table-edit": "fa-th",
   "table-delete": "fa-trash",
   "image-align-center": "fa-align-center",
   "image-align-left": "fa-align-left",
@@ -159,6 +163,41 @@ const BLOCK_BACKGROUND_COLOR_OPTIONS = [
   { id: "magenta", label: "Magenta", backgroundColor: "#fae8ff" },
   { id: "cyan", label: "Cyan", backgroundColor: "#cffafe" }
 ];
+
+function applyTableNodeAttributesToView(table, attrs) {
+  if (!table) {
+    return;
+  }
+
+  const className = String(attrs && attrs.class || "").trim();
+  if (className) {
+    table.setAttribute("class", className);
+  } else {
+    table.removeAttribute("class");
+  }
+
+  const style = String(attrs && attrs.style || "").trim();
+  const minWidth = table.style.minWidth;
+  table.setAttribute("style", style);
+  if (minWidth && !table.style.minWidth) {
+    table.style.minWidth = minWidth;
+  }
+}
+
+class WestgateTableView extends TableView {
+  constructor(node, cellMinWidth, view) {
+    super(node, cellMinWidth, view);
+    applyTableNodeAttributesToView(this.table, node.attrs);
+  }
+
+  update(node) {
+    const updated = super.update(node);
+    if (updated) {
+      applyTableNodeAttributesToView(this.table, node.attrs);
+    }
+    return updated;
+  }
+}
 
 function createButton(def) {
   const button = document.createElement("button");
@@ -191,7 +230,7 @@ function createButton(def) {
 
   button.addEventListener("click", function (event) {
     event.preventDefault();
-    def.action({ button });
+    def.action({ button, table: def.activeTable });
   });
   return button;
 }
@@ -591,6 +630,399 @@ function openWikiEntityDialog({ editor, type, options, initial, replaceMark }) {
   document.addEventListener("keydown", handleDialogKeydown);
   document.body.appendChild(shell);
   searchInput.focus();
+}
+
+function getStyleValue(styleValue, propertyName) {
+  const probe = document.createElement("span");
+  probe.setAttribute("style", String(styleValue || ""));
+  return probe.style.getPropertyValue(propertyName).trim();
+}
+
+function setStyleValue(styleValue, propertyName, value) {
+  const probe = document.createElement("span");
+  probe.setAttribute("style", String(styleValue || ""));
+  if (value) {
+    probe.style.setProperty(propertyName, value);
+  } else {
+    probe.style.removeProperty(propertyName);
+  }
+  return probe.getAttribute("style") || "";
+}
+
+function setClassToken(className, token, enabled) {
+  const tokens = new Set(String(className || "").split(/\s+/).filter(Boolean));
+  if (enabled) {
+    tokens.add(token);
+  } else {
+    tokens.delete(token);
+  }
+  return Array.from(tokens).join(" ");
+}
+
+function createDialogField(labelText, input) {
+  const label = document.createElement("label");
+  label.className = "wiki-editor-dialog__field";
+  const text = document.createElement("span");
+  text.textContent = labelText;
+  label.appendChild(text);
+  label.appendChild(input);
+  return label;
+}
+
+function getActiveTableRowElement(editor, table) {
+  const selectionElement = getSelectionElement(editor);
+  const row = selectionElement && typeof selectionElement.closest === "function" ? selectionElement.closest("tr") : null;
+  return row && table && table.contains(row) ? row : null;
+}
+
+function getActiveTableCellElement(editor, table) {
+  const selectionElement = getSelectionElement(editor);
+  const cell = selectionElement && typeof selectionElement.closest === "function" ? selectionElement.closest("td, th") : null;
+  return cell && table && table.contains(cell) ? cell : null;
+}
+
+function getTableNodePosition(editor, element) {
+  if (!editor || !element) {
+    return null;
+  }
+
+  const pos = editor.view.posAtDOM(element, 0) - 1;
+  return pos >= 0 && editor.state.doc.nodeAt(pos) ? pos : null;
+}
+
+function updateTableElementAttributes(editor, element, attrs) {
+  const pos = getTableNodePosition(editor, element);
+  if (pos == null) {
+    return false;
+  }
+
+  return updateNodeAttributesAtPos(editor, pos, attrs);
+}
+
+function updateNodeAttributesAtPos(editor, pos, attrs, options) {
+  const node = editor.state.doc.nodeAt(pos);
+  if (!node) {
+    return false;
+  }
+  const tr = editor.state.tr.setNodeMarkup(pos, undefined, {
+    ...node.attrs,
+    ...attrs
+  }, node.marks);
+  editor.view.dispatch(options && options.scroll === false ? tr : tr.scrollIntoView());
+  return true;
+}
+
+function updateTableElementStyle(editor, element, updateStyle) {
+  const pos = getTableNodePosition(editor, element);
+  if (pos == null) {
+    return false;
+  }
+
+  return updateNodeStyleAtPos(editor, pos, element.getAttribute("style") || "", updateStyle);
+}
+
+function updateNodeStyleAtPos(editor, pos, fallbackStyle, updateStyle, options) {
+  const node = editor.state.doc.nodeAt(pos);
+  if (!node) {
+    return false;
+  }
+  const style = updateStyle(node.attrs.style || fallbackStyle || "");
+  const tr = editor.state.tr.setNodeMarkup(pos, undefined, {
+    ...node.attrs,
+    style: style || null
+  }, node.marks);
+  editor.view.dispatch(options && options.scroll === false ? tr : tr.scrollIntoView());
+  return true;
+}
+
+function getTableColumnCellPositions(editor, table, columnIndex) {
+  if (!table || columnIndex < 0) {
+    return [];
+  }
+
+  return Array.from(table.rows || []).map(function (row) {
+    const cell = row.cells && row.cells[columnIndex] ? row.cells[columnIndex] : null;
+    if (!cell) {
+      return null;
+    }
+    const pos = getTableNodePosition(editor, cell);
+    return pos == null ? null : {
+      pos,
+      fallbackStyle: cell.getAttribute("style") || ""
+    };
+  }).filter(Boolean);
+}
+
+function applyStyleToTableColumnCells(editor, cellPositions, propertyName, value) {
+  if (!cellPositions.length) {
+    return false;
+  }
+
+  let tr = editor.state.tr;
+  let changed = false;
+  cellPositions.forEach(function ({ pos, fallbackStyle }) {
+    const node = editor.state.doc.nodeAt(pos);
+    if (!node) {
+      return;
+    }
+    const style = setStyleValue(node.attrs.style || fallbackStyle || "", propertyName, value);
+    tr = tr.setNodeMarkup(pos, undefined, {
+      ...node.attrs,
+      style: style || null
+    }, node.marks);
+    changed = true;
+  });
+
+  if (changed) {
+    editor.view.dispatch(tr.scrollIntoView());
+  }
+  return changed;
+}
+
+function applyActiveTableProperties(editor, table, values) {
+  if (!editor || !table) {
+    return false;
+  }
+
+  const tablePos = getTableNodePosition(editor, table);
+  if (tablePos == null) {
+    return false;
+  }
+  const activeCell = getActiveTableCellElement(editor, table);
+  const columnCellPositions = activeCell ? getTableColumnCellPositions(editor, table, activeCell.cellIndex) : [];
+  const activeRow = getActiveTableRowElement(editor, table);
+  const rowPos = activeRow ? getTableNodePosition(editor, activeRow) : null;
+  const rowFallbackStyle = activeRow ? activeRow.getAttribute("style") || "" : "";
+
+  const attrs = {
+    class: table.getAttribute("class") || null,
+    style: table.getAttribute("style") || null
+  };
+  let style = attrs.style || "";
+  style = setStyleValue(style, "width", values.tableWidth);
+  style = setStyleValue(style, "border-color", values.borderColor);
+  let className = setClassToken(attrs.class, "wiki-table-borderless", values.borderMode === "hidden");
+  className = setClassToken(className, "wiki-table-layout-auto", values.layout === "auto");
+  className = setClassToken(className, "wiki-table-layout-fixed", values.layout !== "auto");
+
+  updateNodeAttributesAtPos(editor, tablePos, {
+    class: className || null,
+    style: style || null
+  });
+
+  if (values.columnWidth) {
+    applyStyleToTableColumnCells(editor, columnCellPositions, "width", values.columnWidth);
+  }
+
+  if (values.rowHeight && rowPos != null) {
+    updateNodeStyleAtPos(editor, rowPos, rowFallbackStyle, function (rowStyle) {
+      return setStyleValue(rowStyle, "height", values.rowHeight);
+    });
+  }
+
+  return true;
+}
+
+function openTablePropertiesDialog({ editor, table }) {
+  const existing = document.querySelector(".wiki-editor-entity-dialog-shell");
+  if (existing) {
+    existing.remove();
+  }
+
+  const shell = document.createElement("div");
+  shell.className = "wiki-editor-entity-dialog-shell";
+  const dialog = document.createElement("div");
+  dialog.className = "wiki-editor-entity-dialog wiki-editor-table-dialog";
+  dialog.setAttribute("role", "dialog");
+  dialog.setAttribute("aria-modal", "true");
+  dialog.setAttribute("aria-label", "Table properties");
+  shell.appendChild(dialog);
+
+  const title = document.createElement("h2");
+  title.className = "wiki-editor-entity-dialog__title";
+  title.textContent = "Table properties";
+  dialog.appendChild(title);
+
+  const form = document.createElement("form");
+  form.className = "wiki-editor-entity-dialog__form";
+  dialog.appendChild(form);
+
+  const attrs = editor.getAttributes("table") || {};
+  const tableWidth = document.createElement("input");
+  tableWidth.className = "form-control form-control-sm";
+  tableWidth.placeholder = "100%, 32rem, auto";
+  tableWidth.value = getStyleValue(attrs.style, "width") || "100%";
+  form.appendChild(createDialogField("Table width", tableWidth));
+
+  const columnWidth = document.createElement("input");
+  columnWidth.className = "form-control form-control-sm";
+  columnWidth.placeholder = "12rem, 160px, 25%";
+  form.appendChild(createDialogField("Current column width", columnWidth));
+
+  const rowHeight = document.createElement("input");
+  rowHeight.className = "form-control form-control-sm";
+  rowHeight.placeholder = "3rem, 48px";
+  form.appendChild(createDialogField("Current row height", rowHeight));
+
+  const borderColor = document.createElement("input");
+  borderColor.type = "color";
+  borderColor.className = "form-control form-control-color";
+  borderColor.value = "#caa55a";
+  form.appendChild(createDialogField("Border color", borderColor));
+
+  const layout = document.createElement("select");
+  layout.className = "form-select form-select-sm";
+  [["fixed", "Fixed layout"], ["auto", "Auto layout"]].forEach(function ([value, label]) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    layout.appendChild(option);
+  });
+  layout.value = String(attrs.class || "").includes("wiki-table-layout-auto") ? "auto" : "fixed";
+  form.appendChild(createDialogField("Layout", layout));
+
+  const borderMode = document.createElement("select");
+  borderMode.className = "form-select form-select-sm";
+  [["visible", "Visible borders"], ["hidden", "No visible borders"]].forEach(function ([value, label]) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    borderMode.appendChild(option);
+  });
+  borderMode.value = String(attrs.class || "").includes("wiki-table-borderless") ? "hidden" : "visible";
+  form.appendChild(createDialogField("Borders", borderMode));
+
+  const actions = document.createElement("div");
+  actions.className = "wiki-editor-entity-dialog__actions";
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.className = "btn btn-link btn-sm";
+  cancel.textContent = "Cancel";
+  const apply = document.createElement("button");
+  apply.type = "submit";
+  apply.className = "btn btn-primary btn-sm";
+  apply.textContent = "Apply";
+  actions.appendChild(cancel);
+  actions.appendChild(apply);
+  form.appendChild(actions);
+
+  function close() {
+    shell.remove();
+    editor.commands.focus();
+  }
+
+  cancel.addEventListener("click", close);
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+    applyActiveTableProperties(editor, table, {
+      tableWidth: tableWidth.value.trim(),
+      columnWidth: columnWidth.value.trim(),
+      rowHeight: rowHeight.value.trim(),
+      borderColor: borderColor.value,
+      layout: layout.value,
+      borderMode: borderMode.value
+    });
+    close();
+  });
+
+  document.body.appendChild(shell);
+  tableWidth.focus();
+}
+
+function openAlignmentTableDialog({ editor }) {
+  const existing = document.querySelector(".wiki-editor-entity-dialog-shell");
+  if (existing) {
+    existing.remove();
+  }
+
+  const current = editor.isActive("wikiAlignmentTable") ? editor.getAttributes("wikiAlignmentTable") : {};
+  const active = new Set(normalizeAlignments(current.highlighted));
+  const currentMode = normalizeAlignmentTableMode(current.mode);
+  const shell = document.createElement("div");
+  shell.className = "wiki-editor-entity-dialog-shell";
+  const dialog = document.createElement("div");
+  dialog.className = "wiki-editor-entity-dialog wiki-editor-alignment-dialog";
+  dialog.setAttribute("role", "dialog");
+  dialog.setAttribute("aria-modal", "true");
+  dialog.setAttribute("aria-label", "D&D alignment table");
+  shell.appendChild(dialog);
+
+  const title = document.createElement("h2");
+  title.className = "wiki-editor-entity-dialog__title";
+  title.textContent = "D&D alignment table";
+  dialog.appendChild(title);
+
+  const form = document.createElement("form");
+  form.className = "wiki-editor-entity-dialog__form";
+  dialog.appendChild(form);
+
+  const mode = document.createElement("select");
+  mode.className = "form-select form-select-sm";
+  [["compact", "Compact abbreviations"], ["full", "Full labels"]].forEach(function ([value, label]) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    mode.appendChild(option);
+  });
+  mode.value = currentMode;
+  form.appendChild(createDialogField("Display mode", mode));
+
+  const grid = document.createElement("div");
+  grid.className = "wiki-editor-alignment-picker";
+  DND_ALIGNMENT_OPTIONS.forEach(function (alignment) {
+    const label = document.createElement("label");
+    label.className = "wiki-editor-alignment-picker__item";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = alignment.id;
+    checkbox.checked = active.has(alignment.id);
+    const text = document.createElement("span");
+    text.textContent = alignment.label;
+    label.appendChild(checkbox);
+    label.appendChild(text);
+    grid.appendChild(label);
+  });
+  form.appendChild(grid);
+
+  const actions = document.createElement("div");
+  actions.className = "wiki-editor-entity-dialog__actions";
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.className = "btn btn-link btn-sm";
+  cancel.textContent = "Cancel";
+  const apply = document.createElement("button");
+  apply.type = "submit";
+  apply.className = "btn btn-primary btn-sm";
+  apply.textContent = editor.isActive("wikiAlignmentTable") ? "Update" : "Insert";
+  actions.appendChild(cancel);
+  actions.appendChild(apply);
+  form.appendChild(actions);
+
+  function close() {
+    shell.remove();
+    editor.commands.focus();
+  }
+
+  cancel.addEventListener("click", close);
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+    const highlighted = Array.from(grid.querySelectorAll("input:checked")).map(function (input) {
+      return input.value;
+    });
+    const modeValue = normalizeAlignmentTableMode(mode.value);
+    if (editor.isActive("wikiAlignmentTable")) {
+      editor.chain().focus().updateWikiAlignmentTable({ highlighted, mode: modeValue }).run();
+    } else {
+      editor.chain().focus().insertWikiAlignmentTable({ highlighted, mode: modeValue }).run();
+    }
+    close();
+  });
+
+  document.body.appendChild(shell);
+  const first = grid.querySelector("input");
+  if (first) {
+    first.focus();
+  }
 }
 
 function openWikiEntityDialogForElement(editor, element, options) {
@@ -1183,6 +1615,13 @@ function createToolbar(root, editor, uploadImage) {
       action: function () {
         editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
       }
+    },
+    {
+      id: "dnd-alignment-table",
+      title: "D&D alignment table",
+      action: function () {
+        openAlignmentTableDialog({ editor });
+      }
     }
   ], "tables");
 
@@ -1396,6 +1835,7 @@ function createImageContextToolbar(surface, editor) {
     }
 
     defs.forEach(function (def) {
+      def.activeTable = table;
       def.button.classList.remove("active");
       def.button.disabled = false;
       def.applyState(def.button);
@@ -1424,6 +1864,14 @@ function createImageContextToolbar(surface, editor) {
 
 function getTableToolDefs(editor) {
   return [
+    {
+      id: "table-properties",
+      title: "Table properties",
+      action: function ({ table }) {
+        openTablePropertiesDialog({ editor, table });
+      },
+      applyState: function (button) { button.disabled = !editor.isActive("table"); }
+    },
     {
       id: "table-add-row-before",
       title: "Insert row before",
@@ -1516,6 +1964,28 @@ function getActiveTableElement(editor, surface) {
   return table && surface.contains(table) ? table : null;
 }
 
+function getActiveAlignmentTableElement(editor, surface) {
+  const selectedDom = editor.view.nodeDOM(editor.state.selection.from);
+  if (selectedDom && selectedDom.nodeType === 1 && selectedDom.matches('[data-wiki-node="alignment-table"]') && surface.contains(selectedDom)) {
+    return selectedDom;
+  }
+  const selectionElement = getSelectionElement(editor);
+  const table = selectionElement && typeof selectionElement.closest === "function" ? selectionElement.closest('[data-wiki-node="alignment-table"]') : null;
+  return table && surface.contains(table) ? table : null;
+}
+
+function selectAlignmentTable(editor, target, surface) {
+  const element = target && typeof target.closest === "function" ? target.closest('[data-wiki-node="alignment-table"]') : null;
+  if (!element || !surface.contains(element)) {
+    return false;
+  }
+  const pos = editor.view.posAtDOM(element, 0);
+  if (pos == null) {
+    return false;
+  }
+  return editor.chain().focus().setNodeSelection(pos).run();
+}
+
 function getActiveCodeBlockElement(editor, surface) {
   const { $from } = editor.state.selection;
   for (let depth = $from.depth; depth > 0; depth -= 1) {
@@ -1598,12 +2068,36 @@ function createTableContextToolbar(surface, editor) {
   panel.hidden = true;
 
   const defs = getTableToolDefs(editor);
+  const tableToolGroups = [
+    ["table-properties"],
+    ["table-add-row-before", "table-add-row-after", "table-delete-row"],
+    ["table-add-column-before", "table-add-column-after", "table-delete-column"],
+    ["table-merge-cells", "table-split-cell", "table-toggle-header-row", "table-toggle-header-column"],
+    ["table-delete"]
+  ];
+  const defsById = new Map(defs.map(function (def) {
+    return [def.id, def];
+  }));
+  tableToolGroups.forEach(function (groupIds) {
+    const group = document.createElement("div");
+    group.className = "wiki-editor-context-tools__group";
+    groupIds.forEach(function (id) {
+      const def = defsById.get(id);
+      if (!def) {
+        return;
+      }
+      if (!TABLE_CONTEXT_BUTTON_IDS.includes(def.id)) {
+        throw new Error(`Unknown table context button: ${def.id}`);
+      }
+      def.button = createButton(def);
+      group.appendChild(def.button);
+    });
+    panel.appendChild(group);
+  });
   defs.forEach(function (def) {
     if (!TABLE_CONTEXT_BUTTON_IDS.includes(def.id)) {
       throw new Error(`Unknown table context button: ${def.id}`);
     }
-    def.button = createButton(def);
-    panel.appendChild(def.button);
   });
 
   function syncTableTools() {
@@ -1614,6 +2108,7 @@ function createTableContextToolbar(surface, editor) {
     }
 
     defs.forEach(function (def) {
+      def.activeTable = table;
       def.button.classList.remove("active");
       def.button.disabled = false;
       def.applyState(def.button);
@@ -1633,6 +2128,205 @@ function createTableContextToolbar(surface, editor) {
   return {
     destroy: function () {
       window.removeEventListener("resize", syncTableTools);
+      if (panel.parentNode) {
+        panel.parentNode.removeChild(panel);
+      }
+    }
+  };
+}
+
+function createTableResizeHandle(className, label) {
+  const handle = document.createElement("button");
+  handle.type = "button";
+  handle.className = className;
+  handle.setAttribute("aria-label", label);
+  handle.setAttribute("title", label);
+  handle.hidden = true;
+  return handle;
+}
+
+function setResizeHandleRect(handle, surfaceRect, targetRect, mode) {
+  if (mode === "table-width") {
+    handle.style.left = `${Math.max(0, targetRect.right - surfaceRect.left - 5)}px`;
+    handle.style.top = `${Math.max(0, targetRect.top - surfaceRect.top)}px`;
+    handle.style.height = `${Math.max(12, targetRect.height)}px`;
+    handle.style.width = "10px";
+    return;
+  }
+
+  handle.style.left = `${Math.max(0, targetRect.left - surfaceRect.left)}px`;
+  handle.style.top = `${Math.max(0, targetRect.bottom - surfaceRect.top - 5)}px`;
+  handle.style.width = `${Math.max(12, targetRect.width)}px`;
+  handle.style.height = "10px";
+}
+
+function createTableDimensionHandles(surface, editor) {
+  const tableWidthHandle = createTableResizeHandle("wiki-editor-table-resize-handle wiki-editor-table-resize-handle--width", "Resize table width");
+  const rowHandleLayer = document.createElement("div");
+  rowHandleLayer.className = "wiki-editor-table-row-resize-layer";
+  rowHandleLayer.hidden = true;
+  surface.appendChild(tableWidthHandle);
+  surface.appendChild(rowHandleLayer);
+
+  let activeTable = null;
+  let dragging = null;
+
+  function clearRowHandles() {
+    rowHandleLayer.innerHTML = "";
+  }
+
+  function finishDrag() {
+    if (!dragging) {
+      return;
+    }
+    window.removeEventListener("mousemove", dragMove);
+    window.removeEventListener("mouseup", finishDrag);
+    document.body.classList.remove("wiki-editor-table-resizing");
+    dragging = null;
+    syncTableDimensionHandles();
+  }
+
+  function dragMove(event) {
+    if (!dragging) {
+      return;
+    }
+    event.preventDefault();
+    if (dragging.type === "table-width") {
+      const width = Math.max(96, Math.round(dragging.startWidth + event.clientX - dragging.startX));
+      updateNodeStyleAtPos(editor, dragging.pos, dragging.fallbackStyle, function (style) {
+        return setStyleValue(style, "width", `${width}px`);
+      }, { scroll: false });
+      return;
+    }
+
+    const height = Math.max(24, Math.round(dragging.startHeight + event.clientY - dragging.startY));
+    updateNodeStyleAtPos(editor, dragging.pos, dragging.fallbackStyle, function (style) {
+      return setStyleValue(style, "height", `${height}px`);
+    }, { scroll: false });
+  }
+
+  function startDrag(event, target, type) {
+    const pos = getTableNodePosition(editor, target);
+    if (pos == null) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    const rect = target.getBoundingClientRect();
+    dragging = {
+      type,
+      pos,
+      fallbackStyle: target.getAttribute("style") || "",
+      startX: event.clientX,
+      startY: event.clientY,
+      startWidth: rect.width,
+      startHeight: rect.height
+    };
+    document.body.classList.add("wiki-editor-table-resizing");
+    window.addEventListener("mousemove", dragMove);
+    window.addEventListener("mouseup", finishDrag);
+  }
+
+  tableWidthHandle.addEventListener("mousedown", function (event) {
+    if (activeTable) {
+      startDrag(event, activeTable, "table-width");
+    }
+  });
+
+  function syncTableDimensionHandles() {
+    const table = editor.isActive("table") ? getActiveTableElement(editor, surface) : null;
+    activeTable = table;
+    tableWidthHandle.hidden = !table;
+    rowHandleLayer.hidden = !table;
+    clearRowHandles();
+    if (!table) {
+      return;
+    }
+
+    const surfaceRect = surface.getBoundingClientRect();
+    const tableRect = table.getBoundingClientRect();
+    setResizeHandleRect(tableWidthHandle, surfaceRect, tableRect, "table-width");
+
+    Array.from(table.rows || []).forEach(function (row, index) {
+      const rowHandle = createTableResizeHandle("wiki-editor-table-resize-handle wiki-editor-table-resize-handle--row", `Resize row ${index + 1} height`);
+      const rowRect = row.getBoundingClientRect();
+      setResizeHandleRect(rowHandle, surfaceRect, rowRect, "row-height");
+      rowHandle.addEventListener("mousedown", function (event) {
+        startDrag(event, row, "row-height");
+      });
+      rowHandleLayer.appendChild(rowHandle);
+      rowHandle.hidden = false;
+    });
+  }
+
+  editor.on("create", syncTableDimensionHandles);
+  editor.on("selectionUpdate", syncTableDimensionHandles);
+  editor.on("transaction", syncTableDimensionHandles);
+  editor.on("focus", syncTableDimensionHandles);
+  editor.on("blur", syncTableDimensionHandles);
+  window.addEventListener("resize", syncTableDimensionHandles);
+  surface.addEventListener("scroll", syncTableDimensionHandles);
+  syncTableDimensionHandles();
+
+  return {
+    destroy: function () {
+      finishDrag();
+      window.removeEventListener("resize", syncTableDimensionHandles);
+      surface.removeEventListener("scroll", syncTableDimensionHandles);
+      if (tableWidthHandle.parentNode) {
+        tableWidthHandle.parentNode.removeChild(tableWidthHandle);
+      }
+      if (rowHandleLayer.parentNode) {
+        rowHandleLayer.parentNode.removeChild(rowHandleLayer);
+      }
+    }
+  };
+}
+
+function createAlignmentTableContextToolbar(surface, editor) {
+  const panel = document.createElement("div");
+  panel.className = "wiki-editor-context-tools wiki-editor-alignment-table-tools";
+  panel.setAttribute("role", "toolbar");
+  panel.setAttribute("aria-label", "Selected alignment table tools");
+  panel.hidden = true;
+
+  const edit = createButton({
+    id: "dnd-alignment-table-edit",
+    title: "Edit alignment table",
+    action: function () {
+      openAlignmentTableDialog({ editor });
+    }
+  });
+  const remove = createButton({
+    id: "table-delete",
+    title: "Delete alignment table",
+    action: function () {
+      editor.chain().focus().deleteSelection().run();
+    }
+  });
+  panel.appendChild(edit);
+  panel.appendChild(remove);
+
+  function syncAlignmentTableTools() {
+    const table = editor.isActive("wikiAlignmentTable") ? getActiveAlignmentTableElement(editor, surface) : null;
+    panel.hidden = !table;
+    if (table) {
+      positionContextPanel(panel, table, surface);
+    }
+  }
+
+  editor.on("create", syncAlignmentTableTools);
+  editor.on("selectionUpdate", syncAlignmentTableTools);
+  editor.on("transaction", syncAlignmentTableTools);
+  editor.on("focus", syncAlignmentTableTools);
+  editor.on("blur", syncAlignmentTableTools);
+  window.addEventListener("resize", syncAlignmentTableTools);
+  surface.appendChild(panel);
+  syncAlignmentTableTools();
+
+  return {
+    destroy: function () {
+      window.removeEventListener("resize", syncAlignmentTableTools);
       if (panel.parentNode) {
         panel.parentNode.removeChild(panel);
       }
@@ -2620,6 +3314,7 @@ export async function createWikiEditor(element, options) {
       MediaCell,
       MediaRow,
       ImageFigure,
+      WikiAlignmentTable,
       WikiCodeBlock,
       WikiBlockBackground,
       WikiCallout,
@@ -2645,7 +3340,8 @@ export async function createWikiEditor(element, options) {
         }
       }),
       Table.configure({
-        resizable: true
+        resizable: true,
+        View: WestgateTableView
       }),
       TableRow,
       TableHeader,
@@ -2722,6 +3418,12 @@ export async function createWikiEditor(element, options) {
           }
 
           if (selectClickedImageNode(editor, target, editorMount)) {
+            event.preventDefault();
+            event.stopPropagation();
+            return true;
+          }
+
+          if (selectAlignmentTable(editor, target, editorMount)) {
             event.preventDefault();
             event.stopPropagation();
             return true;
@@ -2807,6 +3509,8 @@ export async function createWikiEditor(element, options) {
   const imageResizeOverlay = createImageResizeOverlay(editorMount, editor);
   const codeBlockLanguageToolbar = createCodeBlockLanguageToolbar(editorMount, editor);
   const tableContextToolbar = createTableContextToolbar(editorMount, editor);
+  const tableDimensionHandles = createTableDimensionHandles(editorMount, editor);
+  const alignmentTableContextToolbar = createAlignmentTableContextToolbar(editorMount, editor);
   linkContextToolbar = createLinkContextToolbar(editorMount, editor);
   const destroyLinkNavigationGuard = installEditorLinkNavigationGuard({
     editorMount,
@@ -2859,6 +3563,8 @@ export async function createWikiEditor(element, options) {
       imageResizeOverlay.destroy();
       codeBlockLanguageToolbar.destroy();
       tableContextToolbar.destroy();
+      tableDimensionHandles.destroy();
+      alignmentTableContextToolbar.destroy();
       linkContextToolbar.destroy();
       editorToc.destroy();
       return editor.destroy();

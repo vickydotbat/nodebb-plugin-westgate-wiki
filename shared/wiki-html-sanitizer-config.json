@@ -118,6 +118,15 @@
       "background-color": [
         "^(?:#[0-9a-fA-F]{3,8}|(?:rgb|hsl)a?\\([0-9\\s.,%/+-]+\\)|var\\(--[a-zA-Z0-9_-]+\\)|[a-zA-Z]+)$"
       ],
+      "border-color": [
+        "^(?:#[0-9a-fA-F]{3,8}|(?:rgb|hsl)a?\\([0-9\\s.,%/+-]+\\)|var\\(--[a-zA-Z0-9_-]+\\)|[a-zA-Z]+)$"
+      ],
+      "border-style": [
+        "^(?:none|hidden|solid|dashed|dotted|double)$"
+      ],
+      "border-width": [
+        "^(?:0|\\d+(?:\\.\\d+)?(?:px|em|rem))$"
+      ],
       "color": [
         "^(?:#[0-9a-fA-F]{3,8}|(?:rgb|hsl)a?\\([0-9\\s.,%/+-]+\\)|var\\(--[a-zA-Z0-9_-]+\\)|[a-zA-Z]+)$"
       ],
@@ -141,6 +150,12 @@
       ],
       "vertical-align": [
         "^(?:sub|super)$"
+      ],
+      "height": [
+        "^(?:\\d+(?:\\.\\d+)?(?:px|em|rem|%)|auto)$"
+      ],
+      "width": [
+        "^(?:\\d+(?:\\.\\d+)?(?:px|em|rem|%)|auto)$"
       ]
     },
     "img": {

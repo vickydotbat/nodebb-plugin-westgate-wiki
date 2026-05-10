@@ -418,9 +418,27 @@
   border-collapse: collapse;
 }
 
+.wiki-article-prose table.wiki-table-layout-auto {
+  table-layout: auto;
+}
+
+.wiki-article-prose table.wiki-table-layout-fixed {
+  table-layout: fixed;
+}
+
 .wiki-article-prose :where(th, td) {
   border: 1px solid var(--wiki-prose-table-border, var(--bs-border-color-translucent, var(--bs-border-color, #dee2e6)));
   padding: 0.5rem 0.65rem;
+}
+
+.wiki-article-prose table[style*="border-color"] :where(th, td) {
+  border-color: inherit;
+}
+
+.wiki-article-prose table.wiki-table-borderless,
+.wiki-article-prose table.wiki-table-borderless :where(th, td) {
+  border-color: transparent;
+  border-width: 0;
 }
 
 .wiki-article-prose :where(td, th)[style*="color"] :where(p, li) {
@@ -451,6 +469,66 @@
 
 .wiki-article-prose .wiki-legacy-table-caption + table {
   margin-top: 0;
+}
+
+.wiki-article-prose .wiki-alignment-table {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.18rem;
+  margin: 1rem 0;
+}
+
+.wiki-article-prose .wiki-alignment-table--compact {
+  width: min(10rem, 100%);
+}
+
+.wiki-article-prose .wiki-alignment-table--full {
+  grid-template-columns: repeat(3, max-content);
+  max-width: 100%;
+  overflow-x: auto;
+  width: max-content;
+}
+
+.wiki-article-prose .wiki-alignment-table__cell {
+  align-items: center;
+  border: 1px solid var(--wiki-prose-table-border, var(--bs-border-color-translucent, var(--bs-border-color, #dee2e6)));
+  display: inline-flex;
+  justify-content: center;
+  padding: 0.45rem 0.55rem;
+  text-align: center;
+  font-size: 0.86rem;
+}
+
+.wiki-article-prose .wiki-alignment-table--compact .wiki-alignment-table__cell {
+  aspect-ratio: 1 / 1;
+  padding: 0.28rem 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.wiki-article-prose .wiki-alignment-table--full .wiki-alignment-table__cell {
+  min-width: 7.2rem;
+  white-space: nowrap;
+}
+
+.wiki-article-prose .wiki-alignment-table .wiki-alignment-table__cell > p {
+  margin-block: 0 !important;
+  padding: 0 !important;
+  line-height: inherit;
+}
+
+#content .wiki-article-prose .wiki-alignment-table .wiki-alignment-table__cell > p {
+  margin-block: 0 !important;
+  padding: 0 !important;
+  line-height: inherit;
+}
+
+.wiki-article-prose .wiki-alignment-table__cell--active {
+  border-color: var(--wiki-prose-table-highlight-border, var(--bs-warning, #ffc107));
+  background: color-mix(in srgb, var(--wiki-prose-table-highlight-bg, var(--bs-warning, #ffc107)) 24%, transparent);
+  color: var(--wiki-prose-table-highlight-color, var(--wiki-prose-color, inherit));
+  font-weight: 700;
 }
 
 .wiki-article-prose figure.image > figcaption {

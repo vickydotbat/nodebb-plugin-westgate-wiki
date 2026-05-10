@@ -432,6 +432,20 @@
   display: none;
 }
 
+.westgate-wiki-compose .wiki-editor-context-tools__group {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding-right: 0.35rem;
+  margin-right: 0.1rem;
+  border-right: 1px solid color-mix(in srgb, var(--wiki-editor-toolbar-border, var(--bs-border-color, #dee2e6)) 70%, transparent);
+}
+
+.westgate-wiki-compose .wiki-editor-context-tools__group:last-child {
+  padding-right: 0;
+  margin-right: 0;
+  border-right: 0;
+}
+
 .wiki-editor-color-swatch {
   background: var(--wiki-editor-swatch-color, transparent);
   border: 1px solid color-mix(in srgb, currentColor 28%, transparent);
@@ -489,6 +503,38 @@
   color: inherit;
   font-size: 0.75rem;
   padding: 0 0.35rem;
+}
+
+.wiki-editor-dialog__field {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.wiki-editor-alignment-picker {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.wiki-editor-alignment-picker__item {
+  display: grid;
+  gap: 0.25rem;
+  align-items: center;
+  justify-items: center;
+  min-height: 3.5rem;
+  border: 1px solid var(--wiki-editor-toolbar-border, var(--bs-border-color, #dee2e6));
+  border-radius: var(--bs-border-radius-sm, 0.25rem);
+  padding: 0.45rem;
+  text-align: center;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.wiki-editor-alignment-picker__item:has(input:checked) {
+  border-color: var(--wiki-editor-focus-border, var(--bs-primary, #0d6efd));
+  background: color-mix(in srgb, var(--wiki-editor-focus-border, var(--bs-primary, #0d6efd)) 16%, transparent);
 }
 
 .westgate-wiki-compose .wiki-editor-code-language-tools {
@@ -718,6 +764,88 @@
 
 .westgate-wiki-compose .wiki-editor__content table {
   table-layout: fixed;
+}
+
+.westgate-wiki-compose .wiki-editor__content table.wiki-table-layout-fixed {
+  table-layout: fixed;
+}
+
+.westgate-wiki-compose .wiki-editor__content table.wiki-table-layout-auto {
+  table-layout: auto;
+}
+
+.westgate-wiki-compose .wiki-editor__content table[style*="border-color"] :where(th, td) {
+  border-color: inherit;
+}
+
+.westgate-wiki-compose .wiki-editor__content table.wiki-table-borderless,
+.westgate-wiki-compose .wiki-editor__content table.wiki-table-borderless :where(th, td) {
+  border-color: transparent;
+  border-width: 0;
+}
+
+.westgate-wiki-compose .wiki-editor__content .tableWrapper {
+  overflow-x: auto;
+}
+
+.westgate-wiki-compose .wiki-editor__content :where(td, th) {
+  box-sizing: border-box;
+  position: relative;
+}
+
+.westgate-wiki-compose .wiki-editor__content .column-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  bottom: 0;
+  z-index: 20;
+  width: 6px;
+  background: color-mix(in srgb, var(--wiki-editor-focus-border, var(--bs-primary, #0d6efd)) 70%, transparent);
+  cursor: col-resize;
+  pointer-events: none;
+}
+
+.westgate-wiki-compose .wiki-editor__content.resize-cursor {
+  cursor: col-resize;
+}
+
+.westgate-wiki-compose .wiki-editor__content .selectedCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: color-mix(in srgb, var(--wiki-editor-focus-border, var(--bs-primary, #0d6efd)) 18%, transparent);
+  pointer-events: none;
+}
+
+.westgate-wiki-compose .wiki-editor-table-resize-handle {
+  position: absolute;
+  z-index: 11;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--wiki-editor-focus-border, var(--bs-primary, #0d6efd)) 72%, transparent);
+  opacity: 0.72;
+  padding: 0;
+}
+
+.westgate-wiki-compose .wiki-editor-table-resize-handle:hover,
+.westgate-wiki-compose .wiki-editor-table-resize-handle:focus-visible,
+.wiki-editor-table-resizing .westgate-wiki-compose .wiki-editor-table-resize-handle {
+  opacity: 1;
+  outline: none;
+}
+
+.westgate-wiki-compose .wiki-editor-table-resize-handle--width {
+  cursor: ew-resize;
+}
+
+.westgate-wiki-compose .wiki-editor-table-resize-handle--row {
+  cursor: ns-resize;
+}
+
+.westgate-wiki-compose .wiki-editor-table-resize-handle[hidden],
+.westgate-wiki-compose .wiki-editor-table-row-resize-layer[hidden] {
+  display: none;
 }
 
 .westgate-wiki-compose .wiki-editor__content img {

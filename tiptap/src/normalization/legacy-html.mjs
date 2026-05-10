@@ -290,6 +290,10 @@ export function hasBlockDescendantChildren(element) {
   });
 }
 
+function isInsidePluginOwnedStructure(element) {
+  return !!(element && element.closest && element.closest('[data-wiki-node="alignment-table"]'));
+}
+
 export function normalizeLegacyPresentationalTags(document, root) {
   [
     ["abbr", "span"],
@@ -635,6 +639,10 @@ export function normalizeLegacyHtmlForTiptap(html) {
   }
 
   root.querySelectorAll("article, section, div").forEach(function (element) {
+    if (isInsidePluginOwnedStructure(element)) {
+      return;
+    }
+
     if (isPlainWrapperElement(element)) {
       unwrapElement(element);
       return;
