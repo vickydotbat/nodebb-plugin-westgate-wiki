@@ -999,7 +999,7 @@ await test("fullscreen source mode has guarded editable source synchronization",
   assert.match(editorBundleSource, /editor\.commands\.setContent\([^,]+,\s*false\)/);
   assert.match(editorBundleSource, /sourceApply\.addEventListener\("click",\s*applySourceToEditor\)/);
   assert.match(editorBundleSource, /sourceTextarea\.addEventListener\("input",\s*function \(\) \{[\s\S]*setSourceDirty\(true\)/);
-  assert.doesNotMatch(editorBundleSource, /sourceTextarea\.addEventListener\("input",\s*function \(\) \{[\s\S]*renderSourceHighlight\(\)/);
+  assert.match(editorBundleSource, /sourceTextarea\.addEventListener\("input",\s*function \(\) \{[\s\S]*renderSourceHighlight\(\)/);
   assert.doesNotMatch(editorBundleSource, /sourceTextarea\.addEventListener\("input",\s*function \(\) \{[\s\S]*syncEditorFromSource\(\)/);
   assert.match(editorBundleSource, /editor\.on\("update",\s*scheduleSourceFromEditor\)/);
   assert.doesNotMatch(editorBundleSource, /editor\.on\("update",\s*syncSourceFromEditor\)/);
@@ -1073,8 +1073,8 @@ await test("fullscreen source mode css supports resize and source hiding", funct
     assert.match(css, /\.wiki-editor__fullscreen-source-toggle,\s*\.westgate-wiki-compose\s+\.wiki-editor__fullscreen-source-wrap\s*{[^}]*width:\s*2rem/);
     assert.match(css, /\.wiki-editor__fullscreen-source-panel--wrap\s+\.wiki-editor__fullscreen-source-highlight,\s*\.westgate-wiki-compose\s+\.wiki-editor__fullscreen-source-panel--wrap\s+\.wiki-editor__fullscreen-source-input\s*{[^}]*white-space:\s*pre-wrap/);
     assert.match(css, /\.wiki-editor__fullscreen-source-panel--wrap\s+\.wiki-editor__fullscreen-source-highlight,\s*\.westgate-wiki-compose\s+\.wiki-editor__fullscreen-source-panel--wrap\s+\.wiki-editor__fullscreen-source-input\s*{[^}]*overflow-wrap:\s*break-word/);
-    assert.match(css, /\.wiki-editor__fullscreen-source-panel--dirty\s+\.wiki-editor__fullscreen-source-highlight\s*{[^}]*visibility:\s*hidden/);
-    assert.match(css, /\.wiki-editor__fullscreen-source-panel--dirty\s+\.wiki-editor__fullscreen-source-input\s*{[^}]*color:\s*#f9fafb/);
+    assert.doesNotMatch(css, /\.wiki-editor__fullscreen-source-panel--dirty\s+\.wiki-editor__fullscreen-source-highlight\s*{[^}]*visibility:\s*hidden/);
+    assert.doesNotMatch(css, /\.wiki-editor__fullscreen-source-panel--dirty\s+\.wiki-editor__fullscreen-source-input\s*{[^}]*color:\s*#f9fafb/);
   });
 });
 

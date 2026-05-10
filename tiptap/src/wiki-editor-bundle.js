@@ -2248,6 +2248,7 @@ function createFullscreenSourceMode(root, editor, sourcePanel, sourceTextarea, s
   sourceTextarea.addEventListener("input", function () {
     clearScheduledSourceSync();
     setSourceDirty(true);
+    renderSourceHighlight();
   });
   sourceTextarea.addEventListener("keydown", handleSourceKeydown);
   sourceTextarea.addEventListener("scroll", syncSourceScroll);
