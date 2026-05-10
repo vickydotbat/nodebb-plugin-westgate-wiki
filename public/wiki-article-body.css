@@ -136,6 +136,13 @@
   padding: 0.02em 0.16em;
 }
 
+.wiki-article-prose p[style*="background-color"] {
+  display: table;
+  max-width: 100%;
+  padding: 0.08rem 0.22rem;
+  width: fit-content;
+}
+
 .wiki-article-prose .wiki-entity {
   border-radius: var(--bs-border-radius-sm, 0.25rem);
   box-decoration-break: clone;
@@ -414,6 +421,10 @@
 .wiki-article-prose :where(th, td) {
   border: 1px solid var(--wiki-prose-table-border, var(--bs-border-color-translucent, var(--bs-border-color, #dee2e6)));
   padding: 0.5rem 0.65rem;
+}
+
+.wiki-article-prose :where(td, th)[style*="color"] :where(p, li) {
+  color: inherit;
 }
 
 .wiki-article-prose thead th {

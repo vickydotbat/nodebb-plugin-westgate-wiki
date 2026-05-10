@@ -21,10 +21,15 @@ function test(name, fn) {
 
 installJsdomGlobals();
 
-const [{ Editor }, StarterKitModule, ImageModule, PreservedNodeAttributesModule, StyledSpanModule, ContainerBlockModule, MediaRowModule, ImageFigureModule, WikiCalloutModule, WikiEditingKeymapModule, SlashCommandModule, WikiCodeBlockModule, WikiLinkModule, WikiEntitiesModule, toolbarSchemaModule, editorTocModule, linkInteractionsModule, imageResizeModule, legacyHtmlModule, sanitizerContractModule] = await Promise.all([
+const [{ Editor }, StarterKitModule, HighlightModule, ImageModule, TableModule, TableCellModule, TableHeaderModule, TableRowModule, PreservedNodeAttributesModule, StyledSpanModule, ContainerBlockModule, MediaRowModule, ImageFigureModule, WikiCalloutModule, WikiEditingKeymapModule, SlashCommandModule, WikiCodeBlockModule, WikiBlockBackgroundModule, WikiLinkModule, WikiEntitiesModule, toolbarSchemaModule, editorTocModule, linkInteractionsModule, imageResizeModule, legacyHtmlModule, sanitizerContractModule, colorContrastModule] = await Promise.all([
   import("@tiptap/core"),
   import("@tiptap/starter-kit"),
+  import("../tiptap/src/extensions/wiki-highlight.mjs"),
   import("@tiptap/extension-image"),
+  import("@tiptap/extension-table"),
+  import("@tiptap/extension-table-cell"),
+  import("@tiptap/extension-table-header"),
+  import("@tiptap/extension-table-row"),
   import("../tiptap/src/extensions/preserved-node-attributes.mjs"),
   import("../tiptap/src/extensions/styled-span.mjs"),
   import("../tiptap/src/extensions/container-block.mjs"),
@@ -34,6 +39,7 @@ const [{ Editor }, StarterKitModule, ImageModule, PreservedNodeAttributesModule,
   import("../tiptap/src/extensions/wiki-editing-keymap.mjs"),
   import("../tiptap/src/extensions/slash-command.mjs"),
   import("../tiptap/src/extensions/wiki-code-block.mjs"),
+  import("../tiptap/src/extensions/wiki-block-background.mjs"),
   import("../tiptap/src/extensions/wiki-link.mjs"),
   import("../tiptap/src/extensions/wiki-entities.mjs"),
   import("../tiptap/src/toolbar/toolbar-schema.mjs"),
@@ -41,11 +47,17 @@ const [{ Editor }, StarterKitModule, ImageModule, PreservedNodeAttributesModule,
   import("../tiptap/src/selection/link-interactions.mjs"),
   import("../tiptap/src/selection/image-resize.mjs"),
   import("../tiptap/src/normalization/legacy-html.mjs"),
-  import("../tiptap/src/shared/sanitizer-contract.mjs")
+  import("../tiptap/src/shared/sanitizer-contract.mjs"),
+  import("../tiptap/src/shared/color-contrast.mjs")
 ]);
 
 const StarterKit = StarterKitModule.default;
+const Highlight = HighlightModule.default;
 const Image = ImageModule.default;
+const { Table } = TableModule;
+const { TableCell } = TableCellModule;
+const { TableHeader } = TableHeaderModule;
+const { TableRow } = TableRowModule;
 const PreservedNodeAttributes = PreservedNodeAttributesModule.default;
 const StyledSpan = StyledSpanModule.default;
 const ContainerBlock = ContainerBlockModule.default;
@@ -55,6 +67,7 @@ const WikiCallout = WikiCalloutModule.default;
 const WikiEditingKeymap = WikiEditingKeymapModule.default;
 const SlashCommand = SlashCommandModule.default;
 const WikiCodeBlock = WikiCodeBlockModule.default;
+const WikiBlockBackground = WikiBlockBackgroundModule.default;
 const WikiLink = WikiLinkModule.default;
 const { WikiFootnote, WikiNamespaceLink, WikiPageLink, WikiUserMention } = WikiEntitiesModule;
 const { IMAGE_CONTEXT_BUTTON_IDS, TABLE_CONTEXT_BUTTON_IDS, TOP_TOOLBAR_BUTTON_IDS, TOP_TOOLBAR_GROUPS } = toolbarSchemaModule;
@@ -67,6 +80,7 @@ const {
   normalizeLegacyHtmlForTiptap
 } = legacyHtmlModule;
 const { sanitizeHtml } = sanitizerContractModule;
+const { getReadableTextColor, normalizeHexColor } = colorContrastModule;
 const articleBodyCss = readFileSync(new URL("../public/wiki-article-body.css", import.meta.url), "utf8");
 const wikiJsSource = readFileSync(new URL("../public/wiki.js", import.meta.url), "utf8");
 const editorCss = readFileSync(new URL("../tiptap/src/wiki-editor.css", import.meta.url), "utf8");
@@ -97,6 +111,10 @@ function createEditor(content) {
       WikiCallout,
       WikiEditingKeymap,
       WikiCodeBlock,
+      WikiBlockBackground,
+      Highlight.configure({
+        multicolor: true
+      }),
       WikiPageLink,
       WikiNamespaceLink,
       WikiUserMention,
@@ -125,7 +143,11 @@ function createEditor(content) {
         HTMLAttributes: {
           "data-wiki-node": "image"
         }
-      })
+      }),
+      Table,
+      TableRow,
+      TableHeader,
+      TableCell
     ],
     content: content || ""
   });
@@ -265,6 +287,92 @@ await test("styled span classes and styles round-trip through the extracted exte
   const rendered = editor.getHTML();
 
   assert.match(rendered, /<span class="legacy-accent" style="font-size: 1\.2rem; color: rgb\(202, 165, 90\);">Accent<\/span>/);
+  editor.destroy();
+});
+
+await test("highlight colors render as sanitized multicolor marks", function () {
+  const editor = createEditor("<p>Colored highlight</p>");
+
+  editor.commands.setTextSelection({ from: 1, to: 8 });
+  editor.commands.toggleHighlight({ color: "#bfdbfe" });
+  const rendered = editor.getHTML();
+
+  assert.match(rendered, /<mark[^>]*style="[^"]*background-color: rgb\(191, 219, 254\);[^"]*"[^>]*>Colored<\/mark>/);
+  assert.match(rendered, /<mark[^>]*style="[^"]*color: rgb\(17, 24, 39\);[^"]*"[^>]*>Colored<\/mark>/);
+  editor.destroy();
+});
+
+await test("highlight colors auto-select a legible foreground for custom dark backgrounds", function () {
+  const editor = createEditor("<p>Custom highlight</p>");
+
+  editor.commands.setTextSelection({ from: 1, to: 7 });
+  editor.commands.toggleHighlight({ color: "#3b0764" });
+  const rendered = editor.getHTML();
+
+  assert.match(rendered, /<mark[^>]*style="[^"]*background-color: rgb\(59, 7, 100\);[^"]*"[^>]*>Custom<\/mark>/);
+  assert.match(rendered, /<mark[^>]*style="[^"]*color: rgb\(249, 250, 251\);[^"]*"[^>]*>Custom<\/mark>/);
+  editor.destroy();
+});
+
+await test("block background command applies and removes sanitized text block color styles", function () {
+  const editor = createEditor('<p style="text-align: center">Block background</p>');
+
+  editor.commands.setTextSelection(3);
+  assert.equal(editor.commands.setWikiBlockBackground({ backgroundColor: "#dcfce7" }), true);
+  assert.match(editor.getHTML(), /<p style="text-align: center; background-color: rgb\(220, 252, 231\); color: rgb\(17, 24, 39\);?">Block background<\/p>/);
+
+  assert.equal(editor.commands.unsetWikiBlockBackground(), true);
+  assert.match(editor.getHTML(), /<p style="text-align: center;">Block background<\/p>/);
+  editor.destroy();
+});
+
+await test("block background command auto-selects a legible foreground for custom dark backgrounds", function () {
+  const editor = createEditor("<p>Dark block</p>");
+
+  editor.commands.setTextSelection(3);
+  assert.equal(editor.commands.setWikiBlockBackground({ backgroundColor: "#111827" }), true);
+  assert.match(editor.getHTML(), /<p style="background-color: rgb\(17, 24, 39\); color: rgb\(249, 250, 251\);?">Dark block<\/p>/);
+  editor.destroy();
+});
+
+await test("editor color contrast helpers normalize custom hex colors and choose readable text", function () {
+  assert.equal(normalizeHexColor("abc"), "#aabbcc");
+  assert.equal(normalizeHexColor("#3B0764"), "#3b0764");
+  assert.equal(normalizeHexColor("not-a-color"), "");
+  assert.equal(getReadableTextColor("#3b0764"), "#f9fafb");
+  assert.equal(getReadableTextColor("#fef08a"), "#111827");
+});
+
+await test("editor toolbar exposes highlight and text block background color palettes", function () {
+  assert.match(editorBundleSource, /const HIGHLIGHT_COLOR_OPTIONS = \[/);
+  assert.match(editorBundleSource, /label:\s*"Magenta"[\s\S]*backgroundColor:\s*"#f5d0fe"/);
+  assert.match(editorBundleSource, /Highlight\.configure\(\{[\s\S]*multicolor:\s*true[\s\S]*\}\)/);
+  assert.match(editorBundleSource, /getReadableTextColor\(backgroundColor\)/);
+  assert.match(editorBundleSource, /normalizeHexColor\(customColor\.value\)/);
+  assert.match(editorBundleSource, /toggleHighlight\(\{ color: backgroundColor, textColor \}\)/);
+  assert.match(editorBundleSource, /const BLOCK_BACKGROUND_COLOR_OPTIONS = \[/);
+  assert.match(editorBundleSource, /setWikiBlockBackground\(\{ backgroundColor, textColor \}\)/);
+  assert.match(editorBundleSource, /unsetWikiBlockBackground\(\)/);
+  assert.match(editorCss, /\.wiki-editor-color-menu\s*\{/);
+  assert.match(editorCss, /\.wiki-editor-color-swatch\s*\{/);
+  assert.match(editorCss, /\.wiki-editor-color-custom\s*\{/);
+  assert.match(vendoredEditorCss, /\.wiki-editor-color-menu\s*\{/);
+  assert.match(vendoredEditorCss, /\.wiki-editor-color-swatch\s*\{/);
+  assert.match(vendoredEditorCss, /\.wiki-editor-color-custom\s*\{/);
+});
+
+await test("paragraph block backgrounds shrink to the text width in article and editor prose", function () {
+  assert.match(articleBodyCss, /\.wiki-article-prose p\[style\*="background-color"\]\s*\{[^}]*display:\s*table/s);
+  assert.match(articleBodyCss, /\.wiki-article-prose p\[style\*="background-color"\]\s*\{[^}]*width:\s*fit-content/s);
+});
+
+await test("table cell block backgrounds keep their paired foreground color", function () {
+  const editor = createEditor("<table><tbody><tr><td><p>Cell background</p></td></tr></tbody></table>");
+
+  editor.commands.setTextSelection(5);
+  assert.equal(editor.commands.setWikiBlockBackground({ backgroundColor: "#dbeafe" }), true);
+  assert.match(editor.getHTML(), /<td[^>]*style="background-color: rgb\(219, 234, 254\); color: rgb\(17, 24, 39\);"[^>]*><p>Cell background<\/p><\/td>/);
+  assert.match(articleBodyCss, /\.wiki-article-prose :where\(td, th\)\[style\*="color"\] :where\(p, li\)\s*\{[^}]*color:\s*inherit/s);
   editor.destroy();
 });
 

@@ -7,7 +7,6 @@ import { gfm } from "turndown-plugin-gfm";
 import { Editor } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import CharacterCount from "@tiptap/extension-character-count";
-import Highlight from "@tiptap/extension-highlight";
 import Image from "@tiptap/extension-image";
 import Placeholder from "@tiptap/extension-placeholder";
 import Subscript from "@tiptap/extension-subscript";
@@ -28,9 +27,11 @@ import { MediaCell, MediaRow } from "./extensions/media-row.mjs";
 import PreservedNodeAttributes from "./extensions/preserved-node-attributes.mjs";
 import SlashCommand from "./extensions/slash-command.mjs";
 import StyledSpan from "./extensions/styled-span.mjs";
+import WikiBlockBackground from "./extensions/wiki-block-background.mjs";
 import WikiCallout from "./extensions/wiki-callout.mjs";
 import WikiCodeBlock, { CODE_BLOCK_LANGUAGE_OPTIONS } from "./extensions/wiki-code-block.mjs";
 import WikiEditingKeymap from "./extensions/wiki-editing-keymap.mjs";
+import Highlight from "./extensions/wiki-highlight.mjs";
 import { WikiFootnote, WikiNamespaceLink, WikiPageLink, WikiUserMention } from "./extensions/wiki-entities.mjs";
 import WikiLink from "./extensions/wiki-link.mjs";
 import {
@@ -52,6 +53,7 @@ import {
   installEditorLinkNavigationGuard
 } from "./selection/link-interactions.mjs";
 import { createImageResizeOverlay } from "./selection/image-resize.mjs";
+import { getReadableTextColor, normalizeHexColor } from "./shared/color-contrast.mjs";
 import { sanitizeHtml } from "./shared/sanitizer-contract.mjs";
 import { buildHeadingToc, flattenHeadingToc, navigateToHeading } from "./toolbar/editor-toc.mjs";
 import { IMAGE_CONTEXT_BUTTON_IDS, TABLE_CONTEXT_BUTTON_IDS, TOP_TOOLBAR_BUTTON_IDS, TOP_TOOLBAR_GROUPS } from "./toolbar/toolbar-schema.mjs";
@@ -92,6 +94,7 @@ const BUTTON_ICONS = {
   strike: "fa-strikethrough",
   "inline-code": "fa-code",
   highlight: "fa-paint-brush",
+  "block-background": "fa-square",
   subscript: "fa-subscript",
   superscript: "fa-superscript",
   link: "fa-link",
@@ -139,6 +142,24 @@ const BUTTON_ICONS = {
   "fullscreen-source": "fa-window-maximize"
 };
 
+const HIGHLIGHT_COLOR_OPTIONS = [
+  { id: "yellow", label: "Yellow", backgroundColor: "#fef08a" },
+  { id: "blue", label: "Blue", backgroundColor: "#bfdbfe" },
+  { id: "red", label: "Red", backgroundColor: "#fecaca" },
+  { id: "green", label: "Green", backgroundColor: "#bbf7d0" },
+  { id: "magenta", label: "Magenta", backgroundColor: "#f5d0fe" },
+  { id: "cyan", label: "Cyan", backgroundColor: "#a5f3fc" }
+];
+
+const BLOCK_BACKGROUND_COLOR_OPTIONS = [
+  { id: "yellow", label: "Yellow", backgroundColor: "#fef9c3" },
+  { id: "blue", label: "Blue", backgroundColor: "#dbeafe" },
+  { id: "red", label: "Red", backgroundColor: "#fee2e2" },
+  { id: "green", label: "Green", backgroundColor: "#dcfce7" },
+  { id: "magenta", label: "Magenta", backgroundColor: "#fae8ff" },
+  { id: "cyan", label: "Cyan", backgroundColor: "#cffafe" }
+];
+
 function createButton(def) {
   const button = document.createElement("button");
   button.type = "button";
@@ -170,7 +191,7 @@ function createButton(def) {
 
   button.addEventListener("click", function (event) {
     event.preventDefault();
-    def.action();
+    def.action({ button });
   });
   return button;
 }
@@ -617,6 +638,94 @@ function createToolbar(root, editor, uploadImage) {
 
   const groups = [];
   const separators = [];
+  let activeColorMenu = null;
+
+  function closeColorMenu() {
+    if (activeColorMenu && activeColorMenu.parentNode) {
+      activeColorMenu.parentNode.removeChild(activeColorMenu);
+    }
+    activeColorMenu = null;
+    document.removeEventListener("mousedown", closeColorMenu);
+  }
+
+  function openColorMenu({ button, title, options, onSelect, onClear }) {
+    closeColorMenu();
+
+    const menu = document.createElement("div");
+    menu.className = "wiki-editor-color-menu";
+    menu.setAttribute("role", "menu");
+    menu.setAttribute("aria-label", title);
+    menu.addEventListener("mousedown", function (event) {
+      event.stopPropagation();
+    });
+
+    options.forEach(function (option) {
+      const swatch = document.createElement("button");
+      swatch.type = "button";
+      swatch.className = "wiki-editor-color-swatch";
+      swatch.setAttribute("role", "menuitem");
+      swatch.setAttribute("title", option.label);
+      swatch.setAttribute("aria-label", option.label);
+      swatch.style.setProperty("--wiki-editor-swatch-color", option.backgroundColor);
+      swatch.addEventListener("click", function (event) {
+        event.preventDefault();
+        onSelect(option);
+        closeColorMenu();
+      });
+      menu.appendChild(swatch);
+    });
+
+    const custom = document.createElement("label");
+    custom.className = "wiki-editor-color-custom";
+    custom.setAttribute("title", "Custom color");
+    custom.setAttribute("aria-label", "Custom color");
+
+    const customIcon = document.createElement("span");
+    customIcon.className = "wiki-editor-color-custom__icon";
+    customIcon.setAttribute("aria-hidden", "true");
+    customIcon.textContent = "+";
+    custom.appendChild(customIcon);
+
+    const customColor = document.createElement("input");
+    customColor.type = "color";
+    customColor.value = (options[0] && normalizeHexColor(options[0].backgroundColor)) || "#fef08a";
+    customColor.addEventListener("input", function () {
+      const backgroundColor = normalizeHexColor(customColor.value);
+      if (!backgroundColor) {
+        return;
+      }
+      onSelect({
+        id: "custom",
+        label: "Custom",
+        backgroundColor
+      });
+      closeColorMenu();
+    });
+    custom.appendChild(customColor);
+    menu.appendChild(custom);
+
+    const clear = document.createElement("button");
+    clear.type = "button";
+    clear.className = "wiki-editor-color-clear";
+    clear.setAttribute("role", "menuitem");
+    clear.textContent = "Clear";
+    clear.addEventListener("click", function (event) {
+      event.preventDefault();
+      onClear();
+      closeColorMenu();
+    });
+    menu.appendChild(clear);
+
+    document.body.appendChild(menu);
+    activeColorMenu = menu;
+
+    const rect = button.getBoundingClientRect();
+    menu.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8))}px`;
+    menu.style.top = `${Math.min(rect.bottom + 6, window.innerHeight - menu.offsetHeight - 8)}px`;
+    window.setTimeout(function () {
+      document.addEventListener("mousedown", closeColorMenu);
+    }, 0);
+  }
 
   function addGroup(defs, groupId) {
     const schemaGroup = TOP_TOOLBAR_GROUPS.find(function (groupDef) {
@@ -793,8 +902,20 @@ function createToolbar(root, editor, uploadImage) {
     {
       id: "highlight",
       title: "Highlight",
-      action: function () {
-        editor.chain().focus().toggleHighlight().run();
+      action: function ({ button }) {
+        openColorMenu({
+          button,
+          title: "Highlight color",
+          options: HIGHLIGHT_COLOR_OPTIONS,
+          onSelect: function (option) {
+            const backgroundColor = option.backgroundColor;
+            const textColor = getReadableTextColor(backgroundColor);
+            editor.chain().focus().toggleHighlight({ color: backgroundColor, textColor }).run();
+          },
+          onClear: function () {
+            editor.chain().focus().unsetHighlight().run();
+          }
+        });
       },
       applyState: function (button) {
         button.classList.toggle("active", editor.isActive("highlight"));
@@ -937,6 +1058,25 @@ function createToolbar(root, editor, uploadImage) {
       },
       applyState: function (button) {
         button.classList.toggle("active", editor.isActive("codeBlock"));
+      }
+    },
+    {
+      id: "block-background",
+      title: "Text block background",
+      action: function ({ button }) {
+        openColorMenu({
+          button,
+          title: "Text block background color",
+          options: BLOCK_BACKGROUND_COLOR_OPTIONS,
+          onSelect: function (option) {
+            const backgroundColor = option.backgroundColor;
+            const textColor = getReadableTextColor(backgroundColor);
+            editor.chain().focus().setWikiBlockBackground({ backgroundColor, textColor }).run();
+          },
+          onClear: function () {
+            editor.chain().focus().unsetWikiBlockBackground().run();
+          }
+        });
       }
     },
     {
@@ -2481,6 +2621,7 @@ export async function createWikiEditor(element, options) {
       MediaRow,
       ImageFigure,
       WikiCodeBlock,
+      WikiBlockBackground,
       WikiCallout,
       WikiEditingKeymap,
       WikiPageLink,
@@ -2488,7 +2629,9 @@ export async function createWikiEditor(element, options) {
       WikiUserMention,
       WikiFootnote,
       Underline,
-      Highlight,
+      Highlight.configure({
+        multicolor: true
+      }),
       WikiLink.configure({
         openOnClick: false,
         autolink: true,
