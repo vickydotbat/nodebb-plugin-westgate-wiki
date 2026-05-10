@@ -1,8 +1,13 @@
 import { mergeAttributes, Node } from "@tiptap/core";
-import { TextSelection } from "@tiptap/pm/state";
+import { NodeSelection } from "@tiptap/pm/state";
 
 import { getFigureImageElement, getFigureImageLinkElement } from "../normalization/legacy-html.mjs";
-import { ALLOWED_IMAGE_FIGURE_CLASSES, getFigureClassForImageNodeClass, normalizeClassTokens } from "../shared/image-class-contract.mjs";
+import {
+  ALLOWED_IMAGE_FIGURE_CLASSES,
+  getFigureClassForImageNodeClass,
+  getImageNodeClassForFigureClass,
+  normalizeClassTokens
+} from "../shared/image-class-contract.mjs";
 
 export function getFigureImageAttrs(element) {
   const image = getFigureImageElement(element);
@@ -20,6 +25,79 @@ export function getFigureImageAttrs(element) {
     class: normalizeClassTokens(element.getAttribute("class"), ALLOWED_IMAGE_FIGURE_CLASSES, "image") || "image",
     id: element.getAttribute("id") || null
   };
+}
+
+function setOptionalAttribute(element, name, value) {
+  if (value === undefined || value === null || value === "") {
+    element.removeAttribute(name);
+  } else {
+    element.setAttribute(name, String(value));
+  }
+}
+
+function applyFigureAttrs(dom, attrs, options) {
+  dom.setAttribute("class", attrs.class || "image");
+  dom.setAttribute("data-wiki-node", "image-figure");
+  setOptionalAttribute(dom, "id", attrs.id);
+  if (options && options.HTMLAttributes) {
+    Object.entries(options.HTMLAttributes).forEach(function ([name, value]) {
+      if (name !== "class" && name !== "id" && name !== "data-wiki-node") {
+        setOptionalAttribute(dom, name, value);
+      }
+    });
+  }
+}
+
+function renderImageMedia(media, attrs) {
+  while (media.firstChild) {
+    media.removeChild(media.firstChild);
+  }
+
+  const doc = media.ownerDocument;
+  const img = doc.createElement("img");
+  setOptionalAttribute(img, "src", attrs.src);
+  setOptionalAttribute(img, "alt", attrs.alt);
+  setOptionalAttribute(img, "title", attrs.title);
+  setOptionalAttribute(img, "width", attrs.width);
+  setOptionalAttribute(img, "height", attrs.height);
+
+  if (attrs.href) {
+    const link = doc.createElement("a");
+    setOptionalAttribute(link, "href", attrs.href);
+    setOptionalAttribute(link, "target", attrs.target);
+    setOptionalAttribute(link, "rel", attrs.rel);
+    link.appendChild(img);
+    media.appendChild(link);
+    return;
+  }
+
+  media.appendChild(img);
+}
+
+function findSelectedImageFigure(state, nodeTypeName) {
+  const { selection } = state;
+  if (selection && selection.node && selection.node.type.name === nodeTypeName) {
+    return {
+      node: selection.node,
+      pos: selection.from
+    };
+  }
+
+  const $from = selection && selection.$from;
+  if (!$from) {
+    return null;
+  }
+  for (let depth = $from.depth; depth > 0; depth -= 1) {
+    const node = $from.node(depth);
+    if (node && node.type.name === nodeTypeName) {
+      return {
+        node,
+        pos: $from.before(depth)
+      };
+    }
+  }
+
+  return null;
 }
 
 const ImageFigure = Node.create({
@@ -148,6 +226,36 @@ const ImageFigure = Node.create({
 
     return ["figure", figureAttrs, imageSpec];
   },
+  addNodeView() {
+    return ({ node }) => {
+      const doc = window.document;
+      const dom = doc.createElement("figure");
+      const media = doc.createElement("div");
+      const caption = doc.createElement("figcaption");
+
+      media.className = "wiki-image-figure__media";
+      media.setAttribute("contenteditable", "false");
+      media.setAttribute("draggable", "true");
+
+      applyFigureAttrs(dom, node.attrs || {}, this.options);
+      renderImageMedia(media, node.attrs || {});
+      dom.appendChild(media);
+      dom.appendChild(caption);
+
+      return {
+        dom,
+        contentDOM: caption,
+        update: (updatedNode) => {
+          if (updatedNode.type.name !== this.name) {
+            return false;
+          }
+          applyFigureAttrs(dom, updatedNode.attrs || {}, this.options);
+          renderImageMedia(media, updatedNode.attrs || {});
+          return true;
+        }
+      };
+    };
+  },
   addCommands() {
     return {
       convertImageToFigure:
@@ -189,7 +297,40 @@ const ImageFigure = Node.create({
           if (dispatch) {
             const insertPos = selection.from;
             const tr = state.tr.replaceSelectionWith(figure);
-            dispatch(tr.setSelection(TextSelection.create(tr.doc, insertPos + 2)).scrollIntoView());
+            dispatch(tr.setSelection(NodeSelection.create(tr.doc, insertPos)).scrollIntoView());
+          }
+          return true;
+        },
+      convertFigureToImage:
+        () =>
+        ({ state, dispatch }) => {
+          const selected = findSelectedImageFigure(state, this.name);
+          if (!selected) {
+            return false;
+          }
+
+          const imageType = state.schema.nodes.image;
+          if (!imageType) {
+            return false;
+          }
+
+          const attrs = selected.node.attrs || {};
+          const image = imageType.create({
+            src: attrs.src || null,
+            alt: attrs.alt || null,
+            title: attrs.title || null,
+            width: attrs.width || null,
+            height: attrs.height || null,
+            class: getImageNodeClassForFigureClass(attrs.class || ""),
+            id: attrs.id || null
+          });
+          if (!image) {
+            return false;
+          }
+
+          if (dispatch) {
+            const tr = state.tr.replaceWith(selected.pos, selected.pos + selected.node.nodeSize, image);
+            dispatch(tr.setSelection(NodeSelection.create(tr.doc, selected.pos)).scrollIntoView());
           }
           return true;
         }

@@ -43,10 +43,17 @@ export function selectClickedImageNode(editor, target, editorMount) {
     return false;
   }
 
+  const caption = target.closest("figcaption");
+  if (caption && editorMount && editorMount.contains(caption)) {
+    return false;
+  }
+
   const imageFigure = target.closest('[data-wiki-node="image-figure"]');
+  const figureImage = target.closest('[data-wiki-node="image-figure"] img');
   const imageNode = target.closest('img[data-wiki-node="image"]');
   const plainImage = target.tagName && target.tagName.toLowerCase() === "img" ? target : null;
-  const selectableNode = imageFigure || imageNode || plainImage;
+  const clickedFigureSurface = imageFigure && target === imageFigure;
+  const selectableNode = imageFigure && (figureImage || clickedFigureSurface) ? imageFigure : (imageNode || plainImage);
   if (!selectableNode || (editorMount && !editorMount.contains(selectableNode))) {
     return false;
   }

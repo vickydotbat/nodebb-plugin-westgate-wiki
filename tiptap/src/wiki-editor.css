@@ -853,6 +853,11 @@
   height: auto;
 }
 
+.westgate-wiki-compose .wiki-editor__content figure.image .wiki-image-figure__media {
+  cursor: pointer;
+  user-select: none;
+}
+
 .westgate-wiki-compose .wiki-editor__content img.ProseMirror-selectednode,
 .westgate-wiki-compose .wiki-editor__content figure.image.ProseMirror-selectednode,
 .westgate-wiki-compose .wiki-editor__content [data-wiki-node="media-cell"].ProseMirror-selectednode,

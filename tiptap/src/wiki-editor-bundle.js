@@ -1858,13 +1858,18 @@ function getImageToolDefs(editor) {
     },
     {
       id: "image-convert-figure",
-      title: "Add figure wrapper",
+      title: "Toggle figure caption",
       action: function () {
+        const nodeName = getActiveImageNodeName(editor);
+        if (nodeName === "imageFigure") {
+          editor.chain().focus().convertFigureToImage().run();
+          return;
+        }
         editor.chain().focus().convertImageToFigure().run();
       },
       applyState: function (button) {
         const nodeName = getActiveImageNodeName(editor);
-        button.disabled = nodeName !== "image";
+        button.disabled = nodeName !== "image" && nodeName !== "imageFigure";
         button.classList.toggle("active", nodeName === "imageFigure");
       }
     }
@@ -1921,7 +1926,6 @@ function createImageContextToolbar(surface, editor) {
     }
 
     defs.forEach(function (def) {
-      def.activeTable = table;
       def.button.classList.remove("active");
       def.button.disabled = false;
       def.applyState(def.button);
@@ -3569,6 +3573,15 @@ export async function createWikiEditor(element, options) {
             }).run();
           }
           return true;
+        },
+        mousedown: function (_view, event) {
+          const target = event.target;
+          if (selectClickedImageNode(editor, target, editorMount)) {
+            event.preventDefault();
+            event.stopPropagation();
+            return true;
+          }
+          return false;
         },
         click: function (_view, event) {
           const target = event.target;

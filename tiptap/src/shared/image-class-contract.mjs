@@ -79,6 +79,29 @@ export function getFigureClassForImageNodeClass(value) {
   return normalizeClassTokens(classes.join(" "), ALLOWED_IMAGE_FIGURE_CLASSES, "image") || "image";
 }
 
+export function getImageNodeClassForFigureClass(value) {
+  const className = String(value || "");
+  const classes = [];
+
+  if (className.includes("image-style-align-left")) {
+    classes.push("wiki-image-align-left");
+  } else if (className.includes("image-style-align-right")) {
+    classes.push("wiki-image-align-right");
+  } else if (className.includes("image-style-side")) {
+    classes.push("wiki-image-align-side");
+  } else if (className.includes("image-style-block")) {
+    classes.push("wiki-image-align-center");
+  }
+
+  IMAGE_SIZE_CLASSES.forEach(function (sizeClass) {
+    if (className.includes(sizeClass)) {
+      classes.push(sizeClass);
+    }
+  });
+
+  return normalizeClassTokens(classes.join(" "), ALLOWED_IMAGE_NODE_CLASSES, "") || null;
+}
+
 export function getImageLayoutClassForNode(nodeName, currentClass, layout) {
   if (nodeName === "imageFigure") {
     const retained = removeClassTokens(currentClass, new Set([

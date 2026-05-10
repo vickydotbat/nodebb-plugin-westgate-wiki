@@ -78,7 +78,7 @@ const { WikiFootnote, WikiNamespaceLink, WikiPageLink, WikiUserMention } = WikiE
 const { IMAGE_CONTEXT_BUTTON_IDS, TABLE_CONTEXT_BUTTON_IDS, TOP_TOOLBAR_BUTTON_IDS, TOP_TOOLBAR_GROUPS } = toolbarSchemaModule;
 const { buildHeadingToc, navigateToHeading } = editorTocModule;
 const { installEditorLinkNavigationGuard, selectEditorLink } = linkInteractionsModule;
-const { calculateResizedImageWidth, setSelectedImageWidth } = imageResizeModule;
+const { calculateResizedImageWidth, getSelectedImageElement, setSelectedImageWidth } = imageResizeModule;
 const { selectClickedImageNode } = mediaSelectionModule;
 const {
   detectUnsupportedContent,
@@ -257,6 +257,7 @@ await test("editor image resize handles are scoped and draggable from the corner
     assert.match(css, /\.westgate-wiki-compose \.wiki-editor-image-resize__handle--nw\s*{[^}]*cursor:\s*nwse-resize/);
     assert.match(css, /\.westgate-wiki-compose \.wiki-editor-image-resize__handle--ne\s*{[^}]*cursor:\s*nesw-resize/);
     assert.match(css, /\.wiki-editor--resizing-image\s*{[^}]*user-select:\s*none/);
+    assert.match(css, /figure\.image \.wiki-image-figure__media\s*{[^}]*cursor:\s*pointer;[^}]*user-select:\s*none/);
   });
 });
 
@@ -511,10 +512,13 @@ await test("imageFigure parses and renders linked figures with captions intact",
     '<figure class="image image-style-align-right wiki-image-size-md" id="hero"><a href="/full.png" target="_blank" rel="noopener noreferrer"><img src="/thumb.png" alt="Thumb" width="240"></a><figcaption><p>Caption</p></figcaption></figure>'
   );
   const rendered = editor.getHTML();
+  const figureDom = editor.view.dom.querySelector('figure[data-wiki-node="image-figure"]');
 
   assert.match(rendered, /<figure class="image image-style-align-right wiki-image-size-md" data-wiki-node="image-figure" id="hero">/);
   assert.match(rendered, /<a href="\/full\.png" target="_blank" rel="noopener noreferrer"><img src="\/thumb\.png" alt="Thumb" width="240"><\/a>/);
   assert.match(rendered, /<figcaption><p>Caption<\/p><\/figcaption>/);
+  assert.equal(figureDom.querySelector(".wiki-image-figure__media").getAttribute("contenteditable"), "false");
+  assert.equal(figureDom.querySelector("figcaption").getAttribute("contenteditable"), null);
   editor.destroy();
 });
 
@@ -530,8 +534,27 @@ await test("regular image can be converted into a plugin-owned image figure", fu
   assert.match(rendered, /<img src="\/plain\.png" alt="Plain" title="Plain title" width="320">/);
   assert.match(rendered, /<figcaption><p><\/p><\/figcaption>/);
   assert.doesNotMatch(rendered, /<p><figure/);
-  assert.equal(editor.state.selection.$from.parent.type.name, "paragraph");
-  assert.equal(editor.state.selection.$from.node(editor.state.selection.$from.depth - 1).type.name, "imageFigure");
+  assert.equal(editor.state.selection.node && editor.state.selection.node.type.name, "imageFigure");
+  assert.equal(setSelectedImageWidth(editor, 280), true);
+  assert.match(editor.getHTML(), /<img src="\/plain\.png" alt="Plain" title="Plain title" width="280">/);
+  editor.destroy();
+});
+
+await test("image figure can be converted back into a regular editable image", function () {
+  const editor = createEditor('<figure class="image image-style-align-right wiki-image-size-md" id="hero"><img src="/plain.png" alt="Plain" title="Plain title" width="320"><figcaption><p>Caption</p></figcaption></figure>');
+  const figure = editor.view.dom.querySelector("figure.image");
+  const selectionPos = editor.view.posAtDOM(figure, 0);
+
+  editor.chain().focus().setNodeSelection(selectionPos).convertFigureToImage().run();
+  const rendered = editor.getHTML();
+
+  assert.match(rendered, /<img[^>]*src="\/plain\.png"[^>]*>/);
+  assert.match(rendered, /<img[^>]*alt="Plain"[^>]*>/);
+  assert.match(rendered, /<img[^>]*title="Plain title"[^>]*>/);
+  assert.match(rendered, /<img[^>]*width="320"[^>]*>/);
+  assert.match(rendered, /class="wiki-image-align-right wiki-image-size-md"/);
+  assert.doesNotMatch(rendered, /<figure/);
+  assert.equal(editor.state.selection.node && editor.state.selection.node.type.name, "image");
   editor.destroy();
 });
 
@@ -574,6 +597,46 @@ await test("full-width image figures can be reselected by clicking the figure su
   assert.equal(selectClickedImageNode(editor, figure, editor.view.dom), true);
   assert.equal(editor.state.selection.node.type.name, "imageFigure");
   editor.destroy();
+});
+
+await test("image figure captions remain editable instead of selecting the whole figure", function () {
+  const editor = createEditor('<figure class="image"><img src="/full.png" alt="Full"><figcaption><p>Caption</p></figcaption></figure><p>After</p>');
+  const captionText = editor.view.dom.querySelector("figcaption p").firstChild;
+  const image = editor.view.dom.querySelector("figure.image img");
+
+  editor.commands.setTextSelection(editor.state.doc.content.size);
+  assert.equal(selectClickedImageNode(editor, captionText, editor.view.dom), false);
+  assert.notEqual(editor.state.selection.node && editor.state.selection.node.type.name, "imageFigure");
+
+  assert.equal(selectClickedImageNode(editor, image, editor.view.dom), true);
+  assert.equal(editor.state.selection.node.type.name, "imageFigure");
+  editor.destroy();
+});
+
+await test("saved aligned image figures can be selected from the image element", function () {
+  const editor = createEditor('<figure class="image image-style-align-right" data-wiki-node="image-figure"><img src="/assets/uploads/files/1778247064628-fire.gif" alt="fire.gif" width="755"><figcaption><p>Figure 1: me irl</p></figcaption></figure>');
+  const image = editor.view.dom.querySelector('figure.image img[width="755"]');
+
+  editor.commands.setTextSelection(editor.state.doc.content.size);
+  assert.equal(selectClickedImageNode(editor, image, editor.view.dom), true);
+  assert.equal(editor.state.selection.node && editor.state.selection.node.type.name, "imageFigure");
+  assert.equal(getSelectedImageElement(editor, editor.view.dom), image);
+  assert.equal(setSelectedImageWidth(editor, 512), true);
+  assert.match(editor.getHTML(), /<img src="\/assets\/uploads\/files\/1778247064628-fire\.gif" alt="fire\.gif" width="512">/);
+  editor.destroy();
+});
+
+await test("image figure selection is handled on mousedown before ProseMirror click selection", function () {
+  assert.match(
+    editorBundleSource,
+    /handleDOMEvents:\s*\{[\s\S]*mousedown:\s*function \(_view, event\)[\s\S]*selectClickedImageNode\(editor, target, editorMount\)[\s\S]*click:\s*function \(_view, event\)/
+  );
+});
+
+await test("image toolbar sync does not reference table-only state", function () {
+  const match = editorBundleSource.match(/function createImageContextToolbar\(surface, editor\) \{[\s\S]*?\nfunction getTableToolDefs/);
+  assert.ok(match, "image context toolbar source should be present");
+  assert.doesNotMatch(match[0], /activeTable\s*=\s*table/);
 });
 
 await test("mediaRow insert command renders bounded two- and three-cell layouts", function () {
