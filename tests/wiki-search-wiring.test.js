@@ -52,6 +52,16 @@ assert.match(
 );
 assert.match(
   wikiCss,
+  /\.wiki-search-suggestions\s*\{[\s\S]*background:\s*var\(--wiki-search-suggestions-bg,\s*var\(--bs-dropdown-bg,\s*var\(--bs-body-bg,\s*#fff\)\)\);[\s\S]*\}/,
+  "search suggestions dropdown should use an opaque dropdown background instead of translucent panel chrome"
+);
+assert.doesNotMatch(
+  wikiCss.match(/\.wiki-search-suggestions\s*\{[\s\S]*?\}/)[0],
+  /--wiki-chrome-surface-bg/,
+  "search suggestions dropdown should not inherit generic wiki panel background"
+);
+assert.match(
+  wikiCss,
   /\.wiki-page-header--search \.wiki-page-heading__title\s*\{[\s\S]*overflow: hidden;[\s\S]*text-overflow: ellipsis;[\s\S]*white-space: nowrap;[\s\S]*\}/,
   "search page heading should stay on one line with ellipsis"
 );

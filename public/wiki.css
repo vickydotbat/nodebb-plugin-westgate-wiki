@@ -139,9 +139,10 @@
 }
 
 .wiki-search-suggestions {
-  background: var(--wiki-chrome-surface-bg, var(--bs-body-bg, #fff));
+  background: var(--wiki-search-suggestions-bg, var(--bs-dropdown-bg, var(--bs-body-bg, #fff)));
   border: 1px solid var(--wiki-chrome-surface-border, var(--bs-border-color, #dee2e6));
   border-radius: var(--wiki-chrome-radius, var(--bs-border-radius, 0.375rem));
+  background-clip: padding-box;
   box-shadow: var(--bs-box-shadow, 0 0.5rem 1rem rgba(0, 0, 0, 0.15));
   left: 0;
   margin-top: 0.35rem;
