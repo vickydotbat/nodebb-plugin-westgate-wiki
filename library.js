@@ -20,6 +20,7 @@ const wikiUserMentions = require("./lib/wiki-user-mentions");
 const wikiMentionNotifications = require("./lib/wiki-mention-notifications");
 const wikiArticleWatch = require("./lib/wiki-article-watch");
 const wikiEditLocks = require("./lib/wiki-edit-locks");
+const wikiPageActions = require("./lib/wiki-page-actions");
 const wikiService = require("./lib/wiki-service");
 const wikiPaths = require("./lib/wiki-paths");
 const wikiPageValidation = require("./lib/wiki-page-validation");
@@ -114,6 +115,20 @@ plugin.registerApiRoutes = async function ({ router, middleware }) {
     "/westgate-wiki/article-watch",
     [middleware.ensureLoggedIn, middleware.checkRequired.bind(null, ["tid"])],
     wikiArticleWatch.deleteArticleWatch
+  );
+  routeHelpers.setupApiRoute(
+    router,
+    "put",
+    "/westgate-wiki/page/move",
+    [middleware.ensureLoggedIn, middleware.checkRequired.bind(null, ["tid", "cid", "title"])],
+    wikiPageActions.moveWikiPage
+  );
+  routeHelpers.setupApiRoute(
+    router,
+    "put",
+    "/westgate-wiki/page/owner",
+    [middleware.ensureLoggedIn, middleware.checkRequired.bind(null, ["tid", "uid"])],
+    wikiPageActions.changeWikiPageOwner
   );
   routeHelpers.setupApiRoute(
     router,

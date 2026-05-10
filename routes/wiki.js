@@ -15,6 +15,7 @@ const topicService = require("../lib/topic-service");
 const wikiSearchService = require("../lib/wiki-search-service");
 const wikiBreadcrumbTrail = require("../lib/wiki-breadcrumb-trail");
 const wikiMissingPageCreate = require("../lib/wiki-missing-page-create");
+const wikiPageActions = require("../lib/wiki-page-actions");
 const wikiPaths = require("../lib/wiki-paths");
 
 function getCreateIntentTitle(req) {
@@ -45,6 +46,10 @@ function buildWikiPageRenderData(wikiPage, { isWikiHome }) {
   const wikiSidebarPageRows = (wikiPage.sectionNavigation && wikiPage.sectionNavigation.topics) || [];
   const pageTitle = serializer.getTitleDisplay(wikiPage.pageTitlePath, wikiPage.topic.titleRaw || wikiPage.topic.title);
   const pageTitleSegments = buildPageTitleSegments(wikiPage.pageTitlePath);
+  const pageParentTitle = wikiPage.pageTitlePath.length > 1 ?
+    serializer.getTitleDisplay(wikiPage.pageTitlePath.slice(0, -1)) :
+    "";
+  const canManageWikiPage = !!wikiPage.canEditWikiPage && !isWikiHome;
 
   return {
     title: wikiPage.topic.title,
@@ -54,6 +59,8 @@ function buildWikiPageRenderData(wikiPage, { isWikiHome }) {
     discussionDisabled: !!wikiPage.discussionDisabled,
     showWikiDiscussionLink: !isWikiHome && !wikiPage.discussionDisabled,
     pageTitle,
+    pageParentTitle,
+    subpageDraftTitle: wikiPageActions.buildSubpageDraftTitle(wikiPage.pageTitlePath, pageTitle),
     pageTitlePath: wikiPage.pageTitlePath,
     pageTitleSegments,
     hasPageTitleSegments: pageTitleSegments.length > 0,
@@ -62,6 +69,9 @@ function buildWikiPageRenderData(wikiPage, { isWikiHome }) {
     category: wikiPage.category,
     canCreateSiblingPage: !!wikiPage.categoryPrivileges["topics:create"],
     canEditWikiPage: !!wikiPage.canEditWikiPage,
+    canMoveWikiPage: canManageWikiPage,
+    canChangeWikiOwner: canManageWikiPage,
+    canMakeWikiSubpage: !!wikiPage.categoryPrivileges["topics:create"],
     canDeleteWikiPage: !!wikiPage.canDeleteWikiPage,
     sectionNavigation: wikiPage.sectionNavigation,
     hasSectionNavigation: !!wikiPage.sectionNavigation,

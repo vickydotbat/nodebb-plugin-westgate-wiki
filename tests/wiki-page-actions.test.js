@@ -1,0 +1,96 @@
+"use strict";
+
+const assert = require("assert");
+const fs = require("fs");
+const path = require("path");
+
+const root = path.resolve(__dirname, "..");
+const actions = require("../lib/wiki-page-actions");
+
+assert.strictEqual(
+  actions.buildSubpageDraftTitle(["Mechanics", "Feats"], "Fallback"),
+  "Mechanics :: Feats :: Subpage",
+  "nested pages should append the dummy subpage leaf to the full title path"
+);
+
+assert.strictEqual(
+  actions.buildSubpageDraftTitle([], "Single Page"),
+  "Single Page :: Subpage",
+  "single pages should append the dummy subpage leaf to the page title"
+);
+
+assert.deepStrictEqual(
+  actions.normalizeMovePayload({
+    cid: "42",
+    title: " New Leaf ",
+    parentTitle: " Mechanics :: Feats "
+  }),
+  {
+    cid: 42,
+    title: "Mechanics :: Feats :: New Leaf",
+    parentTitle: "Mechanics :: Feats",
+    titleLeaf: "New Leaf"
+  },
+  "move payload should combine parent title and leaf title"
+);
+
+assert.deepStrictEqual(
+  actions.normalizeMovePayload({
+    cid: 42,
+    title: "Mechanics :: Feats :: Epic Prowess",
+    parentTitle: ""
+  }),
+  {
+    cid: 42,
+    title: "Mechanics :: Feats :: Epic Prowess",
+    parentTitle: "",
+    titleLeaf: "Epic Prowess"
+  },
+  "move payload should preserve a full explicit title when no parent is supplied"
+);
+
+const template = fs.readFileSync(path.join(root, "templates/wiki-page.tpl"), "utf8");
+assert(
+  template.includes("data-wiki-move-page"),
+  "article FAB should expose a Move Page action"
+);
+assert(
+  template.includes("data-wiki-change-owner"),
+  "article FAB should expose a Change Owner action"
+);
+assert(
+  template.includes("data-wiki-make-subpage"),
+  "article FAB should expose a Make Subpage action"
+);
+assert(
+  /<!-- IF canMoveWikiPage -->[\s\S]*data-wiki-move-page[\s\S]*<!-- ENDIF canMoveWikiPage -->/.test(template),
+  "Move Page action should be permission-gated"
+);
+assert(
+  /<!-- IF canChangeWikiOwner -->[\s\S]*data-wiki-change-owner[\s\S]*<!-- ENDIF canChangeWikiOwner -->/.test(template),
+  "Change Owner action should be permission-gated"
+);
+assert(
+  /<!-- IF canMakeWikiSubpage -->[\s\S]*data-wiki-make-subpage[\s\S]*<!-- ENDIF canMakeWikiSubpage -->/.test(template),
+  "Make Subpage action should be permission-gated"
+);
+
+const client = fs.readFileSync(path.join(root, "public/wiki.js"), "utf8");
+assert(
+  client.includes("/api/v3/plugins/westgate-wiki/page/move"),
+  "client should call the wiki page move endpoint"
+);
+assert(
+  client.includes("/api/v3/plugins/westgate-wiki/page/owner"),
+  "client should call the wiki page owner endpoint"
+);
+
+const library = fs.readFileSync(path.join(root, "library.js"), "utf8");
+assert(
+  library.includes("/westgate-wiki/page/move"),
+  "move endpoint should be registered"
+);
+assert(
+  library.includes("/westgate-wiki/page/owner"),
+  "owner endpoint should be registered"
+);

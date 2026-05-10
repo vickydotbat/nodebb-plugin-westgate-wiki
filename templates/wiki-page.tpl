@@ -172,6 +172,21 @@
           <i class="fa fa-fw fa-pencil" aria-hidden="true"></i>
         </a>
         <!-- ENDIF canEditWikiPage -->
+        <!-- IF canMoveWikiPage -->
+        <button type="button" class="wiki-fab-btn wiki-fab-btn--icon" data-wiki-move-page="1" data-tid="{topic.tid}" data-cid="{category.cid}" data-title="{pageTitle}" data-parent-title="{pageParentTitle}" data-namespace-name="{category.name}" title="Move this wiki page" aria-label="Move this wiki page">
+          <i class="fa fa-fw fa-arrows" aria-hidden="true"></i>
+        </button>
+        <!-- ENDIF canMoveWikiPage -->
+        <!-- IF canChangeWikiOwner -->
+        <button type="button" class="wiki-fab-btn wiki-fab-btn--icon" data-wiki-change-owner="1" data-tid="{topic.tid}" title="Change page owner" aria-label="Change page owner">
+          <i class="fa fa-fw fa-user" aria-hidden="true"></i>
+        </button>
+        <!-- ENDIF canChangeWikiOwner -->
+        <!-- IF canMakeWikiSubpage -->
+        <button type="button" class="wiki-fab-btn wiki-fab-btn--icon" data-wiki-make-subpage="1" data-cid="{category.cid}" data-title="{subpageDraftTitle}" title="Make a subpage" aria-label="Make a subpage">
+          <i class="fa fa-fw fa-level-down" aria-hidden="true"></i>
+        </button>
+        <!-- ENDIF canMakeWikiSubpage -->
         <!-- IF canWatchWikiArticle -->
         <button type="button" class="wiki-fab-btn wiki-fab-btn--icon<!-- IF wikiArticleWatched --> active<!-- ENDIF wikiArticleWatched -->" data-wiki-article-watch="1" data-tid="{topic.tid}" data-watching="<!-- IF wikiArticleWatched -->1<!-- ELSE -->0<!-- ENDIF wikiArticleWatched -->" title="<!-- IF wikiArticleWatched -->Stop watching wiki article edits<!-- ELSE -->Watch wiki article edits<!-- ENDIF wikiArticleWatched -->" aria-label="<!-- IF wikiArticleWatched -->Stop watching wiki article edits<!-- ELSE -->Watch wiki article edits<!-- ENDIF wikiArticleWatched -->" aria-pressed="<!-- IF wikiArticleWatched -->true<!-- ELSE -->false<!-- ENDIF wikiArticleWatched -->">
           <i class="fa fa-fw <!-- IF wikiArticleWatched -->fa-eye<!-- ELSE -->fa-eye-slash<!-- ENDIF wikiArticleWatched -->" aria-hidden="true"></i>

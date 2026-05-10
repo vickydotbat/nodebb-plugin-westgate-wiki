@@ -11,6 +11,18 @@ $(document).ready(function () {
   const MOBILE_FAB_DOCK_SCROLL_DELTA = 8;
   const MOBILE_FAB_DOCK_TOP_GUARD = 32;
 
+  function escapeHtml(value) {
+    return String(value == null ? "" : value).replace(/[&<>"']/g, function (ch) {
+      return {
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        "\"": "&quot;",
+        "'": "&#39;"
+      }[ch];
+    });
+  }
+
   function clearPendingWikiCreate() {
     pendingWikiCreate = null;
   }
@@ -75,6 +87,249 @@ $(document).ready(function () {
     const base = rel.endsWith("/") ? rel.slice(0, -1) : rel;
     window.location.href = `${base}/${target}`;
     return true;
+  }
+
+  function getApiBase() {
+    const rel = getRelativePath();
+    return rel.endsWith("/") ? rel.slice(0, -1) : rel;
+  }
+
+  function showWikiActionAlert(type, title, message) {
+    if (typeof app !== "undefined" && app.alert) {
+      app.alert({ type: type, title: title, message: message });
+    } else {
+      window.alert(message || title);
+    }
+  }
+
+  async function fetchWikiActionJson(url, method, data) {
+    const res = await fetch(url, {
+      method: method,
+      credentials: "same-origin",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": getCsrfToken()
+      },
+      body: JSON.stringify(data || {})
+    });
+    const body = await res.json().catch(function () {
+      return null;
+    });
+    if (!res.ok) {
+      throw new Error((body && body.status && body.status.message) || res.statusText);
+    }
+    return body && body.response ? body.response : body;
+  }
+
+  function closeWikiActionModal(modal) {
+    if (modal && modal.parentNode) {
+      modal.parentNode.removeChild(modal);
+    }
+    document.body.classList.remove("modal-open");
+  }
+
+  function openWikiActionModal(title, bodyHtml) {
+    const modal = document.createElement("div");
+    modal.className = "modal wiki-page-action-modal d-block";
+    modal.setAttribute("role", "dialog");
+    modal.setAttribute("aria-modal", "true");
+    modal.innerHTML = [
+      '<div class="modal-dialog modal-dialog-centered">',
+      '<div class="modal-content">',
+      '<div class="modal-header">',
+      `<h5 class="modal-title">${escapeHtml(title)}</h5>`,
+      '<button type="button" class="btn-close" data-wiki-action-close aria-label="Close"></button>',
+      "</div>",
+      bodyHtml,
+      "</div>",
+      "</div>"
+    ].join("");
+    modal.addEventListener("click", function (event) {
+      if (event.target === modal || event.target.closest("[data-wiki-action-close]")) {
+        event.preventDefault();
+        closeWikiActionModal(modal);
+      }
+    });
+    document.body.appendChild(modal);
+    document.body.classList.add("modal-open");
+    return modal;
+  }
+
+  function namespaceResultItem(row) {
+    const label = row.wikiPath ? `${row.title} (${row.wikiPath})` : row.title;
+    return `<button type="button" class="dropdown-item" data-wiki-namespace-choice data-cid="${row.cid}" data-title="${escapeHtml(row.title)}">${escapeHtml(label)}</button>`;
+  }
+
+  function userResultItem(row) {
+    const label = row.displayName && row.displayName !== row.username ? `${row.displayName} @${row.username}` : row.username;
+    return `<button type="button" class="dropdown-item" data-wiki-user-choice data-uid="${row.uid}" data-title="${escapeHtml(row.username)}">${escapeHtml(label)}</button>`;
+  }
+
+  function openMovePageModal(btn) {
+    const tid = parseInt(btn.getAttribute("data-tid"), 10);
+    const currentCid = parseInt(btn.getAttribute("data-cid"), 10);
+    const currentTitle = btn.getAttribute("data-title") || "";
+    const currentParentTitle = btn.getAttribute("data-parent-title") || "";
+    const currentNamespaceName = btn.getAttribute("data-namespace-name") || `Category ${currentCid}`;
+
+    const modal = openWikiActionModal("Move page", [
+      '<form class="modal-body" data-wiki-move-form>',
+      '<div class="mb-3">',
+      '<label class="form-label">Namespace</label>',
+      `<input class="form-control" data-wiki-namespace-search value="${escapeHtml(currentNamespaceName)}" autocomplete="off">`,
+      `<input type="hidden" data-wiki-namespace-cid value="${currentCid}">`,
+      '<div class="dropdown-menu show mt-1 w-100" data-wiki-namespace-results hidden></div>',
+      "</div>",
+      '<div class="mb-3">',
+      '<label class="form-label">Parent page</label>',
+      `<input class="form-control" data-wiki-parent-title value="${escapeHtml(currentParentTitle)}" placeholder="Optional parent title path">`,
+      "</div>",
+      '<div class="mb-0">',
+      '<label class="form-label">Page title</label>',
+      `<input class="form-control" data-wiki-page-title value="${escapeHtml(currentTitle)}" required>`,
+      "</div>",
+      "</form>",
+      '<div class="modal-footer">',
+      '<button type="button" class="btn btn-outline-secondary" data-wiki-action-close>Cancel</button>',
+      '<button type="button" class="btn btn-primary" data-wiki-move-submit>Move page</button>',
+      "</div>"
+    ].join(""));
+
+    const nsInput = modal.querySelector("[data-wiki-namespace-search]");
+    const nsCid = modal.querySelector("[data-wiki-namespace-cid]");
+    const nsResults = modal.querySelector("[data-wiki-namespace-results]");
+    let namespaceTimer = null;
+
+    nsInput.addEventListener("input", function () {
+      window.clearTimeout(namespaceTimer);
+      namespaceTimer = window.setTimeout(async function () {
+        const q = nsInput.value.trim();
+        nsCid.value = q === currentNamespaceName ? String(currentCid) : "";
+        if (!q) {
+          nsResults.hidden = true;
+          nsResults.innerHTML = "";
+          return;
+        }
+        try {
+          const url = `${getApiBase()}/api/v3/plugins/westgate-wiki/link-autocomplete?type=namespace&scope=all-wiki&limit=8&q=${encodeURIComponent(q)}`;
+          const res = await fetch(url, { credentials: "same-origin" });
+          const body = await res.json();
+          const rows = (body.response && body.response.results) || body.results || [];
+          nsResults.innerHTML = rows.map(namespaceResultItem).join("");
+          nsResults.hidden = rows.length === 0;
+        } catch (err) {
+          nsResults.hidden = true;
+        }
+      }, 180);
+    });
+
+    nsResults.addEventListener("click", function (event) {
+      const choice = event.target.closest("[data-wiki-namespace-choice]");
+      if (!choice) {
+        return;
+      }
+      nsCid.value = choice.getAttribute("data-cid") || "";
+      nsInput.value = choice.getAttribute("data-title") || "";
+      nsResults.hidden = true;
+    });
+
+    modal.querySelector("[data-wiki-move-submit]").addEventListener("click", async function (event) {
+      const submit = event.currentTarget;
+      const title = modal.querySelector("[data-wiki-page-title]").value.trim();
+      const parentTitle = modal.querySelector("[data-wiki-parent-title]").value.trim();
+      const cid = parseInt(nsCid.value, 10);
+      if (!Number.isInteger(tid) || !Number.isInteger(cid) || cid <= 0 || !title) {
+        showWikiActionAlert("error", "Could not move page", "Choose a namespace and page title.");
+        return;
+      }
+      submit.disabled = true;
+      try {
+        const response = await fetchWikiActionJson(`${getApiBase()}/api/v3/plugins/westgate-wiki/page/move`, "PUT", {
+          tid: tid,
+          cid: cid,
+          title: title,
+          parentTitle: parentTitle
+        });
+        window.location.href = `${getApiBase()}${response.wikiPath || "/wiki"}`;
+      } catch (err) {
+        submit.disabled = false;
+        showWikiActionAlert("error", "Could not move page", (err && err.message) || String(err));
+      }
+    });
+  }
+
+  function openChangeOwnerModal(btn) {
+    const tid = parseInt(btn.getAttribute("data-tid"), 10);
+    const modal = openWikiActionModal("Change owner", [
+      '<form class="modal-body" data-wiki-owner-form>',
+      '<label class="form-label">New owner</label>',
+      '<input class="form-control" data-wiki-owner-search autocomplete="off" placeholder="Search users">',
+      '<input type="hidden" data-wiki-owner-uid>',
+      '<div class="dropdown-menu show mt-1 w-100" data-wiki-owner-results hidden></div>',
+      "</form>",
+      '<div class="modal-footer">',
+      '<button type="button" class="btn btn-outline-secondary" data-wiki-action-close>Cancel</button>',
+      '<button type="button" class="btn btn-primary" data-wiki-owner-submit>Change owner</button>',
+      "</div>"
+    ].join(""));
+    const userInput = modal.querySelector("[data-wiki-owner-search]");
+    const userUid = modal.querySelector("[data-wiki-owner-uid]");
+    const userResults = modal.querySelector("[data-wiki-owner-results]");
+    let userTimer = null;
+
+    userInput.addEventListener("input", function () {
+      window.clearTimeout(userTimer);
+      userTimer = window.setTimeout(async function () {
+        const q = userInput.value.trim();
+        if (!q) {
+          userResults.hidden = true;
+          userResults.innerHTML = "";
+          return;
+        }
+        try {
+          const url = `${getApiBase()}/api/v3/plugins/westgate-wiki/user-autocomplete?limit=8&q=${encodeURIComponent(q)}`;
+          const res = await fetch(url, { credentials: "same-origin" });
+          const body = await res.json();
+          const rows = (body.response && body.response.results) || body.results || [];
+          userResults.innerHTML = rows.map(userResultItem).join("");
+          userResults.hidden = rows.length === 0;
+        } catch (err) {
+          userResults.hidden = true;
+        }
+      }, 180);
+    });
+
+    userResults.addEventListener("click", function (event) {
+      const choice = event.target.closest("[data-wiki-user-choice]");
+      if (!choice) {
+        return;
+      }
+      userUid.value = choice.getAttribute("data-uid") || "";
+      userInput.value = choice.getAttribute("data-title") || "";
+      userResults.hidden = true;
+    });
+
+    modal.querySelector("[data-wiki-owner-submit]").addEventListener("click", async function (event) {
+      const submit = event.currentTarget;
+      const uid = parseInt(userUid.value, 10);
+      if (!Number.isInteger(tid) || !Number.isInteger(uid) || uid <= 0) {
+        showWikiActionAlert("error", "Could not change owner", "Choose a user first.");
+        return;
+      }
+      submit.disabled = true;
+      try {
+        await fetchWikiActionJson(`${getApiBase()}/api/v3/plugins/westgate-wiki/page/owner`, "PUT", {
+          tid: tid,
+          uid: uid
+        });
+        closeWikiActionModal(modal);
+        showWikiActionAlert("success", "Owner changed", "The wiki page owner has been updated.");
+        window.location.reload();
+      } catch (err) {
+        submit.disabled = false;
+        showWikiActionAlert("error", "Could not change owner", (err && err.message) || String(err));
+      }
+    });
   }
 
   function maybeOpenCreateFromLocation() {
@@ -820,6 +1075,25 @@ $(document).ready(function () {
       icon.classList.toggle("fa-eye-slash", !watched);
     }
   }
+
+  $(document).on("click", "[data-wiki-make-subpage]", function (event) {
+    const btn = event.currentTarget;
+    const cid = parseInt(btn.getAttribute("data-cid"), 10);
+    const title = btn.getAttribute("data-title") || "";
+
+    event.preventDefault();
+    launchWikiCreate({ cid: cid, title: title });
+  });
+
+  $(document).on("click", "[data-wiki-move-page]", function (event) {
+    event.preventDefault();
+    openMovePageModal(event.currentTarget);
+  });
+
+  $(document).on("click", "[data-wiki-change-owner]", function (event) {
+    event.preventDefault();
+    openChangeOwnerModal(event.currentTarget);
+  });
 
   $(document).on("click", "[data-wiki-article-watch]", async function (event) {
     const btn = event.currentTarget;
