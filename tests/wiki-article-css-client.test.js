@@ -55,6 +55,11 @@ assert.match(
   /\.wiki-article-prose :where\(a\.wiki-external-link, \.wiki-editor-link\.wiki-external-link\)::before\s*\{[\s\S]*content:\s*var\(--wiki-prose-external-link-icon,[\s\S]*\);[\s\S]*\}/,
   "external article and editor links should render a leading icon"
 );
+assert.match(
+  articleBodyCss,
+  /\.wiki-article-prose hr\s*\{[\s\S]*background:\s*var\(\s*--wiki-prose-heading-rule,[\s\S]*var\(--wiki-prose-hr-color,[\s\S]*\);[\s\S]*\}/,
+  "article and editor horizontal rules should use the same ornamental rule token as major headings"
+);
 
 assert.match(libraryJs, /const wikiArticleCss = require\("\.\/lib\/wiki-article-css"\)/);
 assert.match(libraryJs, /"\/westgate-wiki\/article-css"/);

@@ -15,7 +15,7 @@
  *   --wiki-prose-blockquote-bg, --wiki-prose-blockquote-border, --wiki-prose-blockquote-color
  *   --wiki-prose-code-font-family, --wiki-prose-code-bg, --wiki-prose-code-border, --wiki-prose-code-color
  *   --wiki-prose-pre-bg, --wiki-prose-pre-border, --wiki-prose-pre-color
- *   --wiki-prose-hr-color
+ *   --wiki-prose-heading-rule, --wiki-prose-hr-color, --wiki-prose-hr-width
  *   --wiki-prose-table-border, --wiki-prose-table-head-color, --wiki-prose-table-hover-bg, --wiki-prose-table-hover-color
  *   --wiki-prose-caption-bg, --wiki-prose-caption-color, --wiki-prose-caption-font-family
  *   --wiki-prose-caption-font-size, --wiki-prose-caption-padding
@@ -233,9 +233,19 @@
 }
 
 .wiki-article-prose hr {
+  background: var(
+    --wiki-prose-heading-rule,
+    linear-gradient(
+      90deg,
+      var(--wiki-prose-hr-color, var(--bs-border-color, #dee2e6)),
+      color-mix(in srgb, var(--wiki-prose-hr-color, var(--bs-border-color, #dee2e6)) 25%, transparent) 54%,
+      transparent
+    )
+  );
   border: 0;
-  border-top: 1px solid var(--wiki-prose-hr-color, var(--bs-border-color, #dee2e6));
-  margin: 1.5rem 0;
+  block-size: 1px;
+  inline-size: var(--wiki-prose-hr-width, min(14rem, 48%));
+  margin: 1.65rem 0;
 }
 
 .wiki-article-prose .wiki-footnote-ref {
