@@ -21,7 +21,7 @@ function test(name, fn) {
 
 installJsdomGlobals();
 
-const [{ Editor }, StarterKitModule, HighlightModule, ImageModule, TableModule, TableCellModule, TableHeaderModule, TableRowModule, PreservedNodeAttributesModule, StyledSpanModule, ContainerBlockModule, MediaRowModule, ImageFigureModule, WikiAlignmentTableModule, WikiCalloutModule, WikiEditingKeymapModule, SlashCommandModule, WikiCodeBlockModule, WikiBlockBackgroundModule, WikiLinkModule, WikiEntitiesModule, toolbarSchemaModule, editorTocModule, linkInteractionsModule, imageResizeModule, mediaSelectionModule, legacyHtmlModule, sanitizerContractModule, colorContrastModule] = await Promise.all([
+const [{ Editor }, StarterKitModule, HighlightModule, ImageModule, TableModule, TableCellModule, TableHeaderModule, TableRowModule, PreservedNodeAttributesModule, StyledSpanModule, ContainerBlockModule, MediaRowModule, ImageFigureModule, WikiAlignmentTableModule, WikiCalloutModule, WikiPoetryQuoteModule, WikiEditingKeymapModule, SlashCommandModule, WikiCodeBlockModule, WikiBlockBackgroundModule, WikiLinkModule, WikiEntitiesModule, toolbarSchemaModule, editorTocModule, linkInteractionsModule, imageResizeModule, mediaSelectionModule, legacyHtmlModule, sanitizerContractModule, colorContrastModule] = await Promise.all([
   import("@tiptap/core"),
   import("@tiptap/starter-kit"),
   import("../tiptap/src/extensions/wiki-highlight.mjs"),
@@ -37,6 +37,7 @@ const [{ Editor }, StarterKitModule, HighlightModule, ImageModule, TableModule, 
   import("../tiptap/src/extensions/image-figure.mjs"),
   import("../tiptap/src/extensions/wiki-alignment-table.mjs"),
   import("../tiptap/src/extensions/wiki-callout.mjs"),
+  import("../tiptap/src/extensions/wiki-poetry-quote.mjs"),
   import("../tiptap/src/extensions/wiki-editing-keymap.mjs"),
   import("../tiptap/src/extensions/slash-command.mjs"),
   import("../tiptap/src/extensions/wiki-code-block.mjs"),
@@ -67,6 +68,7 @@ const { MediaCell, MediaRow } = MediaRowModule;
 const ImageFigure = ImageFigureModule.default;
 const WikiAlignmentTable = WikiAlignmentTableModule.default;
 const WikiCallout = WikiCalloutModule.default;
+const WikiPoetryQuote = WikiPoetryQuoteModule.default;
 const WikiEditingKeymap = WikiEditingKeymapModule.default;
 const SlashCommand = SlashCommandModule.default;
 const WikiCodeBlock = WikiCodeBlockModule.default;
@@ -114,6 +116,7 @@ function createEditor(content) {
       ImageFigure,
       WikiAlignmentTable,
       WikiCallout,
+      WikiPoetryQuote,
       WikiEditingKeymap,
       WikiCodeBlock,
       WikiBlockBackground,
@@ -456,6 +459,27 @@ await test("normalizeLegacyHtmlForTiptap preserves saved alignment tables as plu
   assert.match(normalized, /data-wiki-node="alignment-table"/);
   assert.match(normalized, /<div class="wiki-alignment-table__cell wiki-alignment-table__cell--active" data-alignment="lg">LG<\/div>/);
   assert.doesNotMatch(normalized, /<p class="wiki-alignment-table__cell/);
+});
+
+await test("normalizeLegacyHtmlForTiptap preserves saved poetry quotes as plugin-owned structures", function () {
+  const savedHtml = '<figure class="wiki-poetry-quote wiki-poetry-quote--plain" data-wiki-node="poetry-quote" data-wiki-quote-container="false"><blockquote class="wiki-poetry-quote__body"><p>Spoken words.</p><p class="wiki-poetry-quote__attribution">- Author</p></blockquote></figure>';
+  const normalized = normalizeLegacyHtmlForTiptap(savedHtml);
+
+  assert.match(normalized, /<figure class="wiki-poetry-quote wiki-poetry-quote--plain" data-wiki-node="poetry-quote" data-wiki-quote-container="false">/);
+  assert.match(normalized, /<blockquote class="wiki-poetry-quote__body">/);
+  assert.match(normalized, /<p class="wiki-poetry-quote__attribution">- Author<\/p>/);
+});
+
+await test("saved containerless poetry quotes reopen as editable quote widgets", function () {
+  const savedHtml = '<figure class="wiki-poetry-quote wiki-poetry-quote--plain" data-wiki-node="poetry-quote" data-wiki-quote-container="false"><blockquote class="wiki-poetry-quote__body"><p>Spoken words.</p><p class="wiki-poetry-quote__attribution">- Author</p></blockquote></figure>';
+  const editor = createEditor(normalizeLegacyHtmlForTiptap(savedHtml));
+  const rendered = editor.getHTML();
+
+  assert.equal(editor.state.doc.child(0).type.name, "wikiPoetryQuote");
+  assert.equal(editor.getJSON().content[0].attrs.container, false);
+  assert.match(rendered, /data-wiki-quote-container="false"/);
+  assert.match(rendered, /wiki-poetry-quote--plain/);
+  editor.destroy();
 });
 
 await test("saved alignment tables reopen as atomic editable widgets", function () {
@@ -1064,6 +1088,114 @@ await test("wikiCallout Backspace shortcut unwraps a callout from an empty parag
   assert.doesNotMatch(rendered, /wiki-callout/);
   assert.match(rendered, /<p><strong>Compatibility<\/strong><\/p>/);
   editor.destroy();
+});
+
+await test("wikiPoetryQuote insert command creates an attributed quote", function () {
+  const editor = createEditor("<p>Start</p>");
+
+  editor.commands.insertWikiPoetryQuote({
+    quote: "I am nothing. I am the empty room.",
+    attribution: "Shar"
+  });
+  const rendered = editor.getHTML();
+
+  assert.match(rendered, /<figure class="wiki-poetry-quote" data-wiki-node="poetry-quote">/);
+  assert.match(rendered, /<blockquote class="wiki-poetry-quote__body">/);
+  assert.match(rendered, /<p>I am nothing\. I am the empty room\.<\/p>/);
+  assert.match(rendered, /<p class="wiki-poetry-quote__attribution">- Shar<\/p>/);
+  editor.destroy();
+});
+
+await test("wikiPoetryQuote insert command moves selected text into the quote body", function () {
+  const editor = createEditor("<p>Before selected words after.</p>");
+
+  const text = editor.state.doc.textContent;
+  const from = text.indexOf("selected");
+  const to = from + "selected words".length;
+  editor.commands.setTextSelection({ from: from + 1, to: to + 1 });
+  editor.commands.insertWikiPoetryQuote({ attribution: "Speaker" });
+  const rendered = editor.getHTML();
+
+  assert.match(rendered, /<p>selected words<\/p>/);
+  assert.match(rendered, /<p class="wiki-poetry-quote__attribution">- Speaker<\/p>/);
+  assert.doesNotMatch(rendered, /Spoken words/);
+  editor.destroy();
+});
+
+await test("wikiPoetryQuote parses saved quote markup as a plugin-owned node", function () {
+  const editor = createEditor('<figure class="wiki-poetry-quote" data-wiki-node="poetry-quote"><blockquote class="wiki-poetry-quote__body"><p>Spoken words.</p><p class="wiki-poetry-quote__attribution">- Author</p></blockquote></figure>');
+  const rendered = editor.getHTML();
+
+  assert.equal(editor.getJSON().content[0].type, "wikiPoetryQuote");
+  assert.match(rendered, /<figure class="wiki-poetry-quote" data-wiki-node="poetry-quote">/);
+  assert.match(rendered, /<p class="wiki-poetry-quote__attribution">- Author<\/p>/);
+  editor.destroy();
+});
+
+await test("wikiPoetryQuote can toggle its visual container and unwrap its content", function () {
+  const editor = createEditor('<figure class="wiki-poetry-quote" data-wiki-node="poetry-quote"><blockquote class="wiki-poetry-quote__body"><p>Spoken words.</p><p class="wiki-poetry-quote__attribution">- Author</p></blockquote></figure>');
+
+  editor.commands.setTextSelection(3);
+  assert.equal(editor.commands.toggleWikiPoetryQuoteContainer(), true);
+  assert.match(editor.getHTML(), /data-wiki-quote-container="false"/);
+  assert.match(editor.getHTML(), /wiki-poetry-quote--plain/);
+
+  assert.equal(editor.commands.unsetWikiPoetryQuote(), true);
+  const rendered = editor.getHTML();
+  assert.doesNotMatch(rendered, /<figure class="wiki-poetry-quote/);
+  assert.doesNotMatch(rendered, /<blockquote class="wiki-poetry-quote__body"/);
+  assert.match(rendered, /<p>Spoken words\.<\/p>/);
+  assert.match(rendered, /<p class="wiki-poetry-quote__attribution">- Author<\/p>/);
+  editor.destroy();
+});
+
+await test("wikiPoetryQuote preserves and can retoggle container state after reopening saved html", function () {
+  const editor = createEditor('<figure class="wiki-poetry-quote wiki-poetry-quote--plain" data-wiki-node="poetry-quote" data-wiki-quote-container="false"><blockquote class="wiki-poetry-quote__body"><p>Spoken words.</p><p class="wiki-poetry-quote__attribution">- Author</p></blockquote></figure>');
+
+  assert.equal(editor.getJSON().content[0].attrs.container, false);
+  assert.match(editor.getHTML(), /data-wiki-quote-container="false"/);
+
+  editor.commands.setTextSelection(3);
+  assert.equal(editor.commands.toggleWikiPoetryQuoteContainer(), true);
+  const rendered = editor.getHTML();
+  assert.doesNotMatch(rendered, /data-wiki-quote-container="false"/);
+  assert.doesNotMatch(rendered, /wiki-poetry-quote--plain/);
+  assert.match(rendered, /<figure class="wiki-poetry-quote" data-wiki-node="poetry-quote">/);
+  editor.destroy();
+});
+
+await test("poetry quote css renders a speech-like quote panel with attribution", function () {
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote\s*\{[\s\S]*margin:\s*1rem\s+0/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote\s*\{[\s\S]*width:\s*fit-content/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote__body\s*\{[\s\S]*background:\s*var\(--wiki-poetry-quote-bg,[\s\S]*#1b101d/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote__body\s*\{[\s\S]*border:\s*1px\s+solid\s+var\(--wiki-poetry-quote-border/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote__body::before\s*\{[\s\S]*content:\s*"\\201C"/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote__body::after\s*\{[\s\S]*content:\s*"\\201D"/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote__attribution\s*\{[\s\S]*text-align:\s*left/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote--plain\s*\{[\s\S]*position:\s*relative/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote--plain\s*\{[\s\S]*overflow:\s*hidden/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote--plain::before\s*\{[\s\S]*content:\s*""/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote--plain::before\s*\{[\s\S]*inset:\s*-20%/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote--plain::before\s*\{[\s\S]*background:\s*#2a2a2a/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote--plain::before\s*\{[\s\S]*filter:\s*blur\(60px\)/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote--plain \.wiki-poetry-quote__body\s*\{[\s\S]*border:\s*0/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote--plain \.wiki-poetry-quote__body\s*\{[\s\S]*background:\s*transparent/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote--plain \.wiki-poetry-quote__body\s*\{[\s\S]*box-shadow:\s*none\s*!important/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote--plain \.wiki-poetry-quote__body\s*\{[\s\S]*z-index:\s*1/);
+});
+
+await test("blockquote toolbar action inserts the attributed quote tool instead of toggling default blockquote", function () {
+  assert.match(editorBundleSource, /id:\s*"blockquote"[\s\S]*title:\s*"Poetry quote"[\s\S]*insertWikiPoetryQuote/);
+  assert.doesNotMatch(editorBundleSource, /id:\s*"blockquote"[\s\S]{0,260}toggleBlockquote/);
+});
+
+await test("poetry quote floating toolbar exposes container toggle and unwrap actions", function () {
+  assert.match(editorBundleSource, /wiki-editor-poetry-quote-tools/);
+  assert.match(editorBundleSource, /toggleWikiPoetryQuoteContainer/);
+  assert.match(editorBundleSource, /unsetWikiPoetryQuote/);
+  assert.match(editorBundleSource, /figure\.wiki-poetry-quote/);
+  assert.match(editorBundleSource, /selectPoetryQuote/);
+  assert.match(editorBundleSource, /closest\("p, h1, h2, h3, h4, h5, h6, li"\)/);
 });
 
 await test("Backspace after a list removes the trailing empty paragraph instead of creating extra gaps", function () {

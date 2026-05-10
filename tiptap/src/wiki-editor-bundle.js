@@ -32,6 +32,7 @@ import WikiBlockBackground from "./extensions/wiki-block-background.mjs";
 import WikiCallout from "./extensions/wiki-callout.mjs";
 import WikiCodeBlock, { CODE_BLOCK_LANGUAGE_OPTIONS } from "./extensions/wiki-code-block.mjs";
 import WikiEditingKeymap from "./extensions/wiki-editing-keymap.mjs";
+import WikiPoetryQuote from "./extensions/wiki-poetry-quote.mjs";
 import Highlight from "./extensions/wiki-highlight.mjs";
 import { WikiFootnote, WikiNamespaceLink, WikiPageLink, WikiUserMention } from "./extensions/wiki-entities.mjs";
 import WikiLink from "./extensions/wiki-link.mjs";
@@ -134,6 +135,8 @@ const BUTTON_ICONS = {
   "table-toggle-header-column": "fa-header",
   "dnd-alignment-table-edit": "fa-th",
   "table-delete": "fa-trash",
+  "poetry-quote-container": "fa-square-o",
+  "poetry-quote-unwrap": "fa-outdent",
   "image-align-center": "fa-align-center",
   "image-align-left": "fa-align-left",
   "image-align-right": "fa-align-right",
@@ -1474,12 +1477,12 @@ function createToolbar(root, editor, uploadImage) {
     },
     {
       id: "blockquote",
-      title: "Blockquote",
+      title: "Poetry quote",
       action: function () {
-        editor.chain().focus().toggleBlockquote().run();
+        editor.chain().focus().insertWikiPoetryQuote().run();
       },
       applyState: function (button) {
-        button.classList.toggle("active", editor.isActive("blockquote"));
+        button.classList.toggle("active", editor.isActive("wikiPoetryQuote"));
       }
     },
     {
@@ -1974,6 +1977,32 @@ function getActiveAlignmentTableElement(editor, surface) {
   return table && surface.contains(table) ? table : null;
 }
 
+function getActivePoetryQuoteElement(editor, surface) {
+  const selectedDom = editor.view.nodeDOM(editor.state.selection.from);
+  const quoteSelector = '[data-wiki-node="poetry-quote"], figure.wiki-poetry-quote';
+  if (selectedDom && selectedDom.nodeType === 1 && selectedDom.matches(quoteSelector) && surface.contains(selectedDom)) {
+    return selectedDom;
+  }
+  const selectionElement = getSelectionElement(editor);
+  const quote = selectionElement && typeof selectionElement.closest === "function" ? selectionElement.closest(quoteSelector) : null;
+  return quote && surface.contains(quote) ? quote : null;
+}
+
+function selectPoetryQuote(editor, target, surface) {
+  const element = target && typeof target.closest === "function" ? target.closest('[data-wiki-node="poetry-quote"], figure.wiki-poetry-quote') : null;
+  if (!element || !surface.contains(element)) {
+    return false;
+  }
+  if (target.closest("p, h1, h2, h3, h4, h5, h6, li")) {
+    return false;
+  }
+  const pos = editor.view.posAtDOM(element, 0);
+  if (pos == null) {
+    return false;
+  }
+  return editor.chain().focus().setNodeSelection(pos).run();
+}
+
 function selectAlignmentTable(editor, target, surface) {
   const element = target && typeof target.closest === "function" ? target.closest('[data-wiki-node="alignment-table"]') : null;
   if (!element || !surface.contains(element)) {
@@ -2327,6 +2356,66 @@ function createAlignmentTableContextToolbar(surface, editor) {
   return {
     destroy: function () {
       window.removeEventListener("resize", syncAlignmentTableTools);
+      if (panel.parentNode) {
+        panel.parentNode.removeChild(panel);
+      }
+    }
+  };
+}
+
+function createPoetryQuoteContextToolbar(surface, editor) {
+  const panel = document.createElement("div");
+  panel.className = "wiki-editor-context-tools wiki-editor-poetry-quote-tools";
+  panel.setAttribute("role", "toolbar");
+  panel.setAttribute("aria-label", "Selected poetry quote tools");
+  panel.hidden = true;
+
+  const container = createButton({
+    id: "poetry-quote-container",
+    title: "Toggle quote container",
+    action: function () {
+      editor.chain().focus().toggleWikiPoetryQuoteContainer().run();
+    },
+    applyState: function (button) {
+      button.classList.toggle("active", editor.getAttributes("wikiPoetryQuote").container !== false);
+    }
+  });
+  const unwrap = createButton({
+    id: "poetry-quote-unwrap",
+    title: "Unwrap quote content",
+    action: function () {
+      editor.chain().focus().unsetWikiPoetryQuote().run();
+    },
+    applyState: function () {}
+  });
+  panel.appendChild(container);
+  panel.appendChild(unwrap);
+
+  function syncPoetryQuoteTools() {
+    const quote = editor.isActive("wikiPoetryQuote") ? getActivePoetryQuoteElement(editor, surface) : null;
+    panel.hidden = !quote;
+    if (!quote) {
+      return;
+    }
+    container.classList.remove("active");
+    container.disabled = false;
+    unwrap.disabled = false;
+    container.classList.toggle("active", editor.getAttributes("wikiPoetryQuote").container !== false);
+    positionContextPanel(panel, quote, surface);
+  }
+
+  editor.on("create", syncPoetryQuoteTools);
+  editor.on("selectionUpdate", syncPoetryQuoteTools);
+  editor.on("transaction", syncPoetryQuoteTools);
+  editor.on("focus", syncPoetryQuoteTools);
+  editor.on("blur", syncPoetryQuoteTools);
+  window.addEventListener("resize", syncPoetryQuoteTools);
+  surface.appendChild(panel);
+  syncPoetryQuoteTools();
+
+  return {
+    destroy: function () {
+      window.removeEventListener("resize", syncPoetryQuoteTools);
       if (panel.parentNode) {
         panel.parentNode.removeChild(panel);
       }
@@ -3318,6 +3407,7 @@ export async function createWikiEditor(element, options) {
       WikiCodeBlock,
       WikiBlockBackground,
       WikiCallout,
+      WikiPoetryQuote,
       WikiEditingKeymap,
       WikiPageLink,
       WikiNamespaceLink,
@@ -3429,6 +3519,12 @@ export async function createWikiEditor(element, options) {
             return true;
           }
 
+          if (selectPoetryQuote(editor, target, editorMount)) {
+            event.preventDefault();
+            event.stopPropagation();
+            return true;
+          }
+
           if (mediaCell && target === mediaCell) {
             event.preventDefault();
             event.stopPropagation();
@@ -3511,6 +3607,7 @@ export async function createWikiEditor(element, options) {
   const tableContextToolbar = createTableContextToolbar(editorMount, editor);
   const tableDimensionHandles = createTableDimensionHandles(editorMount, editor);
   const alignmentTableContextToolbar = createAlignmentTableContextToolbar(editorMount, editor);
+  const poetryQuoteContextToolbar = createPoetryQuoteContextToolbar(editorMount, editor);
   linkContextToolbar = createLinkContextToolbar(editorMount, editor);
   const destroyLinkNavigationGuard = installEditorLinkNavigationGuard({
     editorMount,
@@ -3565,6 +3662,7 @@ export async function createWikiEditor(element, options) {
       tableContextToolbar.destroy();
       tableDimensionHandles.destroy();
       alignmentTableContextToolbar.destroy();
+      poetryQuoteContextToolbar.destroy();
       linkContextToolbar.destroy();
       editorToc.destroy();
       return editor.destroy();

@@ -72,7 +72,7 @@
   line-height: 1.25;
   margin-top: 0.85em;
   margin-bottom: 0.4em;
-  text-shadow: var(--wiki-prose-heading-text-shadow, none);
+  text-shadow: var(--wiki-prose-heading-text-shadow, 2px 2px 10px rgb(0, 0, 0));
 }
 
 .wiki-article-prose :where(h1, h2, h3, h4, h5, h6) :where(strong, b) {
@@ -697,6 +697,99 @@
 
 .wiki-article-prose .wiki-callout--success {
   --wiki-callout-border: var(--bs-success, #198754);
+}
+
+.wiki-article-prose .wiki-poetry-quote {
+  display: table;
+  margin: 1rem 0;
+  max-width: 100%;
+  width: fit-content;
+}
+
+.wiki-article-prose .wiki-poetry-quote__body {
+  position: relative;
+  border: 1px solid var(--wiki-poetry-quote-border, rgba(194, 163, 90, 0.46));
+  border-radius: var(--wiki-poetry-quote-radius, var(--bs-border-radius, 0.5rem));
+  background: var(--wiki-poetry-quote-bg, linear-gradient(145deg, #1b101d 0%, #100d14 62%, #08070a 100%));
+  box-shadow: var(--wiki-poetry-quote-shadow, inset 0 1px 0 rgba(255, 244, 214, 0.06), 0 0.85rem 2rem rgba(0, 0, 0, 0.24));
+  color: var(--wiki-poetry-quote-color, var(--wiki-prose-color, var(--bs-body-color, #d8d0c5)));
+  margin: 0;
+  padding: 0.85rem 3rem 0.95rem;
+  text-align: var(--wiki-poetry-quote-text-align, left);
+}
+
+.wiki-article-prose .wiki-poetry-quote__body::before,
+.wiki-article-prose .wiki-poetry-quote__body::after {
+  position: absolute;
+  color: var(--wiki-poetry-quote-mark-color, var(--wiki-prose-link-color, #c2a35a));
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 2.4rem;
+  font-weight: 700;
+  line-height: 1;
+  opacity: 0.74;
+  pointer-events: none;
+  text-shadow: 0 0 12px rgba(194, 163, 90, 0.24);
+}
+
+.wiki-article-prose .wiki-poetry-quote__body::before {
+  content: "\201C";
+  top: 0.62rem;
+  left: 1.35rem;
+}
+
+.wiki-article-prose .wiki-poetry-quote__body::after {
+  content: "\201D";
+  right: 1.35rem;
+  bottom: 0.35rem;
+}
+
+.wiki-article-prose .wiki-poetry-quote--plain {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.wiki-article-prose .wiki-poetry-quote--plain::before {
+  content: "";
+  position: absolute;
+  inset: -5% 1%;
+  background: #00000059;
+  filter: blur(60px);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.wiki-article-prose .wiki-poetry-quote--plain .wiki-poetry-quote__body {
+  position: relative;
+  z-index: 1;
+  border: 0;
+  background: transparent;
+  box-shadow: none !important;
+  text-shadow: 0 0.35rem 0.7rem rgba(0, 0, 0, 0.72);
+  padding-inline: 2.35rem;
+}
+
+.wiki-article-prose .wiki-poetry-quote--plain .wiki-poetry-quote__body::before {
+  left: 0.5rem;
+}
+
+.wiki-article-prose .wiki-poetry-quote--plain .wiki-poetry-quote__body::after {
+  right: 0.5rem;
+}
+
+.wiki-article-prose .wiki-poetry-quote__body > :first-child {
+  margin-top: 0;
+}
+
+.wiki-article-prose .wiki-poetry-quote__body > :last-child {
+  margin-bottom: 0;
+}
+
+.wiki-article-prose .wiki-poetry-quote__attribution {
+  color: var(--wiki-poetry-quote-attribution-color, var(--wiki-prose-heading-color, #d4b764));
+  font-size: 0.95em;
+  margin-top: 0.35rem;
+  text-align: left;
 }
 
 /* Center simple imported image paragraphs without affecting images placed inside custom div/flex layouts. */

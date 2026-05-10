@@ -12,7 +12,7 @@ function defaultItems() {
     { id: "bullet-list", label: "Bullet list", run: ({ editor }) => editor.chain().focus().toggleBulletList().run() },
     { id: "ordered-list", label: "Ordered list", run: ({ editor }) => editor.chain().focus().toggleOrderedList().run() },
     { id: "task-list", label: "Task list", run: ({ editor }) => editor.chain().focus().toggleTaskList().run() },
-    { id: "quote", label: "Quote", run: ({ editor }) => editor.chain().focus().toggleBlockquote().run() },
+    { id: "quote", label: "Poetry quote", run: ({ editor }) => editor.chain().focus().insertWikiPoetryQuote().run() },
     { id: "code-block", label: "Code block", run: ({ editor }) => editor.chain().focus().toggleCodeBlock().run() },
     { id: "table", label: "Table", run: ({ editor }) => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run() },
     { id: "image", label: "Image", run: ({ editor }) => editor.storage.slashCommand.requestImageUpload(editor) },

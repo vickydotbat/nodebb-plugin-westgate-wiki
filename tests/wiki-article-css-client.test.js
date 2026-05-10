@@ -42,6 +42,11 @@ assert.match(
 );
 assert.match(
   articleBodyCss,
+  /\.wiki-article-prose :where\(h1, h2, h3, h4, h5, h6\)\s*\{[\s\S]*text-shadow:\s*var\(--wiki-prose-heading-text-shadow,\s*2px\s+2px\s+10px\s+rgb\(0,\s*0,\s*0\)\);[\s\S]*\}/,
+  "article headings should default to the Westgate shadow treatment"
+);
+assert.match(
+  articleBodyCss,
   /\.wiki-article-prose :where\(h1, h2, h3, h4, h5, h6\) :where\(strong, b\)\s*\{[\s\S]*font-weight:\s*var\(--wiki-prose-heading-bold-font-weight,\s*700\);[\s\S]*\}/,
   "bold text inside article headings should have a distinct heavier weight"
 );
