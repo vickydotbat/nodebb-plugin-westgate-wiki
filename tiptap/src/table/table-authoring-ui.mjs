@@ -241,14 +241,14 @@ export function createTableAuthoring(surface, editor) {
   const originalDispatch = editor && editor.view && editor.view.dispatch;
 
   function ensureInstalled() {
+    if (stickyRow.parentNode !== surface || stickyRow !== surface.firstElementChild) {
+      surface.insertBefore(stickyRow, surface.firstChild);
+    }
     if (widthHandle.parentNode !== surface) {
       surface.appendChild(widthHandle);
     }
     if (rowHandle.parentNode !== surface) {
       surface.appendChild(rowHandle);
-    }
-    if (stickyRow.parentNode !== surface) {
-      surface.appendChild(stickyRow);
     }
     if (cellPopover.parentNode !== surface) {
       surface.appendChild(cellPopover);
@@ -374,9 +374,10 @@ export function createTableAuthoring(surface, editor) {
       return;
     }
 
-    positionContextPanel(stickyRow, currentContext.activeTableElement, surface);
+    const surfaceRect = surface.getBoundingClientRect();
+    const stickyRect = stickyRow.getBoundingClientRect();
     positionContextPanel(cellPopover, currentContext.activeCellElement || currentContext.activeTableElement, surface, {
-      avoidTop: Number.parseFloat(stickyRow.style.top) + stickyRow.offsetHeight + 8
+      avoidTop: stickyRect.bottom - surfaceRect.top + 8
     });
     updateResizeHandles(currentContext);
     updateColorControls(currentContext);

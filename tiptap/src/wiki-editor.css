@@ -819,14 +819,16 @@
 }
 
 .westgate-wiki-compose .wiki-editor-table-sticky-row {
-  position: absolute;
-  z-index: 12;
+  position: sticky;
+  top: calc(var(--wiki-compose-toolbar-sticky-top, 0.75rem) + var(--wiki-editor-main-toolbar-height, 3.25rem));
+  z-index: 8;
   display: flex;
   flex-wrap: wrap;
   gap: 0.25rem;
   align-items: center;
   max-width: min(42rem, calc(100% - 1rem));
-  padding: 0.35rem;
+  margin: 0 0 0.5rem;
+  padding: 0.35rem 0.45rem;
   border: 1px solid color-mix(in srgb, var(--wiki-editor-focus-border, var(--bs-primary, #0d6efd)) 34%, var(--bs-border-color, #dee2e6));
   border-radius: var(--bs-border-radius, 0.5rem);
   background: color-mix(in srgb, var(--wiki-compose-editable-bg, var(--bs-body-bg, #fff)) 92%, var(--wiki-editor-focus-border, var(--bs-primary, #0d6efd)) 8%);

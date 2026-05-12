@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import { Editor } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
@@ -28,6 +29,8 @@ function test(name, fn) {
 }
 
 installJsdomGlobals();
+
+const wikiEditorCss = readFileSync(new URL("../tiptap/src/wiki-editor.css", import.meta.url), "utf8");
 
 const [
   tableContextModule,
@@ -587,4 +590,14 @@ await test("createTableAuthoring installs sticky table row and cell popover surf
   assert.equal(surface.querySelector(".wiki-editor-table-sticky-row"), null);
   assert.equal(surface.querySelector(".wiki-editor-table-cell-popover"), null);
   editor.destroy();
+});
+
+await test("table authoring sticky row uses the sticky CSS contract", function () {
+  const stickyRule = wikiEditorCss.match(/\.westgate-wiki-compose\s+\.wiki-editor-table-sticky-row\s*\{[^}]+\}/);
+
+  assert(stickyRule, "sticky row CSS rule should exist");
+  assert.match(stickyRule[0], /\bposition:\s*sticky;/);
+  assert.match(stickyRule[0], /\btop:\s*calc\(var\(--wiki-compose-toolbar-sticky-top,\s*0\.75rem\)\s*\+\s*var\(--wiki-editor-main-toolbar-height,\s*3\.25rem\)\);/);
+  assert.match(stickyRule[0], /\bz-index:\s*8;/);
+  assert.doesNotMatch(stickyRule[0], /\bposition:\s*absolute;/);
 });
