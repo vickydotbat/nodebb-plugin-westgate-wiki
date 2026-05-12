@@ -237,6 +237,7 @@ export function createTableAuthoring(surface, editor) {
   const rowHandle = appendResizeHandle(surface, "wiki-editor-table-resize-handle--row", "Resize row height");
 
   let currentContext = deriveTableContext(editor, surface);
+  let activeTableWrapper = null;
   let destroyed = false;
 
   function ensureInstalled() {
@@ -356,6 +357,26 @@ export function createTableAuthoring(surface, editor) {
     });
   }
 
+  function getTableScrollWrapper(context) {
+    const table = context && context.activeTableElement;
+    return table && typeof table.closest === "function" ? table.closest(".tableWrapper") : null;
+  }
+
+  function syncActiveTableWrapper(wrapper) {
+    if (activeTableWrapper === wrapper) {
+      return;
+    }
+
+    if (activeTableWrapper) {
+      activeTableWrapper.removeEventListener("scroll", update);
+    }
+
+    activeTableWrapper = wrapper;
+    if (activeTableWrapper) {
+      activeTableWrapper.addEventListener("scroll", update);
+    }
+  }
+
   function update() {
     if (destroyed) {
       return;
@@ -370,8 +391,11 @@ export function createTableAuthoring(surface, editor) {
     setElementHidden(rowHandle, !visible);
 
     if (!visible) {
+      syncActiveTableWrapper(null);
       return;
     }
+
+    syncActiveTableWrapper(getTableScrollWrapper(currentContext));
 
     const surfaceRect = surface.getBoundingClientRect();
     const stickyRect = stickyRow.getBoundingClientRect();
@@ -437,6 +461,7 @@ export function createTableAuthoring(surface, editor) {
       });
       window.removeEventListener("resize", update);
       surface.removeEventListener("scroll", update);
+      syncActiveTableWrapper(null);
       stickyRow.remove();
       cellPopover.remove();
       widthHandle.remove();

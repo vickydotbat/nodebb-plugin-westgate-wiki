@@ -31,6 +31,7 @@ function test(name, fn) {
 installJsdomGlobals();
 
 const wikiEditorCss = readFileSync(new URL("../tiptap/src/wiki-editor.css", import.meta.url), "utf8");
+const tableAuthoringSource = readFileSync(new URL("../tiptap/src/table/table-authoring-ui.mjs", import.meta.url), "utf8");
 
 const [
   tableContextModule,
@@ -617,4 +618,10 @@ await test("table authoring sticky row uses the sticky CSS contract", function (
   assert.match(stickyRule[0], /\btop:\s*calc\(var\(--wiki-compose-toolbar-sticky-top,\s*0\.75rem\)\s*\+\s*var\(--wiki-editor-main-toolbar-height,\s*3\.25rem\)\);/);
   assert.match(stickyRule[0], /\bz-index:\s*8;/);
   assert.doesNotMatch(stickyRule[0], /\bposition:\s*absolute;/);
+});
+
+await test("table authoring resyncs floating controls on active table wrapper scroll", function () {
+  assert.match(tableAuthoringSource, /closest\("\.tableWrapper"\)/);
+  assert.match(tableAuthoringSource, /activeTableWrapper\.addEventListener\("scroll",\s*update\)/);
+  assert.match(tableAuthoringSource, /activeTableWrapper\.removeEventListener\("scroll",\s*update\)/);
 });

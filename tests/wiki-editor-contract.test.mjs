@@ -451,9 +451,13 @@ await test("createWikiEditor mounts table authoring UI on the editor surface and
 
   const surface = host.querySelector(".wiki-editor__surface");
   const content = host.querySelector(".wiki-editor__content.ProseMirror, .wiki-editor__content");
+  const editorRoot = host.querySelector(".wiki-editor");
+  const toolbarMount = host.querySelector(".wiki-editor__toolbar-mount");
   const stickyRow = surface && surface.querySelector(".wiki-editor-table-sticky-row");
   const cellPopover = surface && surface.querySelector(".wiki-editor-table-cell-popover");
 
+  assert.ok(editorRoot, "editor root should exist");
+  assert.ok(toolbarMount, "toolbar mount should exist");
   assert.ok(surface, "editor surface should exist");
   assert.ok(content, "ProseMirror content should exist");
   assert.ok(stickyRow, "table sticky row should mount under the editor surface");
@@ -461,9 +465,22 @@ await test("createWikiEditor mounts table authoring UI on the editor surface and
   assert.equal(content.contains(stickyRow), false, "table sticky row must not mount inside ProseMirror content");
   assert.equal(content.contains(cellPopover), false, "table cell popover must not mount inside ProseMirror content");
 
+  toolbarMount.getBoundingClientRect = function () {
+    return { left: 0, top: 0, width: 640, height: 96, right: 640, bottom: 96 };
+  };
+  window.dispatchEvent(new Event("resize"));
+  assert.equal(editorRoot.style.getPropertyValue("--wiki-editor-main-toolbar-height"), "96px");
+
+  toolbarMount.getBoundingClientRect = function () {
+    return { left: 0, top: 0, width: 640, height: 124, right: 640, bottom: 124 };
+  };
+  editorRoot.dispatchEvent(new CustomEvent("wiki-editor-fullscreen-source-change"));
+  assert.equal(editorRoot.style.getPropertyValue("--wiki-editor-main-toolbar-height"), "124px");
+
   wikiEditor.destroy();
   assert.equal(host.querySelector(".wiki-editor-table-sticky-row"), null);
   assert.equal(host.querySelector(".wiki-editor-table-cell-popover"), null);
+  assert.equal(editorRoot.style.getPropertyValue("--wiki-editor-main-toolbar-height"), "");
   host.remove();
 });
 

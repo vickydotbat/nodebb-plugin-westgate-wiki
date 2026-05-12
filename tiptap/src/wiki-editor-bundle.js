@@ -1431,7 +1431,7 @@ function createToolbar(root, editor, uploadImage) {
         def.applyState(def.button);
       });
     });
-    syncToolbarSeparators();
+    syncToolbarLayout();
   }
 
   function syncToolbarSeparators() {
@@ -1445,26 +1445,46 @@ function createToolbar(root, editor, uploadImage) {
     });
   }
 
+  function syncToolbarHeight() {
+    const editorRoot = root.closest(".wiki-editor");
+    if (!editorRoot) {
+      return;
+    }
+
+    editorRoot.style.setProperty("--wiki-editor-main-toolbar-height", `${Math.ceil(root.getBoundingClientRect().height)}px`);
+  }
+
+  function syncToolbarLayout() {
+    syncToolbarSeparators();
+    syncToolbarHeight();
+  }
+
+  const toolbarEventTarget = root.closest(".wiki-editor") || root;
+
   editor.on("create", syncToolbar);
   editor.on("selectionUpdate", syncToolbar);
   editor.on("transaction", syncToolbar);
   editor.on("focus", syncToolbar);
   editor.on("blur", syncToolbar);
-  window.addEventListener("resize", syncToolbarSeparators);
-  root.addEventListener("wiki-editor-fullscreen-source-change", syncToolbar);
-  syncToolbar();
+  window.addEventListener("resize", syncToolbarLayout);
+  toolbarEventTarget.addEventListener("wiki-editor-fullscreen-source-change", syncToolbar);
 
   root.appendChild(toolbar);
+  syncToolbar();
   if (typeof window.requestAnimationFrame === "function") {
-    window.requestAnimationFrame(syncToolbarSeparators);
+    window.requestAnimationFrame(syncToolbarLayout);
   } else {
-    setTimeout(syncToolbarSeparators, 0);
+    setTimeout(syncToolbarLayout, 0);
   }
 
   return {
     destroy: function () {
-      window.removeEventListener("resize", syncToolbarSeparators);
-      root.removeEventListener("wiki-editor-fullscreen-source-change", syncToolbar);
+      const editorRoot = root.closest(".wiki-editor");
+      if (editorRoot) {
+        editorRoot.style.removeProperty("--wiki-editor-main-toolbar-height");
+      }
+      window.removeEventListener("resize", syncToolbarLayout);
+      toolbarEventTarget.removeEventListener("wiki-editor-fullscreen-source-change", syncToolbar);
     }
   };
 }
