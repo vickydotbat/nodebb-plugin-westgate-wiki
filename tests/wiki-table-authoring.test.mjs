@@ -30,12 +30,81 @@ const [
 
 const {
   getSelectionElement,
+  getActiveTableElement,
+  getActiveTableRowElement,
+  getActiveTableCellElement,
+  getTableNodePosition,
   setClassToken,
   setStyleValue,
   getStyleValue,
+  updateNodeAttributesAtPos,
+  updateNodeStyleAtPos,
   positionContextPanel
 } = tableDomModule;
 const { WestgateTableView, applyTableNodeAttributesToView } = tableViewModule;
+
+function createSelectionEditorStub(selectionNode) {
+  return {
+    view: {
+      domAtPos: function () {
+        return { node: selectionNode };
+      }
+    },
+    state: {
+      selection: { from: 1 }
+    }
+  };
+}
+
+function createPositionEditorStub(nodeAtResult) {
+  return {
+    view: {
+      posAtDOM: function () {
+        return 9;
+      }
+    },
+    state: {
+      doc: {
+        nodeAt: function (pos) {
+          return pos === 8 ? nodeAtResult : null;
+        }
+      }
+    }
+  };
+}
+
+function createAttributeEditorStub(nodeAtResult) {
+  const calls = [];
+  const tr = {
+    scrolled: false,
+    setNodeMarkup: function (pos, type, attrs, marks) {
+      calls.push({ pos, type, attrs, marks });
+      return tr;
+    },
+    scrollIntoView: function () {
+      tr.scrolled = true;
+      return tr;
+    }
+  };
+  const editor = {
+    dispatched: null,
+    state: {
+      doc: {
+        nodeAt: function (pos) {
+          return pos === 4 ? nodeAtResult : null;
+        }
+      },
+      tr
+    },
+    view: {
+      dispatch: function (transaction) {
+        editor.dispatched = transaction;
+      }
+    }
+  };
+  editor.calls = calls;
+  return editor;
+}
 
 await test("table DOM helpers preserve class tokens and style values", function () {
   assert.equal(setClassToken("one two", "three", true), "one two three");
@@ -64,6 +133,85 @@ await test("positionContextPanel clamps panel within the editor surface", functi
 
   assert.equal(panel.style.left, "412px");
   assert.equal(panel.style.top, "40px");
+});
+
+await test("active table DOM helpers locate table, row, and cell inside the editor surface", function () {
+  const surface = document.createElement("div");
+  const table = document.createElement("table");
+  const row = document.createElement("tr");
+  const cell = document.createElement("td");
+  const paragraph = document.createElement("p");
+  const text = document.createTextNode("Cell text");
+  paragraph.appendChild(text);
+  cell.appendChild(paragraph);
+  row.appendChild(cell);
+  table.appendChild(row);
+  surface.appendChild(table);
+
+  const editor = createSelectionEditorStub(text);
+
+  assert.equal(getActiveTableElement(editor, surface), table);
+  assert.equal(getActiveTableRowElement(editor, table), row);
+  assert.equal(getActiveTableCellElement(editor, table), cell);
+  assert.equal(getActiveTableElement(editor, document.createElement("div")), null);
+  assert.equal(getActiveTableRowElement(editor, document.createElement("table")), null);
+  assert.equal(getActiveTableCellElement(editor, document.createElement("table")), null);
+});
+
+await test("getTableNodePosition maps a table DOM element to a valid document position", function () {
+  const tableNode = { type: { name: "table" } };
+  const editor = createPositionEditorStub(tableNode);
+
+  assert.equal(getTableNodePosition(editor, document.createElement("table")), 8);
+  assert.equal(getTableNodePosition(createPositionEditorStub(null), document.createElement("table")), null);
+  assert.equal(getTableNodePosition({ view: {}, state: { doc: {} } }, document.createElement("table")), null);
+});
+
+await test("updateNodeAttributesAtPos merges node attrs and dispatches the transaction", function () {
+  const node = {
+    attrs: { class: "old", style: "width: 50%" },
+    marks: ["strong"]
+  };
+  const editor = createAttributeEditorStub(node);
+
+  assert.equal(updateNodeAttributesAtPos(editor, 4, { class: "new" }), true);
+  assert.deepEqual(editor.calls, [{
+    pos: 4,
+    type: undefined,
+    attrs: { class: "new", style: "width: 50%" },
+    marks: ["strong"]
+  }]);
+  assert.equal(editor.dispatched, editor.state.tr);
+  assert.equal(editor.state.tr.scrolled, true);
+  assert.equal(updateNodeAttributesAtPos(editor, 5, { class: "missing" }), false);
+});
+
+await test("updateNodeStyleAtPos updates styles from node attrs or fallback style", function () {
+  const node = {
+    attrs: { class: "wiki-table-layout-auto", style: "" },
+    marks: []
+  };
+  const editor = createAttributeEditorStub(node);
+
+  assert.equal(updateNodeStyleAtPos(editor, 4, "width: 50%", function (style) {
+    assert.equal(style, "width: 50%");
+    return setStyleValue(style, "width", "75%");
+  }, { scroll: false }), true);
+
+  assert.deepEqual(editor.calls, [{
+    pos: 4,
+    type: undefined,
+    attrs: { class: "wiki-table-layout-auto", style: "width: 75%" },
+    marks: []
+  }]);
+  assert.equal(editor.dispatched, editor.state.tr);
+  assert.equal(editor.state.tr.scrolled, false);
+
+  const removeStyleEditor = createAttributeEditorStub(node);
+  assert.equal(updateNodeStyleAtPos(removeStyleEditor, 4, "height: 30px", function () {
+    return "";
+  }), true);
+  assert.equal(removeStyleEditor.calls[0].attrs.style, null);
 });
 
 await test("table view exports preserve table class and style attributes", function () {
