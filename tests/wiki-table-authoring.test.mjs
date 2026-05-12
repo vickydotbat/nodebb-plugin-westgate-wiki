@@ -34,12 +34,14 @@ const [
   tableDomModule,
   tableViewModule,
   tableCommandsModule,
+  tablePropertiesDialogModule,
   toolbarSchemaModule
 ] = await Promise.all([
   import("../tiptap/src/table/table-context.mjs"),
   import("../tiptap/src/table/table-dom.mjs"),
   import("../tiptap/src/table/table-view.mjs"),
   import("../tiptap/src/table/table-commands.mjs"),
+  import("../tiptap/src/table/table-properties-dialog.mjs"),
   import("../tiptap/src/toolbar/toolbar-schema.mjs")
 ]);
 
@@ -67,6 +69,7 @@ const {
   isTableCommandEnabled,
   executeTableCommand
 } = tableCommandsModule;
+const { applyActiveTableProperties } = tablePropertiesDialogModule;
 const { TABLE_CONTEXT_BUTTON_IDS } = toolbarSchemaModule;
 
 function createTableEditor(content) {
@@ -471,5 +474,43 @@ await test("selected-cell clear formatting removes supported cell styles", funct
     "width: 40%",
     "border-color: red"
   ]);
+  editor.destroy();
+});
+
+await test("applyActiveTableProperties preserves table width, layout, borders, column width, and row height", function () {
+  const editor = createTableEditor("<table><tbody><tr><td><p>A1</p></td><td><p>B1</p></td></tr></tbody></table>");
+  const positions = findCellPositions(editor);
+  editor.commands.setTextSelection(positions[0] + 2);
+  const context = deriveTableContext(editor, editor.view.dom);
+
+  assert.equal(applyActiveTableProperties(editor, context, {
+    tableWidth: "50%",
+    columnWidth: "12rem",
+    rowHeight: "3rem",
+    borderColor: "#caa55a",
+    layout: "auto",
+    borderMode: "hidden"
+  }), true);
+
+  const html = editor.getHTML();
+  assert.match(html, /<table[^>]*class="[^"]*\bwiki-table-borderless\b[^"]*\bwiki-table-layout-auto\b[^"]*"/);
+  assert.match(html, /<table[^>]*style="[^"]*\bwidth:\s*50%/);
+  assert.match(html, /<table[^>]*style="[^"]*\bborder-color:\s*rgb\(202,\s*165,\s*90\)/);
+  assert.match(html, /<tr[^>]*style="[^"]*\bheight:\s*3rem;?[^"]*"/);
+  assert.match(html, /<td[^>]*style="[^"]*\bwidth:\s*12rem;?[^"]*"/);
+  editor.destroy();
+});
+
+await test("table-properties command opens the table properties dialog", function () {
+  const editor = createTableEditor("<table><tbody><tr><td><p>A1</p></td></tr></tbody></table>");
+  const positions = findCellPositions(editor);
+  editor.commands.setTextSelection(positions[0] + 2);
+  const context = deriveTableContext(editor, editor.view.dom);
+
+  assert.equal(executeTableCommand(editor, context, "table-properties"), true);
+
+  const dialog = document.querySelector(".wiki-editor-table-dialog");
+  assert.equal(dialog && dialog.getAttribute("aria-label"), "Table properties");
+  document.querySelector(".wiki-editor-entity-dialog-shell").remove();
   editor.destroy();
 });

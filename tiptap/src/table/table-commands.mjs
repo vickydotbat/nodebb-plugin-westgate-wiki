@@ -1,5 +1,6 @@
 import { getReadableTextColor } from "../shared/color-contrast.mjs";
 import { setStyleValue } from "./table-dom.mjs";
+import { openTablePropertiesDialog } from "./table-properties-dialog.mjs";
 
 const STRUCTURAL_COMMANDS = {
   "table-add-row-before": "addRowBefore",
@@ -192,7 +193,8 @@ export function executeTableCommand(editor, context, id, payload) {
   }
 
   if (id === "table-properties") {
-    return Boolean(context && context.isActive);
+    openTablePropertiesDialog({ editor, context });
+    return true;
   }
 
   if (isCellFormattingCommand(id)) {
