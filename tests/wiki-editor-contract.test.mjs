@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
 
 import { installJsdomGlobals } from "./helpers/jsdom-setup.mjs";
 
@@ -94,6 +94,21 @@ const editorCss = readFileSync(new URL("../tiptap/src/wiki-editor.css", import.m
 const vendoredEditorCss = readFileSync(new URL("../public/vendor/tiptap/wiki-tiptap.css", import.meta.url), "utf8");
 const editorBundleSource = readFileSync(new URL("../tiptap/src/wiki-editor-bundle.js", import.meta.url), "utf8");
 const vendoredEditorBundleSource = readFileSync(new URL("../public/vendor/tiptap/wiki-tiptap.bundle.js", import.meta.url), "utf8");
+
+let editorBundleContractImportCount = 0;
+
+async function importEditorBundleForContract() {
+  editorBundleContractImportCount += 1;
+  const moduleUrl = new URL(`../tiptap/src/.wiki-editor-bundle-contract-${process.pid}-${editorBundleContractImportCount}.mjs`, import.meta.url);
+  const source = editorBundleSource
+    .replace(/import\s+["']\.\/wiki-editor\.css["'];\s*/, "");
+  writeFileSync(moduleUrl, source);
+  try {
+    return await import(`${moduleUrl.href}?contract=${editorBundleContractImportCount}`);
+  } finally {
+    rmSync(moduleUrl, { force: true });
+  }
+}
 
 function createEditor(content) {
   const mount = document.createElement("div");
@@ -422,6 +437,34 @@ await test("table styles preserve flexible size and border controls", function (
   assert.doesNotMatch(editorBundleSource, /function\s+createTableContextToolbar/);
   assert.doesNotMatch(editorBundleSource, /function\s+createTableDimensionHandles/);
   editor.destroy();
+});
+
+await test("createWikiEditor mounts table authoring UI on the editor surface and cleans it up", async function () {
+  const { createWikiEditor } = await importEditorBundleForContract();
+  const host = document.createElement("div");
+  host.className = "westgate-wiki-compose";
+  document.body.appendChild(host);
+
+  const wikiEditor = await createWikiEditor(host, {
+    initialData: '<table><tbody><tr><td><p>Cell</p></td></tr></tbody></table>'
+  });
+
+  const surface = host.querySelector(".wiki-editor__surface");
+  const content = host.querySelector(".wiki-editor__content.ProseMirror, .wiki-editor__content");
+  const stickyRow = surface && surface.querySelector(".wiki-editor-table-sticky-row");
+  const cellPopover = surface && surface.querySelector(".wiki-editor-table-cell-popover");
+
+  assert.ok(surface, "editor surface should exist");
+  assert.ok(content, "ProseMirror content should exist");
+  assert.ok(stickyRow, "table sticky row should mount under the editor surface");
+  assert.ok(cellPopover, "table cell popover should mount under the editor surface");
+  assert.equal(content.contains(stickyRow), false, "table sticky row must not mount inside ProseMirror content");
+  assert.equal(content.contains(cellPopover), false, "table cell popover must not mount inside ProseMirror content");
+
+  wikiEditor.destroy();
+  assert.equal(host.querySelector(".wiki-editor-table-sticky-row"), null);
+  assert.equal(host.querySelector(".wiki-editor-table-cell-popover"), null);
+  host.remove();
 });
 
 await test("alignment table node renders selected DnD alignments as a dedicated grid", function () {
