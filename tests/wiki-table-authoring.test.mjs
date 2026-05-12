@@ -8,6 +8,7 @@ import { TableHeader } from "@tiptap/extension-table-header";
 import { TableRow } from "@tiptap/extension-table-row";
 import { CellSelection } from "@tiptap/pm/tables";
 
+import PreservedNodeAttributes from "../tiptap/src/extensions/preserved-node-attributes.mjs";
 import { installJsdomGlobals } from "./helpers/jsdom-setup.mjs";
 
 function test(name, fn) {
@@ -64,6 +65,7 @@ function createTableEditor(content) {
         codeBlock: false,
         link: false
       }),
+      PreservedNodeAttributes,
       Table,
       TableRow,
       TableHeader,
@@ -280,6 +282,55 @@ await test("deriveTableContext reports active table and active cell for a cursor
   assert.equal(context.selectedCellPositions.length, 1);
   assert.equal(context.activeTableElement.tagName, "TABLE");
   assert.equal(context.activeCellElement.tagName, "TD");
+  editor.destroy();
+});
+
+await test("deriveTableContext reports positions, table attrs, and selected cell fallback style", function () {
+  const editor = createTableEditor("<table class=\"wiki-table-layout-auto\" style=\"width: 50%;\"><tbody><tr><td style=\"background-color: rgb(202, 165, 90);\"><p>Alpha</p></td><td><p>Beta</p></td></tr></tbody></table>");
+  const positions = findCellPositions(editor);
+  editor.commands.setTextSelection(positions[0] + 2);
+
+  const context = deriveTableContext(editor, editor.view.dom);
+
+  assert.equal(context.activeTablePos, 0);
+  assert.equal(context.activeCellPos, positions[0]);
+  assert.equal(context.tableAttrs.class, "wiki-table-layout-auto");
+  assert.equal(context.tableAttrs.style, "width: 50%");
+  assert.equal(context.selectedCellPositions[0].fallbackStyle, "background-color: rgb(202, 165, 90)");
+  editor.destroy();
+});
+
+await test("deriveTableContext reports empty context outside a table", function () {
+  const editor = createTableEditor("<p>Outside table</p>");
+  editor.commands.setTextSelection(2);
+
+  const context = deriveTableContext(editor, editor.view.dom);
+
+  assert.equal(context.isActive, false);
+  assert.equal(context.activeTableElement, null);
+  assert.equal(context.activeTablePos, null);
+  assert.equal(context.activeCellElement, null);
+  assert.equal(context.activeCellPos, null);
+  assert.deepEqual(context.selectedCellPositions, []);
+  assert.equal(context.selectedCellCount, 0);
+  assert.deepEqual(context.selectedRowIndexes, []);
+  assert.deepEqual(context.selectedColumnIndexes, []);
+  assert.deepEqual(context.tableAttrs, {});
+  assert.equal(context.canFormatSelection, false);
+  assert.equal(context.canUseStructuralCommands, false);
+  editor.destroy();
+});
+
+await test("deriveTableContext reports logical column indexes for spanned cells", function () {
+  const editor = createTableEditor("<table><tbody><tr><td colspan=\"2\"><p>A</p></td><td><p>B</p></td></tr><tr><td><p>C</p></td><td><p>D</p></td><td><p>E</p></td></tr></tbody></table>");
+  const positions = findCellPositions(editor);
+  editor.commands.setTextSelection(positions[1] + 2);
+
+  const context = deriveTableContext(editor, editor.view.dom);
+
+  assert.equal(context.activeCellPos, positions[1]);
+  assert.deepEqual(context.selectedRowIndexes, [0]);
+  assert.deepEqual(context.selectedColumnIndexes, [2]);
   editor.destroy();
 });
 

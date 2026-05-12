@@ -1,4 +1,4 @@
-import { CellSelection } from "@tiptap/pm/tables";
+import { CellSelection, TableMap } from "@tiptap/pm/tables";
 
 import {
   getActiveTableElement,
@@ -41,23 +41,19 @@ function getElementForPosition(editor, pos) {
   return element && element.nodeType === 1 ? element : null;
 }
 
-function getCellIndexes(table, cell) {
-  const row = cell && cell.closest ? cell.closest("tr") : null;
-  if (!table || !row || !table.contains(row)) {
-    return { rowIndex: null, columnIndex: null };
-  }
-
-  const rows = Array.from(table.querySelectorAll("tr"));
-  const cells = Array.from(row.querySelectorAll("td, th"));
-  return {
-    rowIndex: rows.indexOf(row),
-    columnIndex: cells.indexOf(cell)
-  };
-}
-
 function addUniqueIndex(indexes, index) {
   if (Number.isInteger(index) && index >= 0 && !indexes.includes(index)) {
     indexes.push(index);
+  }
+}
+
+function addIndexRange(indexes, start, end) {
+  if (!Number.isInteger(start) || !Number.isInteger(end)) {
+    return;
+  }
+
+  for (let index = start; index < end; index += 1) {
+    addUniqueIndex(indexes, index);
   }
 }
 
@@ -71,6 +67,18 @@ function collectCellSelection(selection) {
     cells.push({ node, pos });
   });
   return cells;
+}
+
+function getCellRect(tableNode, tablePos, cellPos) {
+  if (!tableNode || !Number.isFinite(tablePos) || !Number.isFinite(cellPos)) {
+    return null;
+  }
+
+  try {
+    return TableMap.get(tableNode).findCell(cellPos - tablePos - 1);
+  } catch (err) {
+    return null;
+  }
 }
 
 export function deriveTableContext(editor, surface) {
@@ -102,9 +110,11 @@ export function deriveTableContext(editor, surface) {
   const selectedColumnIndexes = [];
   const selectedCellPositions = selectedCells.map(function (entry) {
     const element = getElementForPosition(editor, entry.pos);
-    const indexes = getCellIndexes(activeTableElement, element);
-    addUniqueIndex(selectedRowIndexes, indexes.rowIndex);
-    addUniqueIndex(selectedColumnIndexes, indexes.columnIndex);
+    const rect = getCellRect(activeTableNode, activeTablePos, entry.pos);
+    if (rect) {
+      addIndexRange(selectedRowIndexes, rect.top, rect.bottom);
+      addIndexRange(selectedColumnIndexes, rect.left, rect.right);
+    }
 
     return {
       pos: entry.pos,
