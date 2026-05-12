@@ -4,17 +4,18 @@ const assert = require("node:assert/strict");
 
 const state = {
   settings: {
-    categoryIds: "1",
+    categoryIds: "1, 2",
     includeChildCategories: "0"
   },
   categories: new Map([
-    [1, { cid: 1, name: "Wiki", slug: "1/wiki", parentCid: 0, topic_count: 1 }]
+    [1, { cid: 1, name: "Wiki", slug: "1/wiki", parentCid: 0, topic_count: 1 }],
+    [2, { cid: 2, name: "Rules", slug: "2/rules", parentCid: 1, topic_count: 1 }]
   ]),
   topics: new Map([
     [10, { tid: 10, cid: 1, title: "Server Rules", slug: "10/server-rules", deleted: 0, scheduled: 0, postcount: 1 }],
     [11, { tid: 11, cid: 1, title: "Third-Party Content Credits", slug: "11/third-party-content-credits", deleted: 0, scheduled: 0, postcount: 1 }]
   ]),
-  tidsByCid: new Map([[1, [10, 11]]])
+  tidsByCid: new Map([[1, [10, 11]], [2, []]])
 };
 
 const originalMainRequire = require.main.require.bind(require.main);
@@ -45,6 +46,10 @@ require.main.require = function requireNodebbStub(id) {
   const stubs = {
     "./src/categories": {
       getCategoryData: async (cid) => state.categories.get(parseInt(cid, 10)) || null,
+      getChildren: async (cids) => (Array.isArray(cids) ? cids : []).map((cid) => {
+        const parsedCid = parseInt(cid, 10);
+        return [...state.categories.values()].filter((category) => parseInt(category.parentCid, 10) === parsedCid);
+      }),
       getChildrenCids: async () => []
     },
     "./src/controllers/helpers": {
@@ -99,6 +104,7 @@ require.main.require = function requireNodebbStub(id) {
 const config = require("../lib/config");
 const wikiDirectory = require("../lib/wiki-directory-service");
 const wikiPaths = require("../lib/wiki-paths");
+const wikiService = require("../lib/wiki-service");
 
 (async () => {
   config.invalidateSettingsCache();
@@ -110,6 +116,14 @@ const wikiPaths = require("../lib/wiki-paths");
     (await wikiPaths.resolveArticlePath("third-party-content-credits", 1)).status,
     "ok",
     "article resolution should not disappear when category.topic_count is lower than the cid tids set"
+  );
+
+  const rootSection = await wikiService.getSection(1, 1);
+  assert.equal(rootSection.status, "ok");
+  assert.equal(
+    rootSection.section.childSections[0].articleCount,
+    0,
+    "child namespace article counts should use the live cid tids set instead of stale category.topic_count"
   );
 
   console.log("wiki directory stale count tests passed");
