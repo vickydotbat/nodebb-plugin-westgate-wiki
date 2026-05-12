@@ -75,7 +75,7 @@ const WikiCodeBlock = WikiCodeBlockModule.default;
 const WikiBlockBackground = WikiBlockBackgroundModule.default;
 const WikiLink = WikiLinkModule.default;
 const { WikiFootnote, WikiNamespaceLink, WikiPageLink, WikiUserMention } = WikiEntitiesModule;
-const { IMAGE_CONTEXT_BUTTON_IDS, TABLE_CONTEXT_BUTTON_IDS, TOP_TOOLBAR_BUTTON_IDS, TOP_TOOLBAR_GROUPS } = toolbarSchemaModule;
+const { IMAGE_CONTEXT_BUTTON_IDS, TABLE_CONTEXT_BUTTON_IDS, TABLE_STICKY_COMMAND_IDS, TOP_TOOLBAR_BUTTON_IDS, TOP_TOOLBAR_GROUPS } = toolbarSchemaModule;
 const { buildHeadingToc, navigateToHeading } = editorTocModule;
 const { installEditorLinkNavigationGuard, selectEditorLink } = linkInteractionsModule;
 const { calculateResizedImageWidth, getSelectedImageElement, setSelectedImageWidth } = imageResizeModule;
@@ -1559,21 +1559,7 @@ await test("fullscreen source mode css supports resize and source hiding", funct
 });
 
 await test("contextual table schema exposes row, column, cell merge, and delete tools", function () {
-  assert.deepEqual(TABLE_CONTEXT_BUTTON_IDS, [
-    "table-properties",
-    "table-add-row-before",
-    "table-add-row-after",
-    "table-delete-row",
-    "table-add-column-before",
-    "table-add-column-after",
-    "table-delete-column",
-    "table-merge-cells",
-    "table-split-cell",
-    "table-toggle-header-row",
-    "table-toggle-header-column",
-    "dnd-alignment-table-edit",
-    "table-delete"
-  ]);
+  assert.deepEqual(TABLE_CONTEXT_BUTTON_IDS, TABLE_STICKY_COMMAND_IDS);
   assert.match(editorBundleSource, /openTablePropertiesDialog\(\{ editor, table \}\)/);
   assert.match(editorBundleSource, /openAlignmentTableDialog\(\{ editor \}\)/);
   assert.match(editorBundleSource, /wiki-editor-context-tools__group/);

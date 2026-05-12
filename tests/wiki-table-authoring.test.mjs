@@ -32,11 +32,15 @@ installJsdomGlobals();
 const [
   tableContextModule,
   tableDomModule,
-  tableViewModule
+  tableViewModule,
+  tableCommandsModule,
+  toolbarSchemaModule
 ] = await Promise.all([
   import("../tiptap/src/table/table-context.mjs"),
   import("../tiptap/src/table/table-dom.mjs"),
-  import("../tiptap/src/table/table-view.mjs")
+  import("../tiptap/src/table/table-view.mjs"),
+  import("../tiptap/src/table/table-commands.mjs"),
+  import("../tiptap/src/toolbar/toolbar-schema.mjs")
 ]);
 
 const { deriveTableContext } = tableContextModule;
@@ -54,6 +58,16 @@ const {
   positionContextPanel
 } = tableDomModule;
 const { WestgateTableView, applyTableNodeAttributesToView } = tableViewModule;
+const {
+  TABLE_COMMANDS,
+  TABLE_COMMAND_IDS,
+  TABLE_STICKY_COMMAND_IDS,
+  TABLE_CELL_POPOVER_COMMAND_IDS,
+  getTableCommand,
+  isTableCommandEnabled,
+  executeTableCommand
+} = tableCommandsModule;
+const { TABLE_CONTEXT_BUTTON_IDS } = toolbarSchemaModule;
 
 function createTableEditor(content) {
   const mount = document.createElement("div");
@@ -83,6 +97,13 @@ function findCellPositions(editor) {
     }
   });
   return positions;
+}
+
+function getCellStyles(editor) {
+  return findCellPositions(editor).map(function (pos) {
+    const node = editor.state.doc.nodeAt(pos);
+    return node && node.attrs ? node.attrs.style || "" : "";
+  });
 }
 
 function createSelectionEditorStub(selectionNode) {
@@ -271,6 +292,42 @@ await test("getSelectionElement tolerates missing editor selection DOM", functio
   assert.equal(getSelectionElement({ view: { domAtPos: function () { return {}; } }, state: { selection: { from: 1 } } }), null);
 });
 
+await test("table command registry exposes structural and cell formatting placements", function () {
+  const expectedStickyIds = [
+    "table-properties",
+    "table-add-row-before",
+    "table-add-row-after",
+    "table-delete-row",
+    "table-add-column-before",
+    "table-add-column-after",
+    "table-delete-column",
+    "table-merge-cells",
+    "table-split-cell",
+    "table-toggle-header-row",
+    "table-toggle-header-column",
+    "table-delete"
+  ];
+  const expectedCellIds = [
+    "table-cell-background",
+    "table-cell-text-color",
+    "table-cell-align-left",
+    "table-cell-align-center",
+    "table-cell-align-right",
+    "table-cell-clear-formatting"
+  ];
+
+  assert.deepEqual(TABLE_STICKY_COMMAND_IDS, expectedStickyIds);
+  assert.deepEqual(TABLE_CELL_POPOVER_COMMAND_IDS, expectedCellIds);
+  assert.deepEqual(TABLE_CONTEXT_BUTTON_IDS, TABLE_STICKY_COMMAND_IDS);
+  assert.deepEqual(TABLE_COMMAND_IDS, expectedStickyIds.concat(expectedCellIds));
+  assert.equal(TABLE_COMMANDS.every(function (command) {
+    return TABLE_COMMAND_IDS.includes(command.id) && command.label && command.scope && command.placement;
+  }), true);
+  assert.equal(getTableCommand("table-cell-background").placement, "cell-popover");
+  assert.equal(getTableCommand("table-add-row-before").placement, "sticky");
+  assert.equal(getTableCommand("missing-command"), null);
+});
+
 await test("deriveTableContext reports active table and active cell for a cursor in a table", function () {
   const editor = createTableEditor("<table><tbody><tr><td><p>Alpha</p></td><td><p>Beta</p></td></tr></tbody></table>");
   editor.commands.setTextSelection(5);
@@ -345,5 +402,52 @@ await test("deriveTableContext reports every selected cell in a CellSelection", 
   assert.equal(context.isActive, true);
   assert.equal(context.selectedCellCount, 4);
   assert.deepEqual(context.selectedCellPositions.map(function (entry) { return entry.pos; }), positions);
+  editor.destroy();
+});
+
+await test("selected-cell background command applies to every selected cell", function () {
+  const editor = createTableEditor("<table><tbody><tr><td><p>A1</p></td><td><p>B1</p></td></tr><tr><td><p>A2</p></td><td><p>B2</p></td></tr></tbody></table>");
+  const positions = findCellPositions(editor);
+  editor.view.dispatch(editor.state.tr.setSelection(CellSelection.create(editor.state.doc, positions[0], positions[3])));
+  const context = deriveTableContext(editor, editor.view.dom);
+  let dispatchCount = 0;
+  const originalDispatch = editor.view.dispatch.bind(editor.view);
+  editor.view.dispatch = function (transaction) {
+    dispatchCount += 1;
+    originalDispatch(transaction);
+  };
+
+  assert.equal(isTableCommandEnabled(editor, context, "table-cell-background"), true);
+  assert.equal(executeTableCommand(editor, context, "table-cell-background", { color: "#3b0764" }), true);
+
+  assert.equal(dispatchCount, 1);
+  assert.deepEqual(getCellStyles(editor), [
+    "background-color: rgb(59, 7, 100); color: rgb(249, 250, 251)",
+    "background-color: rgb(59, 7, 100); color: rgb(249, 250, 251)",
+    "background-color: rgb(59, 7, 100); color: rgb(249, 250, 251)",
+    "background-color: rgb(59, 7, 100); color: rgb(249, 250, 251)"
+  ]);
+  editor.destroy();
+});
+
+await test("selected-cell clear formatting removes supported cell styles", function () {
+  const editor = createTableEditor("<table><tbody><tr><td style=\"background-color: rgb(254, 240, 138); color: rgb(17, 24, 39); text-align: center; width: 40%;\"><p>A1</p></td><td style=\"background-color: rgb(59, 7, 100); color: rgb(249, 250, 251); text-align: right; border-color: red;\"><p>B1</p></td></tr></tbody></table>");
+  const positions = findCellPositions(editor);
+  editor.view.dispatch(editor.state.tr.setSelection(CellSelection.create(editor.state.doc, positions[0], positions[1])));
+  const context = deriveTableContext(editor, editor.view.dom);
+  let dispatchCount = 0;
+  const originalDispatch = editor.view.dispatch.bind(editor.view);
+  editor.view.dispatch = function (transaction) {
+    dispatchCount += 1;
+    originalDispatch(transaction);
+  };
+
+  assert.equal(executeTableCommand(editor, context, "table-cell-clear-formatting"), true);
+
+  assert.equal(dispatchCount, 1);
+  assert.deepEqual(getCellStyles(editor), [
+    "width: 40%",
+    "border-color: red"
+  ]);
   editor.destroy();
 });

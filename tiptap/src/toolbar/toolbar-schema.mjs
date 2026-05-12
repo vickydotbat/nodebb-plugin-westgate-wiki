@@ -1,3 +1,11 @@
+export {
+  TABLE_COMMANDS,
+  TABLE_COMMAND_IDS,
+  TABLE_STICKY_COMMAND_IDS,
+  TABLE_CELL_POPOVER_COMMAND_IDS
+} from "../table/table-commands.mjs";
+import { TABLE_STICKY_COMMAND_IDS } from "../table/table-commands.mjs";
+
 export const TOP_TOOLBAR_GROUPS = [
   {
     id: "history",
@@ -62,21 +70,7 @@ export const IMAGE_CONTEXT_BUTTON_IDS = [
   "image-convert-figure"
 ];
 
-export const TABLE_CONTEXT_BUTTON_IDS = [
-  "table-properties",
-  "table-add-row-before",
-  "table-add-row-after",
-  "table-delete-row",
-  "table-add-column-before",
-  "table-add-column-after",
-  "table-delete-column",
-  "table-merge-cells",
-  "table-split-cell",
-  "table-toggle-header-row",
-  "table-toggle-header-column",
-  "dnd-alignment-table-edit",
-  "table-delete"
-];
+export const TABLE_CONTEXT_BUTTON_IDS = TABLE_STICKY_COMMAND_IDS;
 
 export function isImageContextButton(id) {
   return IMAGE_CONTEXT_BUTTON_IDS.includes(id);
