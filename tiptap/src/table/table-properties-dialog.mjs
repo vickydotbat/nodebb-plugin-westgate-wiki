@@ -1,11 +1,11 @@
+import { TableMap } from "@tiptap/pm/tables";
+
 import {
   getActiveTableRowElement,
   getStyleValue,
   getTableNodePosition,
   setClassToken,
-  setStyleValue,
-  updateNodeAttributesAtPos,
-  updateNodeStyleAtPos
+  setStyleValue
 } from "./table-dom.mjs";
 
 function createDialogField(labelText, input) {
@@ -18,50 +18,46 @@ function createDialogField(labelText, input) {
   return label;
 }
 
-function getTableColumnCellPositions(editor, table, columnIndex) {
-  if (!table || columnIndex < 0) {
+function getTableColumnCellPositions(editor, context) {
+  const tablePos = context && context.activeTablePos;
+  const tableNode = Number.isFinite(tablePos) && editor && editor.state ? editor.state.doc.nodeAt(tablePos) : null;
+  const columnIndex = context && context.selectedColumnIndexes && context.selectedColumnIndexes.length
+    ? context.selectedColumnIndexes[0]
+    : -1;
+  if (!tableNode || !Number.isInteger(columnIndex) || columnIndex < 0) {
     return [];
   }
 
-  return Array.from(table.rows || []).map(function (row) {
-    const cell = row.cells && row.cells[columnIndex] ? row.cells[columnIndex] : null;
-    if (!cell) {
-      return null;
-    }
+  const tableMap = TableMap.get(tableNode);
+  if (columnIndex >= tableMap.width) {
+    return [];
+  }
 
-    const pos = getTableNodePosition(editor, cell);
-    return pos == null ? null : {
-      pos,
-      fallbackStyle: cell.getAttribute("style") || ""
-    };
-  }).filter(Boolean);
+  const seen = new Set();
+  const positions = [];
+  for (let rowIndex = 0; rowIndex < tableMap.height; rowIndex += 1) {
+    const relativeCellPos = tableMap.map[(rowIndex * tableMap.width) + columnIndex];
+    const pos = tablePos + 1 + relativeCellPos;
+    if (seen.has(pos)) {
+      continue;
+    }
+    seen.add(pos);
+    positions.push({ pos });
+  }
+  return positions;
 }
 
-function applyStyleToTableColumnCells(editor, cellPositions, propertyName, value) {
-  if (!editor || !editor.state || !editor.view || !cellPositions.length) {
+function setNodeAttrsOnTransaction(tr, editor, pos, attrs) {
+  const node = editor.state.doc.nodeAt(pos);
+  if (!node) {
     return false;
   }
 
-  let tr = editor.state.tr;
-  let changed = false;
-  cellPositions.forEach(function ({ pos, fallbackStyle }) {
-    const node = editor.state.doc.nodeAt(pos);
-    if (!node) {
-      return;
-    }
-
-    const style = setStyleValue(node.attrs.style || fallbackStyle || "", propertyName, value);
-    tr = tr.setNodeMarkup(pos, undefined, {
-      ...node.attrs,
-      style: style || null
-    }, node.marks);
-    changed = true;
-  });
-
-  if (changed) {
-    editor.view.dispatch(tr.scrollIntoView());
-  }
-  return changed;
+  tr.setNodeMarkup(pos, undefined, {
+    ...node.attrs,
+    ...attrs
+  }, node.marks);
+  return true;
 }
 
 export function applyActiveTableProperties(editor, context, values) {
@@ -77,8 +73,9 @@ export function applyActiveTableProperties(editor, context, values) {
     return false;
   }
 
-  const activeCell = context.activeCellElement;
-  const columnCellPositions = activeCell ? getTableColumnCellPositions(editor, table, activeCell.cellIndex) : [];
+  let tr = editor.state.tr;
+  let changed = false;
+  const columnCellPositions = getTableColumnCellPositions(editor, context);
   const activeRow = getActiveTableRowElement(editor, table);
   const rowPos = activeRow ? getTableNodePosition(editor, activeRow) : null;
   const rowFallbackStyle = activeRow ? activeRow.getAttribute("style") || "" : "";
@@ -95,19 +92,31 @@ export function applyActiveTableProperties(editor, context, values) {
   className = setClassToken(className, "wiki-table-layout-auto", values.layout === "auto");
   className = setClassToken(className, "wiki-table-layout-fixed", values.layout !== "auto");
 
-  updateNodeAttributesAtPos(editor, tablePos, {
+  changed = setNodeAttrsOnTransaction(tr, editor, tablePos, {
     class: className || null,
     style: style || null
-  });
+  }) || changed;
 
   if (values.columnWidth) {
-    applyStyleToTableColumnCells(editor, columnCellPositions, "width", values.columnWidth);
+    columnCellPositions.forEach(function ({ pos }) {
+      const node = editor.state.doc.nodeAt(pos);
+      if (!node) {
+        return;
+      }
+
+      const cellStyle = setStyleValue(node.attrs.style || "", "width", values.columnWidth);
+      changed = setNodeAttrsOnTransaction(tr, editor, pos, { style: cellStyle || null }) || changed;
+    });
   }
 
   if (values.rowHeight && rowPos != null) {
-    updateNodeStyleAtPos(editor, rowPos, rowFallbackStyle, function (rowStyle) {
-      return setStyleValue(rowStyle, "height", values.rowHeight);
-    });
+    const rowNode = editor.state.doc.nodeAt(rowPos);
+    const rowStyle = setStyleValue(rowNode && rowNode.attrs.style || rowFallbackStyle, "height", values.rowHeight);
+    changed = setNodeAttrsOnTransaction(tr, editor, rowPos, { style: rowStyle || null }) || changed;
+  }
+
+  if (changed) {
+    editor.view.dispatch(tr.scrollIntoView());
   }
 
   return true;

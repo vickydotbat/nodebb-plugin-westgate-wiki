@@ -482,6 +482,12 @@ await test("applyActiveTableProperties preserves table width, layout, borders, c
   const positions = findCellPositions(editor);
   editor.commands.setTextSelection(positions[0] + 2);
   const context = deriveTableContext(editor, editor.view.dom);
+  let dispatchCount = 0;
+  const originalDispatch = editor.view.dispatch.bind(editor.view);
+  editor.view.dispatch = function (transaction) {
+    dispatchCount += 1;
+    originalDispatch(transaction);
+  };
 
   assert.equal(applyActiveTableProperties(editor, context, {
     tableWidth: "50%",
@@ -492,12 +498,39 @@ await test("applyActiveTableProperties preserves table width, layout, borders, c
     borderMode: "hidden"
   }), true);
 
+  assert.equal(dispatchCount, 1);
   const html = editor.getHTML();
   assert.match(html, /<table[^>]*class="[^"]*\bwiki-table-borderless\b[^"]*\bwiki-table-layout-auto\b[^"]*"/);
   assert.match(html, /<table[^>]*style="[^"]*\bwidth:\s*50%/);
   assert.match(html, /<table[^>]*style="[^"]*\bborder-color:\s*rgb\(202,\s*165,\s*90\)/);
   assert.match(html, /<tr[^>]*style="[^"]*\bheight:\s*3rem;?[^"]*"/);
   assert.match(html, /<td[^>]*style="[^"]*\bwidth:\s*12rem;?[^"]*"/);
+  editor.destroy();
+});
+
+await test("applyActiveTableProperties applies column width to logical column through colspans", function () {
+  const editor = createTableEditor("<table><tbody><tr><td colspan=\"2\"><p>A</p></td><td><p>B</p></td></tr><tr><td><p>C</p></td><td><p>D</p></td><td><p>E</p></td></tr></tbody></table>");
+  const positions = findCellPositions(editor);
+  editor.commands.setTextSelection(positions[1] + 2);
+  const context = deriveTableContext(editor, editor.view.dom);
+
+  assert.deepEqual(context.selectedColumnIndexes, [2]);
+  assert.equal(applyActiveTableProperties(editor, context, {
+    tableWidth: "",
+    columnWidth: "12rem",
+    rowHeight: "",
+    borderColor: "",
+    layout: "fixed",
+    borderMode: "visible"
+  }), true);
+
+  assert.deepEqual(getCellStyles(editor), [
+    "",
+    "width: 12rem",
+    "",
+    "",
+    "width: 12rem"
+  ]);
   editor.destroy();
 });
 
@@ -513,4 +546,9 @@ await test("table-properties command opens the table properties dialog", functio
   assert.equal(dialog && dialog.getAttribute("aria-label"), "Table properties");
   document.querySelector(".wiki-editor-entity-dialog-shell").remove();
   editor.destroy();
+
+  const outsideEditor = createTableEditor("<p>Outside</p>");
+  outsideEditor.commands.setTextSelection(2);
+  assert.equal(executeTableCommand(outsideEditor, deriveTableContext(outsideEditor, outsideEditor.view.dom), "table-properties"), false);
+  outsideEditor.destroy();
 });

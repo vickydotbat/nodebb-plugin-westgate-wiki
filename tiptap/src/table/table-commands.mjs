@@ -193,8 +193,7 @@ export function executeTableCommand(editor, context, id, payload) {
   }
 
   if (id === "table-properties") {
-    openTablePropertiesDialog({ editor, context });
-    return true;
+    return openTablePropertiesDialog({ editor, context });
   }
 
   if (isCellFormattingCommand(id)) {
