@@ -66,8 +66,24 @@ export function selectClickedImageNode(editor, target, editorMount) {
   return editor.chain().focus().setNodeSelection(selectionPos).run();
 }
 
+function isEffectivelyEmptyMediaCell(cellElement) {
+  if (!cellElement) {
+    return false;
+  }
+
+  if (String(cellElement.textContent || "").trim()) {
+    return false;
+  }
+
+  return !cellElement.querySelector("img, figure, table, ul, ol, blockquote, pre, h1, h2, h3, h4, hr");
+}
+
 export function focusMediaCell(editor, cellElement) {
   if (!editor || !cellElement) {
+    return false;
+  }
+
+  if (!isEffectivelyEmptyMediaCell(cellElement)) {
     return false;
   }
 

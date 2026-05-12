@@ -79,7 +79,7 @@ const { IMAGE_CONTEXT_BUTTON_IDS, TABLE_CELL_POPOVER_COMMAND_IDS, TABLE_CONTEXT_
 const { buildHeadingToc, navigateToHeading } = editorTocModule;
 const { installEditorLinkNavigationGuard, selectEditorLink } = linkInteractionsModule;
 const { calculateResizedImageWidth, getSelectedImageElement, setSelectedImageWidth } = imageResizeModule;
-const { selectClickedImageNode } = mediaSelectionModule;
+const { focusMediaCell, selectClickedImageNode } = mediaSelectionModule;
 const {
   detectUnsupportedContent,
   getNormalizationNotice,
@@ -735,6 +735,29 @@ await test("mediaRow two-up html round-trips without containerBlock wrappers man
 
   firstOpen.destroy();
   reopened.destroy();
+});
+
+await test("populated media cell chrome clicks do not force the cursor to the cell start", function () {
+  const editor = createEditor('<div class="wiki-media-row"><div class="wiki-media-cell"><p>First cell text</p></div><div class="wiki-media-cell"><p>Second cell text</p></div></div><p>After</p>');
+  const firstCell = editor.view.dom.querySelector('[data-wiki-node="media-cell"]');
+
+  editor.commands.setTextSelection(editor.state.doc.content.size);
+  const initialSelection = editor.state.selection.from;
+
+  assert.equal(focusMediaCell(editor, firstCell), false);
+  assert.equal(editor.state.selection.from, initialSelection);
+  editor.destroy();
+});
+
+await test("empty media cell chrome clicks still provide a caret fallback", function () {
+  const editor = createEditor('<div class="wiki-media-row"><div class="wiki-media-cell"><p></p></div><div class="wiki-media-cell"><p>Second cell text</p></div></div><p>After</p>');
+  const firstCell = editor.view.dom.querySelector('[data-wiki-node="media-cell"]');
+
+  editor.commands.setTextSelection(editor.state.doc.content.size);
+
+  assert.equal(focusMediaCell(editor, firstCell), true);
+  assert(editor.state.selection.from < editor.state.doc.content.size);
+  editor.destroy();
 });
 
 await test("wiki link mark stores regular links as inert spans in the editor contract", function () {
