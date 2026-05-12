@@ -1,5 +1,13 @@
 import assert from "node:assert/strict";
 
+import { Editor } from "@tiptap/core";
+import StarterKit from "@tiptap/starter-kit";
+import { Table } from "@tiptap/extension-table";
+import { TableCell } from "@tiptap/extension-table-cell";
+import { TableHeader } from "@tiptap/extension-table-header";
+import { TableRow } from "@tiptap/extension-table-row";
+import { CellSelection } from "@tiptap/pm/tables";
+
 import { installJsdomGlobals } from "./helpers/jsdom-setup.mjs";
 
 function test(name, fn) {
@@ -21,13 +29,16 @@ function test(name, fn) {
 installJsdomGlobals();
 
 const [
+  tableContextModule,
   tableDomModule,
   tableViewModule
 ] = await Promise.all([
+  import("../tiptap/src/table/table-context.mjs"),
   import("../tiptap/src/table/table-dom.mjs"),
   import("../tiptap/src/table/table-view.mjs")
 ]);
 
+const { deriveTableContext } = tableContextModule;
 const {
   getSelectionElement,
   getActiveTableElement,
@@ -42,6 +53,35 @@ const {
   positionContextPanel
 } = tableDomModule;
 const { WestgateTableView, applyTableNodeAttributesToView } = tableViewModule;
+
+function createTableEditor(content) {
+  const mount = document.createElement("div");
+  document.body.appendChild(mount);
+  return new Editor({
+    element: mount,
+    extensions: [
+      StarterKit.configure({
+        codeBlock: false,
+        link: false
+      }),
+      Table,
+      TableRow,
+      TableHeader,
+      TableCell
+    ],
+    content
+  });
+}
+
+function findCellPositions(editor) {
+  const positions = [];
+  editor.state.doc.descendants(function (node, pos) {
+    if (node.type.name === "tableCell" || node.type.name === "tableHeader") {
+      positions.push(pos);
+    }
+  });
+  return positions;
+}
 
 function createSelectionEditorStub(selectionNode) {
   return {
@@ -227,4 +267,32 @@ await test("table view exports preserve table class and style attributes", funct
 
 await test("getSelectionElement tolerates missing editor selection DOM", function () {
   assert.equal(getSelectionElement({ view: { domAtPos: function () { return {}; } }, state: { selection: { from: 1 } } }), null);
+});
+
+await test("deriveTableContext reports active table and active cell for a cursor in a table", function () {
+  const editor = createTableEditor("<table><tbody><tr><td><p>Alpha</p></td><td><p>Beta</p></td></tr></tbody></table>");
+  editor.commands.setTextSelection(5);
+
+  const context = deriveTableContext(editor, editor.view.dom);
+
+  assert.equal(context.isActive, true);
+  assert.equal(context.selectedCellCount, 1);
+  assert.equal(context.selectedCellPositions.length, 1);
+  assert.equal(context.activeTableElement.tagName, "TABLE");
+  assert.equal(context.activeCellElement.tagName, "TD");
+  editor.destroy();
+});
+
+await test("deriveTableContext reports every selected cell in a CellSelection", function () {
+  const editor = createTableEditor("<table><tbody><tr><td><p>A1</p></td><td><p>B1</p></td></tr><tr><td><p>A2</p></td><td><p>B2</p></td></tr></tbody></table>");
+  const positions = findCellPositions(editor);
+  const selection = CellSelection.create(editor.state.doc, positions[0], positions[3]);
+  editor.view.dispatch(editor.state.tr.setSelection(selection));
+
+  const context = deriveTableContext(editor, editor.view.dom);
+
+  assert.equal(context.isActive, true);
+  assert.equal(context.selectedCellCount, 4);
+  assert.deepEqual(context.selectedCellPositions.map(function (entry) { return entry.pos; }), positions);
+  editor.destroy();
 });
