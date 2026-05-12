@@ -35,6 +35,7 @@ const [
   tableViewModule,
   tableCommandsModule,
   tablePropertiesDialogModule,
+  tableAuthoringUiModule,
   toolbarSchemaModule
 ] = await Promise.all([
   import("../tiptap/src/table/table-context.mjs"),
@@ -42,6 +43,7 @@ const [
   import("../tiptap/src/table/table-view.mjs"),
   import("../tiptap/src/table/table-commands.mjs"),
   import("../tiptap/src/table/table-properties-dialog.mjs"),
+  import("../tiptap/src/table/table-authoring-ui.mjs"),
   import("../tiptap/src/toolbar/toolbar-schema.mjs")
 ]);
 
@@ -70,6 +72,7 @@ const {
   executeTableCommand
 } = tableCommandsModule;
 const { applyActiveTableProperties } = tablePropertiesDialogModule;
+const { createTableAuthoring } = tableAuthoringUiModule;
 const { TABLE_CONTEXT_BUTTON_IDS } = toolbarSchemaModule;
 
 function createTableEditor(content) {
@@ -551,4 +554,37 @@ await test("table-properties command opens the table properties dialog", functio
   outsideEditor.commands.setTextSelection(2);
   assert.equal(executeTableCommand(outsideEditor, deriveTableContext(outsideEditor, outsideEditor.view.dom), "table-properties"), false);
   outsideEditor.destroy();
+});
+
+await test("createTableAuthoring installs sticky table row and cell popover surfaces", function () {
+  const editor = createTableEditor("<table><tbody><tr><td><p>A1</p></td><td><p>B1</p></td></tr></tbody></table>");
+  const surface = editor.view.dom;
+  const authoring = createTableAuthoring(surface, editor);
+
+  editor.commands.setTextSelection(5);
+  editor.view.dispatch(editor.state.tr.scrollIntoView());
+
+  const sticky = surface.querySelector(".wiki-editor-table-sticky-row");
+  const popover = surface.querySelector(".wiki-editor-table-cell-popover");
+  assert(sticky, "sticky table row should be installed");
+  assert(popover, "cell popover should be installed");
+  assert.equal(sticky.getAttribute("role"), "toolbar");
+  assert.equal(sticky.getAttribute("aria-label"), "Table tools");
+  assert.equal(popover.getAttribute("role"), "toolbar");
+  assert.equal(popover.getAttribute("aria-label"), "Selected cell formatting");
+  assert.equal(sticky.hidden, false);
+  assert.equal(popover.hidden, false);
+  assert(sticky.querySelector("[data-table-command-id='table-properties'][aria-label='Table properties']"));
+  const backgroundInput = popover.querySelector("[data-table-command-id='table-cell-background'] input[type='color'][aria-label='Cell background']");
+  assert(backgroundInput);
+  assert(popover.querySelector("[data-table-command-id='table-cell-text-color'] input[type='color'][aria-label='Cell text color']"));
+
+  backgroundInput.value = "#dbeafe";
+  backgroundInput.dispatchEvent(new window.Event("input", { bubbles: true }));
+  assert.match(editor.getHTML(), /<td[^>]*style="[^"]*\bbackground-color:\s*rgb\(219,\s*234,\s*254\)/);
+
+  authoring.destroy();
+  assert.equal(surface.querySelector(".wiki-editor-table-sticky-row"), null);
+  assert.equal(surface.querySelector(".wiki-editor-table-cell-popover"), null);
+  editor.destroy();
 });
