@@ -238,7 +238,6 @@ export function createTableAuthoring(surface, editor) {
 
   let currentContext = deriveTableContext(editor, surface);
   let destroyed = false;
-  const originalDispatch = editor && editor.view && editor.view.dispatch;
 
   function ensureInstalled() {
     if (stickyRow.parentNode !== surface || stickyRow !== surface.firstElementChild) {
@@ -422,12 +421,6 @@ export function createTableAuthoring(surface, editor) {
       editor.on(eventName, update);
     }
   });
-  if (editor && editor.view && typeof originalDispatch === "function") {
-    editor.view.dispatch = function (transaction) {
-      originalDispatch.call(editor.view, transaction);
-      update();
-    };
-  }
   window.addEventListener("resize", update);
   surface.addEventListener("scroll", update);
 
@@ -442,9 +435,6 @@ export function createTableAuthoring(surface, editor) {
           editor.off(eventName, update);
         }
       });
-      if (editor && editor.view && editor.view.dispatch !== originalDispatch && typeof originalDispatch === "function") {
-        editor.view.dispatch = originalDispatch;
-      }
       window.removeEventListener("resize", update);
       surface.removeEventListener("scroll", update);
       stickyRow.remove();

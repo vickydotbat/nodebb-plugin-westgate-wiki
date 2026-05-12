@@ -98,6 +98,14 @@ function createTableEditor(content) {
   });
 }
 
+function createEditorShell(editor) {
+  const shell = document.createElement("div");
+  shell.className = "wiki-editor__surface";
+  document.body.appendChild(shell);
+  shell.appendChild(editor.view.dom);
+  return shell;
+}
+
 function findCellPositions(editor) {
   const positions = [];
   editor.state.doc.descendants(function (node, pos) {
@@ -561,16 +569,20 @@ await test("table-properties command opens the table properties dialog", functio
 
 await test("createTableAuthoring installs sticky table row and cell popover surfaces", function () {
   const editor = createTableEditor("<table><tbody><tr><td><p>A1</p></td><td><p>B1</p></td></tr></tbody></table>");
-  const surface = editor.view.dom;
-  const authoring = createTableAuthoring(surface, editor);
+  const shell = createEditorShell(editor);
+  const originalDispatch = editor.view.dispatch;
+  const authoring = createTableAuthoring(shell, editor);
 
   editor.commands.setTextSelection(5);
   editor.view.dispatch(editor.state.tr.scrollIntoView());
 
-  const sticky = surface.querySelector(".wiki-editor-table-sticky-row");
-  const popover = surface.querySelector(".wiki-editor-table-cell-popover");
+  const sticky = shell.querySelector(".wiki-editor-table-sticky-row");
+  const popover = shell.querySelector(".wiki-editor-table-cell-popover");
   assert(sticky, "sticky table row should be installed");
   assert(popover, "cell popover should be installed");
+  assert.equal(editor.view.dom.querySelector(".wiki-editor-table-sticky-row"), null);
+  assert.equal(editor.view.dom.querySelector(".wiki-editor-table-cell-popover"), null);
+  assert.equal(editor.view.dispatch, originalDispatch);
   assert.equal(sticky.getAttribute("role"), "toolbar");
   assert.equal(sticky.getAttribute("aria-label"), "Table tools");
   assert.equal(popover.getAttribute("role"), "toolbar");
@@ -587,14 +599,19 @@ await test("createTableAuthoring installs sticky table row and cell popover surf
   assert.match(editor.getHTML(), /<td[^>]*style="[^"]*\bbackground-color:\s*rgb\(219,\s*234,\s*254\)/);
 
   authoring.destroy();
-  assert.equal(surface.querySelector(".wiki-editor-table-sticky-row"), null);
-  assert.equal(surface.querySelector(".wiki-editor-table-cell-popover"), null);
+  assert.equal(shell.querySelector(".wiki-editor-table-sticky-row"), null);
+  assert.equal(shell.querySelector(".wiki-editor-table-cell-popover"), null);
+  assert.equal(editor.view.dispatch, originalDispatch);
   editor.destroy();
+  shell.remove();
 });
 
 await test("table authoring sticky row uses the sticky CSS contract", function () {
   const stickyRule = wikiEditorCss.match(/\.westgate-wiki-compose\s+\.wiki-editor-table-sticky-row\s*\{[^}]+\}/);
+  const surfaceRule = wikiEditorCss.match(/\.westgate-wiki-compose\s+\.wiki-editor__surface\s*\{[^}]+\}/);
 
+  assert(surfaceRule, "editor surface CSS rule should exist");
+  assert.match(surfaceRule[0], /\bposition:\s*relative;/);
   assert(stickyRule, "sticky row CSS rule should exist");
   assert.match(stickyRule[0], /\bposition:\s*sticky;/);
   assert.match(stickyRule[0], /\btop:\s*calc\(var\(--wiki-compose-toolbar-sticky-top,\s*0\.75rem\)\s*\+\s*var\(--wiki-editor-main-toolbar-height,\s*3\.25rem\)\);/);
