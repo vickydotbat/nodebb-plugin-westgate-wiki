@@ -1205,6 +1205,31 @@ await test("wikiCallout parses and renders safe callout HTML", function () {
   editor.destroy();
 });
 
+await test("wikiCallout unwraps nested callouts when loading saved HTML", function () {
+  const editor = createEditor('<aside class="wiki-callout wiki-callout--warning" data-callout-type="warning"><p>Outer before.</p><aside class="wiki-callout wiki-callout--info" data-callout-type="info"><p>Nested content.</p></aside><p>Outer after.</p></aside>');
+  const rendered = editor.getHTML();
+
+  assert.equal((rendered.match(/class="wiki-callout/g) || []).length, 1);
+  assert.match(rendered, /<p>Outer before\.<\/p>/);
+  assert.match(rendered, /<p>Nested content\.<\/p>/);
+  assert.match(rendered, /<p>Outer after\.<\/p>/);
+  assert.doesNotMatch(rendered, /wiki-callout--info/);
+  editor.destroy();
+});
+
+await test("wikiCallout unwraps callouts inserted inside an existing callout", function () {
+  const editor = createEditor('<aside class="wiki-callout wiki-callout--warning" data-callout-type="warning"><p>Outer text.</p></aside>');
+
+  editor.commands.setTextSelection(7);
+  editor.commands.insertContent('<aside class="wiki-callout wiki-callout--info" data-callout-type="info"><p>Pasted callout.</p></aside>');
+  const rendered = editor.getHTML();
+
+  assert.equal((rendered.match(/class="wiki-callout/g) || []).length, 1);
+  assert.match(rendered, /<p>Pasted callout\.<\/p>/);
+  assert.doesNotMatch(rendered, /wiki-callout--info/);
+  editor.destroy();
+});
+
 await test("wikiCallout insert command creates a warning callout", function () {
   const editor = createEditor("<p>Start</p>");
 
