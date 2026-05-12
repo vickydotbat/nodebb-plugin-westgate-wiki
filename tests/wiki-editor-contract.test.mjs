@@ -277,6 +277,35 @@ await test("editor image resize handles are scoped and draggable from the corner
   });
 });
 
+await test("editor image mousedown selection preserves native drag start", function () {
+  const sourceMousedownHandler = editorBundleSource.match(/mousedown:\s*function\s*\([^)]*\)\s*\{([\s\S]*?)\n\s*\},\n\s*click:/);
+  const vendoredMousedownHandler = vendoredEditorBundleSource.match(/mousedown:function\([^)]*\)\{([\s\S]*?)\},click:function/);
+
+  assert.ok(sourceMousedownHandler, "source editor bundle should expose a mousedown DOM handler before the click handler");
+  assert.match(
+    sourceMousedownHandler[1],
+    /selectClickedImageNode\(editor,\s*target,\s*editorMount\)[\s\S]*return\s+false;/,
+    "image mousedown should select the node but return false so ProseMirror/native drag can continue"
+  );
+  assert.doesNotMatch(
+    sourceMousedownHandler[1],
+    /event\.preventDefault\(\)/,
+    "image mousedown must not prevent default because that cancels drag-to-reposition"
+  );
+
+  assert.ok(vendoredMousedownHandler, "vendored editor bundle should expose a mousedown DOM handler before the click handler");
+  assert.match(
+    vendoredMousedownHandler[1],
+    /Fm\(E,\s*q,\s*g\),!1/,
+    "vendored image mousedown should select the node but return false so ProseMirror/native drag can continue"
+  );
+  assert.doesNotMatch(
+    vendoredMousedownHandler[1],
+    /preventDefault/,
+    "vendored image mousedown must not prevent default because that cancels drag-to-reposition"
+  );
+});
+
 await test("editor toolbar group labels stay visually subdued", function () {
   [editorCss, vendoredEditorCss].forEach(function (css) {
     assert.match(css, /\.wiki-editor-toolbar__group-label\s*{[^}]*font-size:\s*(?:0)?\.62rem/);
