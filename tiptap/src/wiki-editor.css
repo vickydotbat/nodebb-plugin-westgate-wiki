@@ -793,6 +793,10 @@
   position: relative;
 }
 
+.westgate-wiki-compose .wiki-editor__content :where(td, th) > p {
+  margin: 0;
+}
+
 .westgate-wiki-compose .wiki-editor__content .column-resize-handle {
   position: absolute;
   top: 0;

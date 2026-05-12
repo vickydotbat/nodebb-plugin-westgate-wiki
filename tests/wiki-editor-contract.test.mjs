@@ -402,6 +402,13 @@ await test("table cell block backgrounds keep their paired foreground color", fu
   editor.destroy();
 });
 
+await test("table cell paragraphs have no margins in article and editor prose", function () {
+  assert.match(articleBodyCss, /\.wiki-article-prose\s+:where\(td,\s*th\)\s*>\s*p\s*\{[^}]*margin:\s*0/s);
+  [editorCss, vendoredEditorCss].forEach(function (css) {
+    assert.match(css, /\.westgate-wiki-compose\s+\.wiki-editor__content\s+:where\(td,\s*th\)\s*>\s*p\s*\{[^}]*margin:\s*0/s);
+  });
+});
+
 await test("table styles preserve flexible size and border controls", function () {
   const editor = createEditor('<table><tbody><tr><td><p>Flexible</p></td></tr></tbody></table>');
 
