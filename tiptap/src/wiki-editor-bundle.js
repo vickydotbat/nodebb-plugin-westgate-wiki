@@ -3002,9 +3002,7 @@ export async function createWikiEditor(element, options) {
         mousedown: function (_view, event) {
           const target = event.target;
           if (selectClickedImageNode(editor, target, editorMount)) {
-            event.preventDefault();
-            event.stopPropagation();
-            return true;
+            return false;
           }
           return false;
         },

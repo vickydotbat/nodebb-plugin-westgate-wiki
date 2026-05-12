@@ -1,4 +1,6 @@
 import { mergeAttributes, Node } from "@tiptap/core";
+import { DOMParser } from "@tiptap/pm/model";
+import { Plugin, PluginKey } from "@tiptap/pm/state";
 
 const CALLOUT_TYPES = new Set(["info", "warning", "danger", "success", "note"]);
 
@@ -15,6 +17,82 @@ function getCalloutTitle(element) {
 
   const firstStrong = element.querySelector(":scope > p:first-child > strong:first-child");
   return firstStrong ? firstStrong.textContent.trim() : "";
+}
+
+function appendCalloutContentWithoutNestedCallouts(target, node) {
+  if (node.nodeType === 3) {
+    target.appendChild(node.cloneNode(true));
+    return;
+  }
+
+  if (node.nodeType !== 1) {
+    return;
+  }
+
+  const element = node;
+  if (element.matches("aside.wiki-callout")) {
+    Array.from(element.childNodes).forEach(function (child) {
+      appendCalloutContentWithoutNestedCallouts(target, child);
+    });
+    return;
+  }
+
+  const clone = element.cloneNode(false);
+  Array.from(element.childNodes).forEach(function (child) {
+    appendCalloutContentWithoutNestedCallouts(clone, child);
+  });
+  target.appendChild(clone);
+}
+
+function parseCalloutContentWithoutNestedCallouts(element, schema) {
+  const container = element.ownerDocument.createElement("div");
+  Array.from(element.childNodes).forEach(function (child) {
+    appendCalloutContentWithoutNestedCallouts(container, child);
+  });
+  return DOMParser.fromSchema(schema).parseSlice(container).content;
+}
+
+function collectNestedCalloutRanges(doc, typeName) {
+  const ranges = [];
+
+  function visit(node, pos, insideCallout) {
+    node.forEach(function (child, offset) {
+      const childPos = pos + offset + 1;
+      const isCallout = child.type.name === typeName;
+      if (isCallout && insideCallout) {
+        ranges.push({
+          from: childPos,
+          to: childPos + child.nodeSize,
+          content: child.content
+        });
+      }
+      visit(child, childPos, insideCallout || isCallout);
+    });
+  }
+
+  visit(doc, -1, false);
+  return ranges;
+}
+
+function unwrapNestedCallouts(state, dispatch, typeName) {
+  const ranges = collectNestedCalloutRanges(state.doc, typeName);
+  if (!ranges.length) {
+    return false;
+  }
+
+  if (dispatch) {
+    const tr = state.tr;
+    ranges
+      .sort(function (a, b) {
+        return b.from - a.from;
+      })
+      .forEach(function (range) {
+        tr.replaceWith(range.from, range.to, range.content);
+      });
+    dispatch(tr);
+  }
+
+  return true;
 }
 
 const WikiCallout = Node.create({
@@ -41,8 +119,14 @@ const WikiCallout = Node.create({
   },
   parseHTML() {
     return [
-      { tag: "aside.wiki-callout" }
+      {
+        tag: "aside.wiki-callout",
+        getContent: parseCalloutContentWithoutNestedCallouts
+      }
     ];
+  },
+  onCreate() {
+    unwrapNestedCallouts(this.editor.state, this.editor.view.dispatch, this.name);
   },
   renderHTML({ HTMLAttributes }) {
     const type = normalizeCalloutType(HTMLAttributes.type);
@@ -124,6 +208,33 @@ const WikiCallout = Node.create({
         return false;
       }
     };
+  },
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        key: new PluginKey("wikiCalloutNoNestedCallouts"),
+        appendTransaction: (transactions, oldState, newState) => {
+          if (!transactions.some(function (transaction) { return transaction.docChanged; })) {
+            return null;
+          }
+
+          const ranges = collectNestedCalloutRanges(newState.doc, this.name);
+          if (!ranges.length) {
+            return null;
+          }
+
+          const tr = newState.tr;
+          ranges
+            .sort(function (a, b) {
+              return b.from - a.from;
+            })
+            .forEach(function (range) {
+              tr.replaceWith(range.from, range.to, range.content);
+            });
+          return tr;
+        }
+      })
+    ];
   }
 });
 

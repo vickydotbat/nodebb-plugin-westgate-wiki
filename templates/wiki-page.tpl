@@ -187,6 +187,16 @@
           <i class="fa fa-fw fa-level-down" aria-hidden="true"></i>
         </button>
         <!-- ENDIF canMakeWikiSubpage -->
+        <!-- IF rootNamespaceCanCreatePage -->
+        <a class="wiki-fab-btn wiki-fab-btn--icon" href="#" data-wiki-create-page="1" data-cid="{rootNamespaceCid}" title="Create a new wiki page in the root namespace" aria-label="Create a new wiki page in the root namespace">
+          <i class="fa fa-fw fa-file-text" aria-hidden="true"></i>
+        </a>
+        <!-- ENDIF rootNamespaceCanCreatePage -->
+        <!-- IF rootNamespaceCanCreateWikiNamespaces -->
+        <a class="wiki-fab-btn wiki-fab-btn--icon" href="{config.relative_path}/wiki/namespace/create/{rootNamespaceCid}" title="Create a child wiki namespace under the root namespace" aria-label="Create a child wiki namespace under the root namespace">
+          <i class="fa fa-fw fa-folder-open" aria-hidden="true"></i>
+        </a>
+        <!-- ENDIF rootNamespaceCanCreateWikiNamespaces -->
         <!-- IF canWatchWikiArticle -->
         <button type="button" class="wiki-fab-btn wiki-fab-btn--icon<!-- IF wikiArticleWatched --> active<!-- ENDIF wikiArticleWatched -->" data-wiki-article-watch="1" data-tid="{topic.tid}" data-watching="<!-- IF wikiArticleWatched -->1<!-- ELSE -->0<!-- ENDIF wikiArticleWatched -->" title="<!-- IF wikiArticleWatched -->Stop watching wiki article edits<!-- ELSE -->Watch wiki article edits<!-- ENDIF wikiArticleWatched -->" aria-label="<!-- IF wikiArticleWatched -->Stop watching wiki article edits<!-- ELSE -->Watch wiki article edits<!-- ENDIF wikiArticleWatched -->" aria-pressed="<!-- IF wikiArticleWatched -->true<!-- ELSE -->false<!-- ENDIF wikiArticleWatched -->">
           <i class="fa fa-fw <!-- IF wikiArticleWatched -->fa-eye<!-- ELSE -->fa-eye-slash<!-- ENDIF wikiArticleWatched -->" aria-hidden="true"></i>

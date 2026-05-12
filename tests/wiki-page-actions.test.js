@@ -50,6 +50,16 @@ assert.deepStrictEqual(
 );
 
 const template = fs.readFileSync(path.join(root, "templates/wiki-page.tpl"), "utf8");
+const routes = fs.readFileSync(path.join(root, "routes/wiki.js"), "utf8");
+
+assert(
+  /rootNamespaceCanCreatePage:[\s\S]*rootNamespace/.test(routes),
+  "homepage render data should expose root namespace page creation permissions"
+);
+assert(
+  /rootNamespaceCanCreateWikiNamespaces:[\s\S]*rootNamespace/.test(routes),
+  "homepage render data should expose root namespace creation permissions"
+);
 assert(
   template.includes("data-wiki-move-page"),
   "article FAB should expose a Move Page action"
@@ -73,6 +83,14 @@ assert(
 assert(
   /<!-- IF canMakeWikiSubpage -->[\s\S]*data-wiki-make-subpage[\s\S]*<!-- ENDIF canMakeWikiSubpage -->/.test(template),
   "Make Subpage action should be permission-gated"
+);
+assert(
+  /<!-- IF rootNamespaceCanCreatePage -->[\s\S]*data-wiki-create-page[\s\S]*data-cid="{rootNamespaceCid}"[\s\S]*<!-- ENDIF rootNamespaceCanCreatePage -->/.test(template),
+  "homepage FAB should expose root namespace page creation when allowed"
+);
+assert(
+  /<!-- IF rootNamespaceCanCreateWikiNamespaces -->[\s\S]*\/wiki\/namespace\/create\/{rootNamespaceCid}[\s\S]*<!-- ENDIF rootNamespaceCanCreateWikiNamespaces -->/.test(template),
+  "homepage FAB should expose root namespace creation when allowed"
 );
 
 const client = fs.readFileSync(path.join(root, "public/wiki.js"), "utf8");

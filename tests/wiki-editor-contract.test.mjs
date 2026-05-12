@@ -79,7 +79,7 @@ const { IMAGE_CONTEXT_BUTTON_IDS, TABLE_CELL_POPOVER_COMMAND_IDS, TABLE_CONTEXT_
 const { buildHeadingToc, navigateToHeading } = editorTocModule;
 const { installEditorLinkNavigationGuard, selectEditorLink } = linkInteractionsModule;
 const { calculateResizedImageWidth, getSelectedImageElement, setSelectedImageWidth } = imageResizeModule;
-const { selectClickedImageNode } = mediaSelectionModule;
+const { focusMediaCell, selectClickedImageNode } = mediaSelectionModule;
 const {
   detectUnsupportedContent,
   getNormalizationNotice,
@@ -275,6 +275,35 @@ await test("editor image resize handles are scoped and draggable from the corner
     assert.match(css, /\.wiki-editor--resizing-image\s*{[^}]*user-select:\s*none/);
     assert.match(css, /figure\.image \.wiki-image-figure__media\s*{[^}]*cursor:\s*pointer;[^}]*user-select:\s*none/);
   });
+});
+
+await test("editor image mousedown selection preserves native drag start", function () {
+  const sourceMousedownHandler = editorBundleSource.match(/mousedown:\s*function\s*\([^)]*\)\s*\{([\s\S]*?)\n\s*\},\n\s*click:/);
+  const vendoredMousedownHandler = vendoredEditorBundleSource.match(/mousedown:function\([^)]*\)\{([\s\S]*?)\},click:function/);
+
+  assert.ok(sourceMousedownHandler, "source editor bundle should expose a mousedown DOM handler before the click handler");
+  assert.match(
+    sourceMousedownHandler[1],
+    /selectClickedImageNode\(editor,\s*target,\s*editorMount\)[\s\S]*return\s+false;/,
+    "image mousedown should select the node but return false so ProseMirror/native drag can continue"
+  );
+  assert.doesNotMatch(
+    sourceMousedownHandler[1],
+    /event\.preventDefault\(\)/,
+    "image mousedown must not prevent default because that cancels drag-to-reposition"
+  );
+
+  assert.ok(vendoredMousedownHandler, "vendored editor bundle should expose a mousedown DOM handler before the click handler");
+  assert.match(
+    vendoredMousedownHandler[1],
+    /Fm\(E,\s*q,\s*g\),!1/,
+    "vendored image mousedown should select the node but return false so ProseMirror/native drag can continue"
+  );
+  assert.doesNotMatch(
+    vendoredMousedownHandler[1],
+    /preventDefault/,
+    "vendored image mousedown must not prevent default because that cancels drag-to-reposition"
+  );
 });
 
 await test("editor toolbar group labels stay visually subdued", function () {
@@ -735,6 +764,29 @@ await test("mediaRow two-up html round-trips without containerBlock wrappers man
 
   firstOpen.destroy();
   reopened.destroy();
+});
+
+await test("populated media cell chrome clicks do not force the cursor to the cell start", function () {
+  const editor = createEditor('<div class="wiki-media-row"><div class="wiki-media-cell"><p>First cell text</p></div><div class="wiki-media-cell"><p>Second cell text</p></div></div><p>After</p>');
+  const firstCell = editor.view.dom.querySelector('[data-wiki-node="media-cell"]');
+
+  editor.commands.setTextSelection(editor.state.doc.content.size);
+  const initialSelection = editor.state.selection.from;
+
+  assert.equal(focusMediaCell(editor, firstCell), false);
+  assert.equal(editor.state.selection.from, initialSelection);
+  editor.destroy();
+});
+
+await test("empty media cell chrome clicks still provide a caret fallback", function () {
+  const editor = createEditor('<div class="wiki-media-row"><div class="wiki-media-cell"><p></p></div><div class="wiki-media-cell"><p>Second cell text</p></div></div><p>After</p>');
+  const firstCell = editor.view.dom.querySelector('[data-wiki-node="media-cell"]');
+
+  editor.commands.setTextSelection(editor.state.doc.content.size);
+
+  assert.equal(focusMediaCell(editor, firstCell), true);
+  assert(editor.state.selection.from < editor.state.doc.content.size);
+  editor.destroy();
 });
 
 await test("wiki link mark stores regular links as inert spans in the editor contract", function () {
@@ -1202,6 +1254,31 @@ await test("wikiCallout parses and renders safe callout HTML", function () {
   assert.match(rendered, /<aside class="wiki-callout wiki-callout--warning" data-callout-type="warning" data-callout-title="Compatibility">/);
   assert.match(rendered, /<p><strong>Compatibility<\/strong><\/p>/);
   assert.match(rendered, /<p>Test custom CSS\.<\/p>/);
+  editor.destroy();
+});
+
+await test("wikiCallout unwraps nested callouts when loading saved HTML", function () {
+  const editor = createEditor('<aside class="wiki-callout wiki-callout--warning" data-callout-type="warning"><p>Outer before.</p><aside class="wiki-callout wiki-callout--info" data-callout-type="info"><p>Nested content.</p></aside><p>Outer after.</p></aside>');
+  const rendered = editor.getHTML();
+
+  assert.equal((rendered.match(/class="wiki-callout/g) || []).length, 1);
+  assert.match(rendered, /<p>Outer before\.<\/p>/);
+  assert.match(rendered, /<p>Nested content\.<\/p>/);
+  assert.match(rendered, /<p>Outer after\.<\/p>/);
+  assert.doesNotMatch(rendered, /wiki-callout--info/);
+  editor.destroy();
+});
+
+await test("wikiCallout unwraps callouts inserted inside an existing callout", function () {
+  const editor = createEditor('<aside class="wiki-callout wiki-callout--warning" data-callout-type="warning"><p>Outer text.</p></aside>');
+
+  editor.commands.setTextSelection(7);
+  editor.commands.insertContent('<aside class="wiki-callout wiki-callout--info" data-callout-type="info"><p>Pasted callout.</p></aside>');
+  const rendered = editor.getHTML();
+
+  assert.equal((rendered.match(/class="wiki-callout/g) || []).length, 1);
+  assert.match(rendered, /<p>Pasted callout\.<\/p>/);
+  assert.doesNotMatch(rendered, /wiki-callout--info/);
   editor.destroy();
 });
 

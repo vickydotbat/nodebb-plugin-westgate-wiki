@@ -134,6 +134,32 @@ async function getWikiFallbackContext(uid) {
   };
 }
 
+async function getRouteRootNamespaceActions(uid, canCreateWikiNamespaces) {
+  const rootNamespace = await wikiPaths.resolveRouteRootNamespace();
+  if (rootNamespace.status !== "ok") {
+    return {
+      rootNamespaceCid: "",
+      rootNamespaceCanCreatePage: false,
+      rootNamespaceCanCreateWikiNamespaces: false
+    };
+  }
+
+  const wikiSection = await wikiService.getSection(rootNamespace.cid, uid);
+  if (wikiSection.status !== "ok") {
+    return {
+      rootNamespaceCid: "",
+      rootNamespaceCanCreatePage: false,
+      rootNamespaceCanCreateWikiNamespaces: false
+    };
+  }
+
+  return {
+    rootNamespaceCid: wikiSection.section.cid,
+    rootNamespaceCanCreatePage: !!wikiSection.section.privileges.canCreatePage,
+    rootNamespaceCanCreateWikiNamespaces: !!canCreateWikiNamespaces
+  };
+}
+
 function register(params) {
   const { router, middleware } = params;
 
@@ -205,9 +231,11 @@ function register(params) {
 
       if (wikiPage.status === "ok") {
         const canCreateWikiNamespaces = await wikiNamespaceCreators.getCanCreateWikiNamespaces(req.uid);
+        const rootNamespaceActions = await getRouteRootNamespaceActions(req.uid, canCreateWikiNamespaces);
         const homePageData = {
           ...buildWikiPageRenderData(wikiPage, { isWikiHome: true }),
-          canCreateWikiNamespaces
+          canCreateWikiNamespaces,
+          ...rootNamespaceActions
         };
         return res.render("wiki-page", homePageData);
       }
