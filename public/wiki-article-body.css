@@ -431,6 +431,10 @@
   padding: 0.5rem 0.65rem;
 }
 
+.wiki-article-prose :where(td, th) > p {
+  margin: 0;
+}
+
 .wiki-article-prose table[style*="border-color"] :where(th, td) {
   border-color: inherit;
 }

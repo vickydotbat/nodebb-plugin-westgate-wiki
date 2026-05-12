@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
 
 import { installJsdomGlobals } from "./helpers/jsdom-setup.mjs";
 
@@ -75,7 +75,7 @@ const WikiCodeBlock = WikiCodeBlockModule.default;
 const WikiBlockBackground = WikiBlockBackgroundModule.default;
 const WikiLink = WikiLinkModule.default;
 const { WikiFootnote, WikiNamespaceLink, WikiPageLink, WikiUserMention } = WikiEntitiesModule;
-const { IMAGE_CONTEXT_BUTTON_IDS, TABLE_CONTEXT_BUTTON_IDS, TOP_TOOLBAR_BUTTON_IDS, TOP_TOOLBAR_GROUPS } = toolbarSchemaModule;
+const { IMAGE_CONTEXT_BUTTON_IDS, TABLE_CELL_POPOVER_COMMAND_IDS, TABLE_CONTEXT_BUTTON_IDS, TABLE_STICKY_COMMAND_IDS, TOP_TOOLBAR_BUTTON_IDS, TOP_TOOLBAR_GROUPS } = toolbarSchemaModule;
 const { buildHeadingToc, navigateToHeading } = editorTocModule;
 const { installEditorLinkNavigationGuard, selectEditorLink } = linkInteractionsModule;
 const { calculateResizedImageWidth, getSelectedImageElement, setSelectedImageWidth } = imageResizeModule;
@@ -94,6 +94,21 @@ const editorCss = readFileSync(new URL("../tiptap/src/wiki-editor.css", import.m
 const vendoredEditorCss = readFileSync(new URL("../public/vendor/tiptap/wiki-tiptap.css", import.meta.url), "utf8");
 const editorBundleSource = readFileSync(new URL("../tiptap/src/wiki-editor-bundle.js", import.meta.url), "utf8");
 const vendoredEditorBundleSource = readFileSync(new URL("../public/vendor/tiptap/wiki-tiptap.bundle.js", import.meta.url), "utf8");
+
+let editorBundleContractImportCount = 0;
+
+async function importEditorBundleForContract() {
+  editorBundleContractImportCount += 1;
+  const moduleUrl = new URL(`../tiptap/src/.wiki-editor-bundle-contract-${process.pid}-${editorBundleContractImportCount}.mjs`, import.meta.url);
+  const source = editorBundleSource
+    .replace(/import\s+["']\.\/wiki-editor\.css["'];\s*/, "");
+  writeFileSync(moduleUrl, source);
+  try {
+    return await import(`${moduleUrl.href}?contract=${editorBundleContractImportCount}`);
+  } finally {
+    rmSync(moduleUrl, { force: true });
+  }
+}
 
 function createEditor(content) {
   const mount = document.createElement("div");
@@ -387,6 +402,13 @@ await test("table cell block backgrounds keep their paired foreground color", fu
   editor.destroy();
 });
 
+await test("table cell paragraphs have no margins in article and editor prose", function () {
+  assert.match(articleBodyCss, /\.wiki-article-prose\s+:where\(td,\s*th\)\s*>\s*p\s*\{[^}]*margin:\s*0/s);
+  [editorCss, vendoredEditorCss].forEach(function (css) {
+    assert.match(css, /\.westgate-wiki-compose\s+\.wiki-editor__content\s+:where\(td,\s*th\)\s*>\s*p\s*\{[^}]*margin:\s*0/s);
+  });
+});
+
 await test("table styles preserve flexible size and border controls", function () {
   const editor = createEditor('<table><tbody><tr><td><p>Flexible</p></td></tr></tbody></table>');
 
@@ -414,15 +436,59 @@ await test("table styles preserve flexible size and border controls", function (
     assert.match(css, /\.westgate-wiki-compose\s+\.wiki-editor-table-resize-handle--width\s*\{[^}]*cursor:\s*ew-resize/s);
     assert.match(css, /\.westgate-wiki-compose\s+\.wiki-editor-table-resize-handle--row\s*\{[^}]*cursor:\s*ns-resize/s);
   });
-  assert.match(editorBundleSource, /applyStyleToTableColumnCells/);
-  assert.match(editorBundleSource, /updateTableElementAttributes/);
-  assert.match(editorBundleSource, /class\s+WestgateTableView\s+extends\s+TableView/);
-  assert.match(editorBundleSource, /applyTableNodeAttributesToView\(this\.table,\s*node\.attrs\)/);
+  assert.match(editorBundleSource, /import\s+\{\s*createTableAuthoring\s*\}\s+from\s+["']\.\/table\/table-authoring-ui\.mjs["']/);
+  assert.match(editorBundleSource, /import\s+\{\s*WestgateTableView\s*\}\s+from\s+["']\.\/table\/table-view\.mjs["']/);
   assert.match(editorBundleSource, /View:\s*WestgateTableView/);
-  assert.match(editorBundleSource, /createTableDimensionHandles/);
-  assert.match(editorBundleSource, /Resize table width/);
-  assert.match(editorBundleSource, /Resize row \$\{index \+ 1\} height/);
+  assert.match(editorBundleSource, /createTableAuthoring\(editorMount,\s*editor\)/);
+  assert.doesNotMatch(editorBundleSource, /function\s+getTableToolDefs/);
+  assert.doesNotMatch(editorBundleSource, /function\s+createTableContextToolbar/);
+  assert.doesNotMatch(editorBundleSource, /function\s+createTableDimensionHandles/);
   editor.destroy();
+});
+
+await test("createWikiEditor mounts table authoring UI on the editor surface and cleans it up", async function () {
+  const { createWikiEditor } = await importEditorBundleForContract();
+  const host = document.createElement("div");
+  host.className = "westgate-wiki-compose";
+  document.body.appendChild(host);
+
+  const wikiEditor = await createWikiEditor(host, {
+    initialData: '<table><tbody><tr><td><p>Cell</p></td></tr></tbody></table>'
+  });
+
+  const surface = host.querySelector(".wiki-editor__surface");
+  const content = host.querySelector(".wiki-editor__content.ProseMirror, .wiki-editor__content");
+  const editorRoot = host.querySelector(".wiki-editor");
+  const toolbarMount = host.querySelector(".wiki-editor__toolbar-mount");
+  const stickyRow = surface && surface.querySelector(".wiki-editor-table-sticky-row");
+  const cellPopover = surface && surface.querySelector(".wiki-editor-table-cell-popover");
+
+  assert.ok(editorRoot, "editor root should exist");
+  assert.ok(toolbarMount, "toolbar mount should exist");
+  assert.ok(surface, "editor surface should exist");
+  assert.ok(content, "ProseMirror content should exist");
+  assert.ok(stickyRow, "table sticky row should mount under the editor surface");
+  assert.ok(cellPopover, "table cell popover should mount under the editor surface");
+  assert.equal(content.contains(stickyRow), false, "table sticky row must not mount inside ProseMirror content");
+  assert.equal(content.contains(cellPopover), false, "table cell popover must not mount inside ProseMirror content");
+
+  toolbarMount.getBoundingClientRect = function () {
+    return { left: 0, top: 0, width: 640, height: 96, right: 640, bottom: 96 };
+  };
+  window.dispatchEvent(new Event("resize"));
+  assert.equal(editorRoot.style.getPropertyValue("--wiki-editor-main-toolbar-height"), "96px");
+
+  toolbarMount.getBoundingClientRect = function () {
+    return { left: 0, top: 0, width: 640, height: 124, right: 640, bottom: 124 };
+  };
+  editorRoot.dispatchEvent(new CustomEvent("wiki-editor-fullscreen-source-change"));
+  assert.equal(editorRoot.style.getPropertyValue("--wiki-editor-main-toolbar-height"), "124px");
+
+  wikiEditor.destroy();
+  assert.equal(host.querySelector(".wiki-editor-table-sticky-row"), null);
+  assert.equal(host.querySelector(".wiki-editor-table-cell-popover"), null);
+  assert.equal(editorRoot.style.getPropertyValue("--wiki-editor-main-toolbar-height"), "");
+  host.remove();
 });
 
 await test("alignment table node renders selected DnD alignments as a dedicated grid", function () {
@@ -635,7 +701,7 @@ await test("image figure selection is handled on mousedown before ProseMirror cl
 });
 
 await test("image toolbar sync does not reference table-only state", function () {
-  const match = editorBundleSource.match(/function createImageContextToolbar\(surface, editor\) \{[\s\S]*?\nfunction getTableToolDefs/);
+  const match = editorBundleSource.match(/function createImageContextToolbar\(surface, editor\) \{[\s\S]*?\nfunction getSelectionElement/);
   assert.ok(match, "image context toolbar source should be present");
   assert.doesNotMatch(match[0], /activeTable\s*=\s*table/);
 });
@@ -1559,26 +1625,14 @@ await test("fullscreen source mode css supports resize and source hiding", funct
 });
 
 await test("contextual table schema exposes row, column, cell merge, and delete tools", function () {
-  assert.deepEqual(TABLE_CONTEXT_BUTTON_IDS, [
-    "table-properties",
-    "table-add-row-before",
-    "table-add-row-after",
-    "table-delete-row",
-    "table-add-column-before",
-    "table-add-column-after",
-    "table-delete-column",
-    "table-merge-cells",
-    "table-split-cell",
-    "table-toggle-header-row",
-    "table-toggle-header-column",
-    "dnd-alignment-table-edit",
-    "table-delete"
-  ]);
-  assert.match(editorBundleSource, /openTablePropertiesDialog\(\{ editor, table \}\)/);
+  assert.deepEqual(TABLE_CONTEXT_BUTTON_IDS, TABLE_STICKY_COMMAND_IDS);
+  assert.ok(TABLE_CELL_POPOVER_COMMAND_IDS.includes("table-cell-background"));
+  assert.match(editorBundleSource, /createTableAuthoring\(editorMount,\s*editor\)/);
   assert.match(editorBundleSource, /openAlignmentTableDialog\(\{ editor \}\)/);
-  assert.match(editorBundleSource, /wiki-editor-context-tools__group/);
   assert.match(editorCss, /\.wiki-editor-context-tools__group\s*\{/);
   assert.match(vendoredEditorCss, /\.wiki-editor-context-tools__group\s*\{/);
+  assert.match(editorCss, /\.westgate-wiki-compose\s+\.wiki-editor-table-sticky-row\s*\{/);
+  assert.match(editorCss, /\.westgate-wiki-compose\s+\.wiki-editor-table-cell-popover__color\s*\{/);
 });
 
 await test("buildHeadingToc nests smaller headings under the nearest larger heading", function () {
