@@ -75,7 +75,7 @@ const WikiCodeBlock = WikiCodeBlockModule.default;
 const WikiBlockBackground = WikiBlockBackgroundModule.default;
 const WikiLink = WikiLinkModule.default;
 const { WikiFootnote, WikiNamespaceLink, WikiPageLink, WikiUserMention } = WikiEntitiesModule;
-const { IMAGE_CONTEXT_BUTTON_IDS, TABLE_CONTEXT_BUTTON_IDS, TABLE_STICKY_COMMAND_IDS, TOP_TOOLBAR_BUTTON_IDS, TOP_TOOLBAR_GROUPS } = toolbarSchemaModule;
+const { IMAGE_CONTEXT_BUTTON_IDS, TABLE_CELL_POPOVER_COMMAND_IDS, TABLE_CONTEXT_BUTTON_IDS, TABLE_STICKY_COMMAND_IDS, TOP_TOOLBAR_BUTTON_IDS, TOP_TOOLBAR_GROUPS } = toolbarSchemaModule;
 const { buildHeadingToc, navigateToHeading } = editorTocModule;
 const { installEditorLinkNavigationGuard, selectEditorLink } = linkInteractionsModule;
 const { calculateResizedImageWidth, getSelectedImageElement, setSelectedImageWidth } = imageResizeModule;
@@ -414,14 +414,13 @@ await test("table styles preserve flexible size and border controls", function (
     assert.match(css, /\.westgate-wiki-compose\s+\.wiki-editor-table-resize-handle--width\s*\{[^}]*cursor:\s*ew-resize/s);
     assert.match(css, /\.westgate-wiki-compose\s+\.wiki-editor-table-resize-handle--row\s*\{[^}]*cursor:\s*ns-resize/s);
   });
-  assert.match(editorBundleSource, /applyStyleToTableColumnCells/);
-  assert.match(editorBundleSource, /updateTableElementAttributes/);
-  assert.match(editorBundleSource, /class\s+WestgateTableView\s+extends\s+TableView/);
-  assert.match(editorBundleSource, /applyTableNodeAttributesToView\(this\.table,\s*node\.attrs\)/);
+  assert.match(editorBundleSource, /import\s+\{\s*createTableAuthoring\s*\}\s+from\s+["']\.\/table\/table-authoring-ui\.mjs["']/);
+  assert.match(editorBundleSource, /import\s+\{\s*WestgateTableView\s*\}\s+from\s+["']\.\/table\/table-view\.mjs["']/);
   assert.match(editorBundleSource, /View:\s*WestgateTableView/);
-  assert.match(editorBundleSource, /createTableDimensionHandles/);
-  assert.match(editorBundleSource, /Resize table width/);
-  assert.match(editorBundleSource, /Resize row \$\{index \+ 1\} height/);
+  assert.match(editorBundleSource, /createTableAuthoring\(editorMount,\s*editor\)/);
+  assert.doesNotMatch(editorBundleSource, /function\s+getTableToolDefs/);
+  assert.doesNotMatch(editorBundleSource, /function\s+createTableContextToolbar/);
+  assert.doesNotMatch(editorBundleSource, /function\s+createTableDimensionHandles/);
   editor.destroy();
 });
 
@@ -635,7 +634,7 @@ await test("image figure selection is handled on mousedown before ProseMirror cl
 });
 
 await test("image toolbar sync does not reference table-only state", function () {
-  const match = editorBundleSource.match(/function createImageContextToolbar\(surface, editor\) \{[\s\S]*?\nfunction getTableToolDefs/);
+  const match = editorBundleSource.match(/function createImageContextToolbar\(surface, editor\) \{[\s\S]*?\nfunction getSelectionElement/);
   assert.ok(match, "image context toolbar source should be present");
   assert.doesNotMatch(match[0], /activeTable\s*=\s*table/);
 });
@@ -1560,11 +1559,13 @@ await test("fullscreen source mode css supports resize and source hiding", funct
 
 await test("contextual table schema exposes row, column, cell merge, and delete tools", function () {
   assert.deepEqual(TABLE_CONTEXT_BUTTON_IDS, TABLE_STICKY_COMMAND_IDS);
-  assert.match(editorBundleSource, /openTablePropertiesDialog\(\{ editor, table \}\)/);
+  assert.ok(TABLE_CELL_POPOVER_COMMAND_IDS.includes("table-cell-background"));
+  assert.match(editorBundleSource, /createTableAuthoring\(editorMount,\s*editor\)/);
   assert.match(editorBundleSource, /openAlignmentTableDialog\(\{ editor \}\)/);
-  assert.match(editorBundleSource, /wiki-editor-context-tools__group/);
   assert.match(editorCss, /\.wiki-editor-context-tools__group\s*\{/);
   assert.match(vendoredEditorCss, /\.wiki-editor-context-tools__group\s*\{/);
+  assert.match(editorCss, /\.westgate-wiki-compose\s+\.wiki-editor-table-sticky-row\s*\{/);
+  assert.match(editorCss, /\.westgate-wiki-compose\s+\.wiki-editor-table-cell-popover__color\s*\{/);
 });
 
 await test("buildHeadingToc nests smaller headings under the nearest larger heading", function () {
