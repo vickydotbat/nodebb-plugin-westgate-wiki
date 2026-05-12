@@ -321,8 +321,16 @@ await test("table command registry exposes structural and cell formatting placem
   assert.deepEqual(TABLE_CONTEXT_BUTTON_IDS, TABLE_STICKY_COMMAND_IDS);
   assert.deepEqual(TABLE_COMMAND_IDS, expectedStickyIds.concat(expectedCellIds));
   assert.equal(TABLE_COMMANDS.every(function (command) {
-    return TABLE_COMMAND_IDS.includes(command.id) && command.label && command.scope && command.placement;
+    return TABLE_COMMAND_IDS.includes(command.id) && command.label && command.scope && command.placement && command.icon && command.group;
   }), true);
+  assert.equal(getTableCommand("table-add-row-before").badge, "R+");
+  assert.equal(getTableCommand("table-add-row-after").badge, "+R");
+  assert.equal(getTableCommand("table-delete-row").badge, "R");
+  assert.equal(getTableCommand("table-add-column-before").badge, "C+");
+  assert.equal(getTableCommand("table-add-column-after").badge, "+C");
+  assert.equal(getTableCommand("table-delete-column").badge, "C");
+  assert.equal(getTableCommand("table-toggle-header-row").badge, "R");
+  assert.equal(getTableCommand("table-toggle-header-column").badge, "C");
   assert.equal(getTableCommand("table-cell-background").placement, "cell-popover");
   assert.equal(getTableCommand("table-add-row-before").placement, "sticky");
   assert.equal(getTableCommand("missing-command"), null);
@@ -418,14 +426,28 @@ await test("selected-cell background command applies to every selected cell", fu
   };
 
   assert.equal(isTableCommandEnabled(editor, context, "table-cell-background"), true);
-  assert.equal(executeTableCommand(editor, context, "table-cell-background", { color: "#3b0764" }), true);
+  assert.equal(executeTableCommand(editor, context, "table-cell-background", { value: "#dbeafe" }), true);
 
   assert.equal(dispatchCount, 1);
   assert.deepEqual(getCellStyles(editor), [
-    "background-color: rgb(59, 7, 100); color: rgb(249, 250, 251)",
-    "background-color: rgb(59, 7, 100); color: rgb(249, 250, 251)",
-    "background-color: rgb(59, 7, 100); color: rgb(249, 250, 251)",
-    "background-color: rgb(59, 7, 100); color: rgb(249, 250, 251)"
+    "background-color: rgb(219, 234, 254); color: rgb(17, 24, 39)",
+    "background-color: rgb(219, 234, 254); color: rgb(17, 24, 39)",
+    "background-color: rgb(219, 234, 254); color: rgb(17, 24, 39)",
+    "background-color: rgb(219, 234, 254); color: rgb(17, 24, 39)"
+  ]);
+  editor.destroy();
+});
+
+await test("selected-cell text color command accepts value payload", function () {
+  const editor = createTableEditor("<table><tbody><tr><td><p>A1</p></td><td><p>B1</p></td></tr></tbody></table>");
+  const positions = findCellPositions(editor);
+  editor.view.dispatch(editor.state.tr.setSelection(CellSelection.create(editor.state.doc, positions[0], positions[1])));
+  const context = deriveTableContext(editor, editor.view.dom);
+
+  assert.equal(executeTableCommand(editor, context, "table-cell-text-color", { value: "#3b0764" }), true);
+  assert.deepEqual(getCellStyles(editor), [
+    "color: rgb(59, 7, 100)",
+    "color: rgb(59, 7, 100)"
   ]);
   editor.destroy();
 });

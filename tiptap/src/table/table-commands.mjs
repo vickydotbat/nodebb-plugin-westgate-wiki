@@ -40,24 +40,24 @@ export const TABLE_CELL_POPOVER_COMMAND_IDS = [
 ];
 
 export const TABLE_COMMANDS = [
-  { id: "table-properties", label: "Table properties", scope: "table", placement: "sticky" },
-  { id: "table-add-row-before", label: "Insert row before", scope: "structure", placement: "sticky" },
-  { id: "table-add-row-after", label: "Insert row after", scope: "structure", placement: "sticky" },
-  { id: "table-delete-row", label: "Delete row", scope: "structure", placement: "sticky" },
-  { id: "table-add-column-before", label: "Insert column before", scope: "structure", placement: "sticky" },
-  { id: "table-add-column-after", label: "Insert column after", scope: "structure", placement: "sticky" },
-  { id: "table-delete-column", label: "Delete column", scope: "structure", placement: "sticky" },
-  { id: "table-merge-cells", label: "Merge cells", scope: "structure", placement: "sticky" },
-  { id: "table-split-cell", label: "Split cell", scope: "structure", placement: "sticky" },
-  { id: "table-toggle-header-row", label: "Toggle header row", scope: "structure", placement: "sticky" },
-  { id: "table-toggle-header-column", label: "Toggle header column", scope: "structure", placement: "sticky" },
-  { id: "table-delete", label: "Delete table", scope: "structure", placement: "sticky" },
-  { id: "table-cell-background", label: "Cell background", scope: "cell-formatting", placement: "cell-popover" },
-  { id: "table-cell-text-color", label: "Cell text color", scope: "cell-formatting", placement: "cell-popover" },
-  { id: "table-cell-align-left", label: "Align cell left", scope: "cell-formatting", placement: "cell-popover" },
-  { id: "table-cell-align-center", label: "Align cell center", scope: "cell-formatting", placement: "cell-popover" },
-  { id: "table-cell-align-right", label: "Align cell right", scope: "cell-formatting", placement: "cell-popover" },
-  { id: "table-cell-clear-formatting", label: "Clear cell formatting", scope: "cell-formatting", placement: "cell-popover" }
+  { id: "table-properties", label: "Table properties", scope: "table", placement: "sticky", icon: "fa-sliders", group: "table" },
+  { id: "table-add-row-before", label: "Insert row before", scope: "structure", placement: "sticky", icon: "fa-plus", group: "rows", badge: "R+" },
+  { id: "table-add-row-after", label: "Insert row after", scope: "structure", placement: "sticky", icon: "fa-plus", group: "rows", badge: "+R" },
+  { id: "table-delete-row", label: "Delete row", scope: "structure", placement: "sticky", icon: "fa-minus", group: "rows", badge: "R" },
+  { id: "table-add-column-before", label: "Insert column before", scope: "structure", placement: "sticky", icon: "fa-plus", group: "columns", badge: "C+" },
+  { id: "table-add-column-after", label: "Insert column after", scope: "structure", placement: "sticky", icon: "fa-plus", group: "columns", badge: "+C" },
+  { id: "table-delete-column", label: "Delete column", scope: "structure", placement: "sticky", icon: "fa-minus", group: "columns", badge: "C" },
+  { id: "table-merge-cells", label: "Merge cells", scope: "structure", placement: "sticky", icon: "fa-compress", group: "cells" },
+  { id: "table-split-cell", label: "Split cell", scope: "structure", placement: "sticky", icon: "fa-expand", group: "cells" },
+  { id: "table-toggle-header-row", label: "Toggle header row", scope: "structure", placement: "sticky", icon: "fa-header", group: "headers", badge: "R" },
+  { id: "table-toggle-header-column", label: "Toggle header column", scope: "structure", placement: "sticky", icon: "fa-header", group: "headers", badge: "C" },
+  { id: "table-delete", label: "Delete table", scope: "structure", placement: "sticky", icon: "fa-trash", group: "table" },
+  { id: "table-cell-background", label: "Cell background", scope: "cell-formatting", placement: "cell-popover", icon: "fa-tint", group: "cell-formatting" },
+  { id: "table-cell-text-color", label: "Cell text color", scope: "cell-formatting", placement: "cell-popover", icon: "fa-font", group: "cell-formatting" },
+  { id: "table-cell-align-left", label: "Align cell left", scope: "cell-formatting", placement: "cell-popover", icon: "fa-align-left", group: "cell-alignment" },
+  { id: "table-cell-align-center", label: "Align cell center", scope: "cell-formatting", placement: "cell-popover", icon: "fa-align-center", group: "cell-alignment" },
+  { id: "table-cell-align-right", label: "Align cell right", scope: "cell-formatting", placement: "cell-popover", icon: "fa-align-right", group: "cell-alignment" },
+  { id: "table-cell-clear-formatting", label: "Clear cell formatting", scope: "cell-formatting", placement: "cell-popover", icon: "fa-eraser", group: "cell-formatting" }
 ];
 
 export const TABLE_COMMAND_IDS = TABLE_COMMANDS.map(function (command) {
@@ -69,7 +69,7 @@ function isCellFormattingCommand(id) {
 }
 
 function getPayloadColor(payload) {
-  return String(payload && (payload.color || payload.backgroundColor || payload.textColor) || "").trim();
+  return String(payload && (payload.value || payload.color || payload.backgroundColor || payload.textColor) || "").trim();
 }
 
 function runChainCommand(editor, commandName) {
