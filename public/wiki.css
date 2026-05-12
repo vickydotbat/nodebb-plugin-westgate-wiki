@@ -1111,7 +1111,7 @@
 /* Root ToC list only: do not use :only-of-type — nested <ol> under each <li> is also
    "only ol among siblings" and would lose indent, flattening the hierarchy. */
 [data-wiki-article-toc] > .wiki-article-toc__ol {
-  padding-inline-start: 0;
+  padding-inline-start: 1.2rem;
 }
 
 .wiki-article-toc__ol.wiki-article-toc__ol--nest {
@@ -1127,6 +1127,54 @@
 
 .wiki-article-toc__item {
   margin: 0.2rem 0 0 0;
+}
+
+.wiki-article-toc__row {
+  display: block;
+  min-width: 0;
+  position: relative;
+}
+
+.wiki-article-toc__toggle,
+.wiki-directory-tree-toggle,
+.wiki-editor-toc__toggle {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--wiki-chrome-muted-color, var(--bs-secondary-color, inherit));
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 1.45rem;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+  width: 1.25rem;
+}
+
+.wiki-article-toc__toggle:hover,
+.wiki-article-toc__toggle:focus,
+.wiki-directory-tree-toggle:hover,
+.wiki-directory-tree-toggle:focus {
+  color: var(--wiki-chrome-link-hover-color, var(--bs-link-hover-color, inherit));
+  outline: none;
+}
+
+.wiki-article-toc__toggle i,
+.wiki-directory-tree-toggle i,
+.wiki-editor-toc__toggle i {
+  transition: transform 0.16s ease;
+}
+
+.wiki-article-toc__toggle {
+  inset-block-start: -0.05rem;
+  inset-inline-start: -1.2rem;
+  position: absolute;
+}
+
+.wiki-article-toc__item--collapsed > .wiki-article-toc__row .wiki-article-toc__toggle i,
+.wiki-directory-row--collapsed > .wiki-directory-tree-toggle i,
+.wiki-editor-toc__entry--collapsed > .wiki-editor-toc__row .wiki-editor-toc__toggle i {
+  transform: rotate(-90deg);
 }
 
 .wiki-article-toc__link {
@@ -1237,12 +1285,12 @@
   margin: 0;
   margin-inline-start: 0.45rem;
   padding: 0;
-  padding-inline-start: 0.75rem;
+  padding-inline-start: 1.55rem;
 }
 
 .wiki-sidebar-directory .wiki-sidebar-nav-rows--child-pages .wiki-sidebar-nav-row {
   padding-inline-end: 0.35rem;
-  padding-inline-start: 0.35rem;
+  padding-inline-start: calc(0.35rem + 0.85rem * var(--wiki-nav-depth, 0));
 }
 
 .wiki-sidebar-directory .wiki-sidebar-nav-rows--child-pages .wiki-sidebar-nav-row--page {
@@ -1268,6 +1316,16 @@
   margin-top: 0.45rem;
   padding-inline-start: calc(0.55rem + 0.85rem * var(--wiki-nav-depth, 0));
   padding-inline-end: 0.35rem;
+}
+
+.wiki-sidebar-nav-row--page {
+  position: relative;
+}
+
+.wiki-sidebar-nav-row--page > .wiki-directory-tree-toggle {
+  inset-block-start: -0.05rem;
+  inset-inline-start: calc(0.35rem + 0.85rem * var(--wiki-nav-depth, 0) - 1.05rem);
+  position: absolute;
 }
 
 .wiki-sidebar-nav-row:first-child {
@@ -1547,6 +1605,13 @@
 
 .wiki-index-entry:last-child {
   margin-bottom: 0;
+}
+
+.wiki-index-entry.wiki-directory-row {
+  align-items: flex-start;
+  display: flex;
+  gap: 0.1rem;
+  padding-inline-start: calc(0.85rem * var(--wiki-title-depth, 0));
 }
 
 .wiki-index-entry-main {

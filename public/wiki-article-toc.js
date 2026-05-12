@@ -85,11 +85,15 @@
       li.className = "wiki-article-toc__item";
       li.dataset.wikiTocLevel = String(level);
 
+      const row = document.createElement("div");
+      row.className = "wiki-article-toc__row";
+      li.appendChild(row);
+
       const a = document.createElement("a");
       a.className = "wiki-article-toc__link";
       a.setAttribute("href", "#" + h.id);
       a.textContent = (h.textContent || "").replace(/\s+/g, " ").trim();
-      li.appendChild(a);
+      row.appendChild(a);
       parentList.appendChild(li);
 
       const next = headings[i + 1];
@@ -97,6 +101,22 @@
       if (next && nextLevel > level) {
         const sub = document.createElement("ol");
         sub.className = "wiki-article-toc__ol wiki-article-toc__ol--nest";
+        const toggle = document.createElement("button");
+        toggle.type = "button";
+        toggle.className = "wiki-article-toc__toggle";
+        toggle.setAttribute("aria-expanded", "true");
+        toggle.setAttribute("aria-label", "Collapse " + (a.textContent || "section"));
+        toggle.innerHTML = '<i class="fa fa-fw fa-caret-down" aria-hidden="true"></i>';
+        toggle.addEventListener("click", function (event) {
+          const collapsed = !li.classList.contains("wiki-article-toc__item--collapsed");
+          event.preventDefault();
+          event.stopPropagation();
+          li.classList.toggle("wiki-article-toc__item--collapsed", collapsed);
+          sub.hidden = collapsed;
+          toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+          toggle.setAttribute("aria-label", (collapsed ? "Expand " : "Collapse ") + (a.textContent || "section"));
+        });
+        row.insertBefore(toggle, a);
         li.appendChild(sub);
         stack.push({ list: sub, hLevel: level });
       }

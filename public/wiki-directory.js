@@ -35,6 +35,29 @@
       .replace(/"/g, "&quot;");
   }
 
+  function normalizePathSegment(value) {
+    return String(value || "").trim().toLowerCase();
+  }
+
+  function getPageTitlePath(page) {
+    if (page && Array.isArray(page.titlePath) && page.titlePath.length) {
+      return page.titlePath.map(function (segment) {
+        return String(segment || "").trim();
+      }).filter(Boolean);
+    }
+    var segments = Array.isArray(page && page.parentTitlePathSegments) ?
+      page.parentTitlePathSegments.map(function (segment) {
+        return String(segment && segment.text || "").trim();
+      }).filter(Boolean) :
+      String(page && page.parentTitlePathText || "").split(/\s*::\s*/).filter(Boolean);
+    segments.push(String(page && (page.titleLeaf || page.title) || "").trim());
+    return segments.filter(Boolean);
+  }
+
+  function titlePathAttr(page) {
+    return escapeHtml(JSON.stringify(getPageTitlePath(page)));
+  }
+
   function renderParentPath(page, className) {
     if (!page || !page.hasParentPath) {
       return "";
@@ -63,7 +86,7 @@
     var depth = parseInt(page.titleDepth, 10);
     var depthStyle = Number.isInteger(depth) && depth > 0 ? " style=\"--wiki-title-depth: " + escapeHtml(String(depth)) + ";\"" : "";
     return (
-      "<li class=\"wiki-index-entry wiki-directory-row" + subpageClass + "\"" + depthStyle + ">" +
+      "<li class=\"wiki-index-entry wiki-directory-row" + subpageClass + "\" data-wiki-title-path=\"" + titlePathAttr(page) + "\"" + depthStyle + ">" +
       "<div class=\"wiki-index-entry-main\">" +
       "<a class=\"wiki-index-entry-title\" href=\"" + escapeHtml(rel + (page.wikiPath || "")) + "\">" +
       parent + leaf +
@@ -77,11 +100,113 @@
     var active = page.isActive ? " is-active" : "";
     var tidAttr = page.tid != null ? " data-wiki-nav-tid=\"" + escapeHtml(String(page.tid)) + "\"" : "";
     return (
-      "<li class=\"wiki-sidebar-nav-row wiki-sidebar-nav-row--page" + active + "\"" + tidAttr + ">" +
+      "<li class=\"wiki-sidebar-nav-row wiki-sidebar-nav-row--page" + active + "\"" + tidAttr + " data-wiki-title-path=\"" + titlePathAttr(page) + "\">" +
       "<a class=\"wiki-sidebar-nav-page\" href=\"" + escapeHtml(rel + (page.wikiPath || "")) + "\">" +
       parent + leaf +
       "</a></li>"
     );
+  }
+
+  function getRowTitlePath(row) {
+    var attr = row && row.getAttribute("data-wiki-title-path");
+    if (attr) {
+      try {
+        var parsed = JSON.parse(attr);
+        if (Array.isArray(parsed) && parsed.length) {
+          return parsed.map(normalizePathSegment).filter(Boolean);
+        }
+      } catch (err) {
+        /* infer from rendered title parts below */
+      }
+    }
+
+    var parts = [];
+    Array.prototype.forEach.call(row.querySelectorAll(".wiki-sidebar-parent-path__part, .wiki-topic-parent-path__part"), function (part) {
+      var text = normalizePathSegment(part.textContent);
+      if (text) {
+        parts.push(text);
+      }
+    });
+    var leaf = row.querySelector(".wiki-sidebar-page-title, .wiki-topic-title-leaf");
+    var leafText = normalizePathSegment(leaf && leaf.textContent);
+    if (leafText) {
+      parts.push(leafText);
+    }
+    return parts;
+  }
+
+  function isDescendantPath(path, ancestor) {
+    if (!path || !ancestor || path.length <= ancestor.length) {
+      return false;
+    }
+    for (var i = 0; i < ancestor.length; i += 1) {
+      if (path[i] !== ancestor[i]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function getTreeRows(list) {
+    return Array.prototype.filter.call(list ? list.children : [], function (row) {
+      return row && row.matches && row.matches(".wiki-directory-row, .wiki-sidebar-nav-row--page");
+    });
+  }
+
+  function refreshTreeVisibility(list) {
+    var rows = getTreeRows(list);
+    var collapsedAncestors = [];
+
+    rows.forEach(function (row) {
+      var path = getRowTitlePath(row);
+      collapsedAncestors = collapsedAncestors.filter(function (ancestor) {
+        return isDescendantPath(path, ancestor);
+      });
+      row.hidden = collapsedAncestors.length > 0;
+      if (row.classList.contains("wiki-directory-row--collapsed")) {
+        collapsedAncestors.push(path);
+      }
+    });
+  }
+
+  function addTreeToggle(row, list) {
+    if (row.querySelector(":scope > .wiki-directory-tree-toggle")) {
+      return;
+    }
+    var title = row.querySelector(".wiki-sidebar-page-title, .wiki-topic-title-leaf");
+    var label = (title && title.textContent || "page").replace(/\s+/g, " ").trim();
+    var toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "wiki-directory-tree-toggle";
+    toggle.setAttribute("aria-expanded", "true");
+    toggle.setAttribute("aria-label", "Collapse " + label);
+    toggle.innerHTML = '<i class="fa fa-fw fa-caret-down" aria-hidden="true"></i>';
+    toggle.addEventListener("click", function (event) {
+      var collapsed = !row.classList.contains("wiki-directory-row--collapsed");
+      event.preventDefault();
+      event.stopPropagation();
+      row.classList.toggle("wiki-directory-row--collapsed", collapsed);
+      toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      toggle.setAttribute("aria-label", (collapsed ? "Expand " : "Collapse ") + label);
+      refreshTreeVisibility(list);
+    });
+    row.insertBefore(toggle, row.firstElementChild);
+  }
+
+  function decorateTreeRows(list) {
+    var rows = getTreeRows(list);
+    rows.forEach(function (row, index) {
+      var path = getRowTitlePath(row);
+      row.style.setProperty("--wiki-title-depth", String(Math.max(0, path.length - 1)));
+      row.style.setProperty("--wiki-nav-depth", String(Math.max(0, path.length - 1)));
+      var next = rows[index + 1];
+      var hasChildren = next && isDescendantPath(getRowTitlePath(next), path);
+      row.classList.toggle("wiki-directory-row--has-children", !!hasChildren);
+      if (hasChildren) {
+        addTreeToggle(row, list);
+      }
+    });
+    refreshTreeVisibility(list);
   }
 
   function parseBoolAttr(el, name, fallback) {
@@ -215,6 +340,7 @@
       } else {
         list.insertAdjacentHTML("beforeend", html);
       }
+      decorateTreeRows(list);
     }
 
     function loadMore(isReset) {
@@ -331,6 +457,9 @@
 
     if (navMode) {
       markActiveNav();
+    }
+    if (list) {
+      decorateTreeRows(list);
     }
   }
 

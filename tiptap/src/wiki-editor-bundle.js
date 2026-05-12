@@ -2621,6 +2621,10 @@ function createEditorToc(root, surface, editor) {
       const row = document.createElement("li");
       row.className = `wiki-editor-toc__entry wiki-editor-toc__entry--level-${item.level}`;
 
+      const line = document.createElement("div");
+      line.className = "wiki-editor-toc__row";
+      row.appendChild(line);
+
       const button = document.createElement("button");
       button.type = "button";
       button.className = "wiki-editor-toc__link";
@@ -2637,9 +2641,31 @@ function createEditorToc(root, surface, editor) {
           bubbles: true
         }));
       });
-      row.appendChild(button);
+      line.appendChild(button);
 
       if (item.children && item.children.length) {
+        const toggle = document.createElement("button");
+        toggle.type = "button";
+        toggle.className = "wiki-editor-toc__toggle";
+        toggle.setAttribute("aria-expanded", "true");
+        toggle.setAttribute("aria-label", "Collapse " + (item.text || "heading"));
+        toggle.innerHTML = '<i class="fa fa-fw fa-caret-down" aria-hidden="true"></i>';
+        toggle.addEventListener("mousedown", function (event) {
+          event.preventDefault();
+        });
+        toggle.addEventListener("click", function (event) {
+          const collapsed = !row.classList.contains("wiki-editor-toc__entry--collapsed");
+          event.preventDefault();
+          event.stopPropagation();
+          row.classList.toggle("wiki-editor-toc__entry--collapsed", collapsed);
+          const childList = row.querySelector(":scope > .wiki-editor-toc__entries");
+          if (childList) {
+            childList.hidden = collapsed;
+          }
+          toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+          toggle.setAttribute("aria-label", (collapsed ? "Expand " : "Collapse ") + (item.text || "heading"));
+        });
+        line.insertBefore(toggle, button);
         renderItems(item.children, row);
       }
       list.appendChild(row);
