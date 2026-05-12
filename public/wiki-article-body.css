@@ -435,6 +435,15 @@
   margin: 0;
 }
 
+.wiki-article-prose :where(td, th) :where(img, figure.image) {
+  clear: none !important;
+  display: block;
+  float: none !important;
+  height: auto;
+  margin: 0.25rem auto;
+  max-width: 100%;
+}
+
 .wiki-article-prose table[style*="border-color"] :where(th, td) {
   border-color: inherit;
 }

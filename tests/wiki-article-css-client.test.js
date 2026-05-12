@@ -65,6 +65,11 @@ assert.match(
   /\.wiki-article-prose hr\s*\{[\s\S]*background:\s*var\(\s*--wiki-prose-heading-rule,[\s\S]*var\(--wiki-prose-hr-color,[\s\S]*\);[\s\S]*\}/,
   "article and editor horizontal rules should use the same ornamental rule token as major headings"
 );
+assert.match(
+  articleBodyCss,
+  /\.wiki-article-prose :where\(td, th\) :where\(img, figure\.image\)\s*\{[\s\S]*float:\s*none\s*!important;[\s\S]*height:\s*auto;[\s\S]*margin:\s*0\.25rem auto;[\s\S]*max-width:\s*100%;[\s\S]*\}/,
+  "images inside article tables should stay in normal cell flow instead of floating over adjacent cells"
+);
 
 assert.match(libraryJs, /const wikiArticleCss = require\("\.\/lib\/wiki-article-css"\)/);
 assert.match(libraryJs, /"\/westgate-wiki\/article-css"/);
