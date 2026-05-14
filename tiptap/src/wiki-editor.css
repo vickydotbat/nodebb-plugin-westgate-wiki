@@ -1136,10 +1136,10 @@
 .westgate-wiki-compose .wiki-editor__content .wiki-callout::after {
 content: "";
   position: absolute;
-  top: 1.25rem;
-  left: 1.45rem;
-  width: 3rem;
-  height: 3rem;
+  top: 0.95rem;
+  left: 1.1rem;
+  width: 3.5rem;
+  height: 3.5rem;
   background: rgba(255, 255, 255, 0.94);
   mask: var(--wiki-callout-icon) center / 1.75rem 1.75rem no-repeat;
   -webkit-mask: var(--wiki-callout-icon) center / 2.5rem 2.5rem no-repeat;
