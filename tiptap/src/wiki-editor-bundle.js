@@ -4,7 +4,7 @@ import MarkdownIt from "markdown-it";
 import TurndownService from "turndown";
 import { gfm } from "turndown-plugin-gfm";
 
-import { Editor } from "@tiptap/core";
+import { Editor, getMarkRange } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import CharacterCount from "@tiptap/extension-character-count";
 import Image from "@tiptap/extension-image";
@@ -692,6 +692,182 @@ function openWikiEntityDialog({ editor, type, options, initial, replaceMark }) {
   searchInput.focus();
 }
 
+function closeEditorDialogShells() {
+  document.querySelectorAll(".wiki-editor-entity-dialog-shell, .wiki-editor-link-dialog-shell").forEach(function (shell) {
+    shell.remove();
+  });
+}
+
+function normalizeLinkDialogText(value) {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function getActiveLinkRange(editor) {
+  const markType = editor && editor.state && editor.state.schema && editor.state.schema.marks.link;
+  if (!markType) {
+    return null;
+  }
+  return getMarkRange(editor.state.selection.$from, markType) || null;
+}
+
+function getTextInRange(editor, range) {
+  if (!editor || !range || range.from === range.to) {
+    return "";
+  }
+  return normalizeLinkDialogText(editor.state.doc.textBetween(range.from, range.to, " "));
+}
+
+function getExternalLinkTargetRange(editor) {
+  const selection = editor.state.selection;
+  if (!selection.empty) {
+    return { from: selection.from, to: selection.to };
+  }
+  return getActiveLinkRange(editor) || { from: selection.from, to: selection.to };
+}
+
+export function getExternalLinkDialogState(editor) {
+  const selection = editor.state.selection;
+  const targetRange = !selection.empty ? { from: selection.from, to: selection.to } : getActiveLinkRange(editor);
+
+  return {
+    href: editor.getAttributes("link").href || "",
+    text: getTextInRange(editor, targetRange)
+  };
+}
+
+export function applyExternalLinkEdit(editor, attrs) {
+  const href = String((attrs && attrs.href) || "").trim();
+  if (!href) {
+    return false;
+  }
+
+  const range = getExternalLinkTargetRange(editor);
+  const text = normalizeLinkDialogText(attrs && attrs.text) || href;
+  const currentText = getTextInRange(editor, range);
+  const linkAttrs = {
+    href,
+    target: "_blank",
+    rel: "noopener noreferrer"
+  };
+
+  if (range.from !== range.to && currentText === text) {
+    return editor.chain().focus().setTextSelection(range).setLink(linkAttrs).run();
+  }
+
+  return editor.chain().focus().insertContentAt(range, {
+    type: "text",
+    text,
+    marks: [{ type: "link", attrs: linkAttrs }]
+  }).run();
+}
+
+function openExternalLinkDialog({ editor, onSave } = {}) {
+  closeEditorDialogShells();
+
+  const initial = getExternalLinkDialogState(editor);
+  const shell = document.createElement("div");
+  shell.className = "wiki-editor-entity-dialog-shell wiki-editor-link-dialog-shell";
+
+  const dialog = document.createElement("div");
+  dialog.className = "wiki-editor-entity-dialog wiki-editor-link-dialog";
+  dialog.setAttribute("role", "dialog");
+  dialog.setAttribute("aria-modal", "true");
+  dialog.setAttribute("aria-label", "External link");
+  shell.appendChild(dialog);
+
+  const title = document.createElement("h2");
+  title.className = "wiki-editor-entity-dialog__title";
+  title.textContent = "External link";
+  dialog.appendChild(title);
+
+  const form = document.createElement("form");
+  form.className = "wiki-editor-entity-dialog__form";
+  dialog.appendChild(form);
+
+  function addInput(labelText, input) {
+    const label = document.createElement("label");
+    label.className = "wiki-editor-entity-dialog__label";
+    label.textContent = labelText;
+    label.appendChild(input);
+    form.appendChild(label);
+    return input;
+  }
+
+  const hrefInput = document.createElement("input");
+  hrefInput.className = "form-control form-control-sm";
+  hrefInput.type = "text";
+  hrefInput.inputMode = "url";
+  hrefInput.autocomplete = "off";
+  hrefInput.value = initial.href || "";
+  addInput("Link URL", hrefInput);
+
+  const textInput = document.createElement("input");
+  textInput.className = "form-control form-control-sm";
+  textInput.type = "text";
+  textInput.autocomplete = "off";
+  textInput.value = initial.text || initial.href || "";
+  addInput("Text", textInput);
+
+  const actions = document.createElement("div");
+  actions.className = "wiki-editor-entity-dialog__actions";
+  const saveBtn = document.createElement("button");
+  saveBtn.type = "submit";
+  saveBtn.className = "btn btn-primary btn-sm";
+  saveBtn.textContent = "Save";
+  const cancelBtn = document.createElement("button");
+  cancelBtn.type = "button";
+  cancelBtn.className = "btn btn-link btn-sm";
+  cancelBtn.textContent = "Cancel";
+  actions.appendChild(saveBtn);
+  actions.appendChild(cancelBtn);
+  form.appendChild(actions);
+
+  function closeDialog({ restoreFocus = true } = {}) {
+    shell.remove();
+    document.removeEventListener("keydown", handleDialogKeydown);
+    if (restoreFocus) {
+      editor.commands.focus();
+    }
+  }
+
+  function handleDialogKeydown(event) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeDialog();
+    }
+  }
+
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+    const href = hrefInput.value.trim();
+    if (!href) {
+      closeDialog();
+      return;
+    }
+    if (applyExternalLinkEdit(editor, { href, text: textInput.value })) {
+      closeDialog({ restoreFocus: false });
+      if (typeof onSave === "function") {
+        onSave();
+      }
+    }
+  });
+
+  cancelBtn.addEventListener("click", function () {
+    closeDialog();
+  });
+
+  shell.addEventListener("mousedown", function (event) {
+    if (event.target === shell) {
+      event.preventDefault();
+      closeDialog();
+    }
+  });
+
+  document.addEventListener("keydown", handleDialogKeydown);
+  document.body.appendChild(shell);
+  (initial.href ? textInput : hrefInput).focus();
+}
+
 function createDialogField(labelText, input) {
   const label = document.createElement("label");
   label.className = "wiki-editor-dialog__field";
@@ -1153,16 +1329,7 @@ function createToolbar(root, editor, uploadImage) {
       id: "link",
       title: "Set external link",
       action: function () {
-        const currentHref = editor.getAttributes("link").href || "";
-        const href = window.prompt("Link URL", currentHref || "https://");
-        if (!href) {
-          return;
-        }
-        editor.chain().focus().extendMarkRange("link").setLink({
-          href: href.trim(),
-          target: "_blank",
-          rel: "noopener noreferrer"
-        }).run();
+        openExternalLinkDialog({ editor });
       },
       applyState: function (button) {
         button.classList.toggle("active", editor.isActive("link"));
@@ -2025,17 +2192,12 @@ function createLinkContextToolbar(surface, editor) {
   panel.hidden = true;
 
   function editLink() {
-    const currentHref = editor.getAttributes("link").href || "";
-    const href = window.prompt("Link URL", currentHref || "https://");
-    if (!href) {
-      return;
-    }
-    editor.chain().focus().extendMarkRange("link").setLink({
-      href: href.trim(),
-      target: "_blank",
-      rel: "noopener noreferrer"
-    }).run();
-    panel.hidden = true;
+    openExternalLinkDialog({
+      editor,
+      onSave: function () {
+        panel.hidden = true;
+      }
+    });
   }
 
   function unlink() {
@@ -3096,15 +3258,7 @@ export async function createWikiEditor(element, options) {
             return true;
           }
 
-          const currentHref = editor.getAttributes("link").href || "";
-          const href = window.prompt("Link URL", currentHref || "https://");
-          if (href) {
-            editor.chain().focus().extendMarkRange("link").setLink({
-              href: href.trim(),
-              target: "_blank",
-              rel: "noopener noreferrer"
-            }).run();
-          }
+          openExternalLinkDialog({ editor });
           return true;
         },
         mousedown: function (_view, event) {

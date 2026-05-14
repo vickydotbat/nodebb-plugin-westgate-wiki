@@ -188,6 +188,25 @@ function findNodePositions(editor, typeName) {
   return positions;
 }
 
+function findTextRange(editor, text) {
+  let range = null;
+  editor.state.doc.descendants(function (node, pos) {
+    if (!node.isText || range) {
+      return !range;
+    }
+    const index = node.text.indexOf(text);
+    if (index === -1) {
+      return true;
+    }
+    range = {
+      from: pos + index,
+      to: pos + index + text.length
+    };
+    return false;
+  });
+  return range;
+}
+
 function nextAnimationFrame() {
   return new Promise(function (resolve) {
     requestAnimationFrame(resolve);
@@ -984,6 +1003,87 @@ await test("wiki link mark stores regular links as inert spans in the editor con
   assert.equal(editor.getAttributes("link").href, "https://google.com");
 
   editor.destroy();
+});
+
+await test("wiki link mark does not consume separators typed after existing links", function () {
+  const firstUrl = "https://one.example";
+  const secondUrl = "https://two.example";
+  const editor = createEditor(`<p><a href="${firstUrl}">${firstUrl}</a><a href="${secondUrl}">${secondUrl}</a></p>`);
+  const firstRange = findTextRange(editor, firstUrl);
+
+  assert.ok(firstRange, "expected to find the first link text");
+  editor.commands.setTextSelection(firstRange.to);
+  editor.commands.insertContent(" ");
+
+  const rendered = editor.getHTML();
+  assert.match(rendered, /data-wiki-link-href="https:\/\/one\.example"[^>]*>https:\/\/one\.example<\/span> /);
+  assert.match(rendered, /data-wiki-link-href="https:\/\/two\.example"[^>]*>https:\/\/two\.example<\/span>/);
+  assert.doesNotMatch(rendered, /data-wiki-link-href="https:\/\/one\.example"[^>]*>https:\/\/one\.example /);
+
+  const reopened = createEditor(sanitizeHtml(rendered));
+  const reopenedHtml = reopened.getHTML();
+  assert.equal((reopenedHtml.match(/data-wiki-link-href=/g) || []).length, 2);
+  assert.match(reopenedHtml, /data-wiki-link-href="https:\/\/one\.example"[^>]*>https:\/\/one\.example<\/span> /);
+  assert.match(reopenedHtml, /data-wiki-link-href="https:\/\/two\.example"[^>]*>https:\/\/two\.example<\/span>/);
+
+  editor.destroy();
+  reopened.destroy();
+});
+
+await test("external link dialog state uses selected text as the default link text", async function () {
+  const { getExternalLinkDialogState, applyExternalLinkEdit } = await importEditorBundleForContract();
+  const editor = createEditor("<p>Turn this into a link.</p>");
+  const selectedRange = findTextRange(editor, "Turn this");
+
+  assert.ok(selectedRange, "expected selected text range");
+  editor.commands.setTextSelection(selectedRange);
+
+  assert.deepEqual(getExternalLinkDialogState(editor), {
+    href: "",
+    text: "Turn this"
+  });
+
+  assert.equal(applyExternalLinkEdit(editor, {
+    href: "https://example.com/page",
+    text: "Example page"
+  }), true);
+
+  const rendered = editor.getHTML();
+  assert.match(rendered, /data-wiki-link-href="https:\/\/example\.com\/page"[^>]*>Example page<\/span>/);
+  assert.doesNotMatch(rendered, /Turn this/);
+
+  editor.destroy();
+});
+
+await test("external link dialog state and save can replace existing link text", async function () {
+  const { getExternalLinkDialogState, applyExternalLinkEdit } = await importEditorBundleForContract();
+  const editor = createEditor('<p><a href="https://old.example">Old link text</a> remains.</p>');
+  const oldLinkRange = findTextRange(editor, "Old link text");
+
+  assert.ok(oldLinkRange, "expected old link text range");
+  editor.commands.setTextSelection(oldLinkRange.from + 2);
+
+  assert.deepEqual(getExternalLinkDialogState(editor), {
+    href: "https://old.example",
+    text: "Old link text"
+  });
+
+  assert.equal(applyExternalLinkEdit(editor, {
+    href: "https://new.example",
+    text: "New link text"
+  }), true);
+
+  const rendered = editor.getHTML();
+  assert.match(rendered, /data-wiki-link-href="https:\/\/new\.example"[^>]*>New link text<\/span>/);
+  assert.doesNotMatch(rendered, /Old link text/);
+
+  editor.destroy();
+});
+
+await test("external link creation uses the shared dialog instead of URL prompts", function () {
+  assert.doesNotMatch(editorBundleSource, /window\.prompt\("Link URL"/);
+  assert.doesNotMatch(vendoredEditorBundleSource, /window\.prompt\("Link URL"/);
+  assert.match(editorBundleSource, /function openExternalLinkDialog/);
 });
 
 await test("wiki entity marks and nodes round-trip as inert editor spans", function () {
