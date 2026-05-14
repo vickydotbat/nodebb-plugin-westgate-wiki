@@ -306,6 +306,18 @@ await test("table view exports preserve table class and style attributes", funct
   assert.equal(typeof WestgateTableView, "function");
 });
 
+await test("table view preserves TipTap-managed fixed table width during attr sync", function () {
+  const table = document.createElement("table");
+  table.style.width = "360px";
+  applyTableNodeAttributesToView(table, {
+    class: "wiki-table-layout-fixed",
+    style: ""
+  });
+
+  assert.equal(table.style.width, "360px");
+  assert.equal(table.getAttribute("class"), "wiki-table-layout-fixed");
+});
+
 await test("getSelectionElement tolerates missing editor selection DOM", function () {
   assert.equal(getSelectionElement({ view: { domAtPos: function () { return {}; } }, state: { selection: { from: 1 } } }), null);
 });
@@ -546,6 +558,50 @@ await test("applyActiveTableProperties applies column width to logical column th
     "",
     "width: 12rem"
   ]);
+  editor.destroy();
+});
+
+await test("applyActiveTableProperties writes pixel column width to TipTap colwidth attrs", function () {
+  const editor = createTableEditor("<table><tbody><tr><td><p>A1</p></td><td><p>B1</p></td></tr><tr><td><p>A2</p></td><td><p>B2</p></td></tr></tbody></table>");
+  const positions = findCellPositions(editor);
+  editor.commands.setTextSelection(positions[1] + 2);
+  const context = deriveTableContext(editor, editor.view.dom);
+
+  assert.equal(applyActiveTableProperties(editor, context, {
+    tableWidth: "",
+    columnWidth: "180px",
+    rowHeight: "",
+    borderColor: "",
+    layout: "fixed",
+    borderMode: "visible"
+  }), true);
+
+  assert.deepEqual(findCellPositions(editor).map(function (pos) {
+    return editor.state.doc.nodeAt(pos).attrs.colwidth;
+  }), [
+    null,
+    [180],
+    null,
+    [180]
+  ]);
+  assert.match(editor.getHTML(), /<td[^>]*colwidth="180"/);
+  assert.match(editor.getHTML(), /<td[^>]*style="[^"]*\bwidth:\s*180px;?[^"]*"/);
+  editor.destroy();
+});
+
+await test("table-properties dialog prefills selected column width and row height", function () {
+  const editor = createTableEditor("<table><tbody><tr style=\"height: 48px;\"><td><p>A1</p></td><td colwidth=\"180\"><p>B1</p></td></tr></tbody></table>");
+  const positions = findCellPositions(editor);
+  editor.commands.setTextSelection(positions[1] + 2);
+  const context = deriveTableContext(editor, editor.view.dom);
+
+  assert.equal(executeTableCommand(editor, context, "table-properties"), true);
+
+  const dialog = document.querySelector(".wiki-editor-table-dialog");
+  const inputs = dialog.querySelectorAll("input");
+  assert.equal(inputs[1].value, "180px");
+  assert.equal(inputs[2].value, "48px");
+  document.querySelector(".wiki-editor-entity-dialog-shell").remove();
   editor.destroy();
 });
 

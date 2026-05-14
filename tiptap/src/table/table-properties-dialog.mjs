@@ -42,9 +42,48 @@ function getTableColumnCellPositions(editor, context) {
       continue;
     }
     seen.add(pos);
-    positions.push({ pos });
+    const rect = tableMap.findCell(relativeCellPos);
+    positions.push({
+      pos,
+      colwidthIndex: rect ? columnIndex - rect.left : 0
+    });
   }
   return positions;
+}
+
+function getPixelWidth(value) {
+  const match = String(value || "").trim().match(/^(\d+(?:\.\d+)?)px$/i);
+  return match ? Math.round(parseFloat(match[1])) : null;
+}
+
+function getCellColumnWidthValue(node, fallbackStyle, colwidthIndex) {
+  const colwidth = node && node.attrs && Array.isArray(node.attrs.colwidth)
+    ? node.attrs.colwidth[colwidthIndex || 0]
+    : null;
+  if (Number.isFinite(colwidth) && colwidth > 0) {
+    return `${colwidth}px`;
+  }
+
+  return getStyleValue(node && node.attrs && node.attrs.style || fallbackStyle || "", "width");
+}
+
+function getActiveColumnWidthValue(editor, context) {
+  const columnCellPositions = getTableColumnCellPositions(editor, context);
+  for (const { pos, colwidthIndex } of columnCellPositions) {
+    const node = editor.state.doc.nodeAt(pos);
+    const value = getCellColumnWidthValue(node, "", colwidthIndex);
+    if (value) {
+      return value;
+    }
+  }
+  return "";
+}
+
+function getActiveRowHeightValue(editor, table) {
+  const activeRow = getActiveTableRowElement(editor, table);
+  const rowPos = activeRow ? getTableNodePosition(editor, activeRow) : null;
+  const rowNode = rowPos != null ? editor.state.doc.nodeAt(rowPos) : null;
+  return getStyleValue(rowNode && rowNode.attrs && rowNode.attrs.style || activeRow && activeRow.getAttribute("style") || "", "height");
 }
 
 function setNodeAttrsOnTransaction(tr, editor, pos, attrs) {
@@ -97,15 +136,32 @@ export function applyActiveTableProperties(editor, context, values) {
     style: style || null
   }) || changed;
 
-  if (values.columnWidth) {
-    columnCellPositions.forEach(function ({ pos }) {
+  if (Object.prototype.hasOwnProperty.call(values, "columnWidth")) {
+    const pixelWidth = getPixelWidth(values.columnWidth);
+    columnCellPositions.forEach(function ({ pos, colwidthIndex }) {
       const node = editor.state.doc.nodeAt(pos);
       if (!node) {
         return;
       }
 
       const cellStyle = setStyleValue(node.attrs.style || "", "width", values.columnWidth);
-      changed = setNodeAttrsOnTransaction(tr, editor, pos, { style: cellStyle || null }) || changed;
+      let colwidth = node.attrs.colwidth;
+      if (pixelWidth) {
+        colwidth = Array.isArray(colwidth) ? colwidth.slice() : new Array(node.attrs.colspan || 1).fill(0);
+        colwidth[colwidthIndex || 0] = pixelWidth;
+      } else if (Array.isArray(colwidth)) {
+        colwidth = colwidth.slice();
+        colwidth[colwidthIndex || 0] = 0;
+        if (!colwidth.some(function (width) {
+          return Number.isFinite(width) && width > 0;
+        })) {
+          colwidth = null;
+        }
+      }
+      changed = setNodeAttrsOnTransaction(tr, editor, pos, {
+        style: cellStyle || null,
+        colwidth
+      }) || changed;
     });
   }
 
@@ -161,11 +217,13 @@ export function openTablePropertiesDialog({ editor, context }) {
   const columnWidth = document.createElement("input");
   columnWidth.className = "form-control form-control-sm";
   columnWidth.placeholder = "12rem, 160px, 25%";
+  columnWidth.value = getActiveColumnWidthValue(editor, context);
   form.appendChild(createDialogField("Current column width", columnWidth));
 
   const rowHeight = document.createElement("input");
   rowHeight.className = "form-control form-control-sm";
   rowHeight.placeholder = "3rem, 48px";
+  rowHeight.value = getActiveRowHeightValue(editor, table);
   form.appendChild(createDialogField("Current row height", rowHeight));
 
   const borderColor = document.createElement("input");
