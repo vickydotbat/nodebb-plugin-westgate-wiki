@@ -79,7 +79,7 @@ const { IMAGE_CONTEXT_BUTTON_IDS, TABLE_CELL_POPOVER_COMMAND_IDS, TABLE_CONTEXT_
 const { buildHeadingToc, navigateToHeading } = editorTocModule;
 const { installEditorLinkNavigationGuard, selectEditorLink } = linkInteractionsModule;
 const { calculateResizedImageWidth, getSelectedImageElement, setSelectedImageWidth } = imageResizeModule;
-const { focusMediaCell, selectClickedImageNode } = mediaSelectionModule;
+const { focusMediaCell, isMediaCellSurfaceTarget, selectClickedImageNode } = mediaSelectionModule;
 const {
   detectUnsupportedContent,
   getNormalizationNotice,
@@ -178,6 +178,16 @@ function createEditor(content) {
   });
 }
 
+function findNodePositions(editor, typeName) {
+  const positions = [];
+  editor.state.doc.descendants(function (node, pos) {
+    if (node.type.name === typeName) {
+      positions.push(pos);
+    }
+  });
+  return positions;
+}
+
 await test("normalizeLegacyHtmlForTiptap converts legacy media layouts into wiki media rows", function () {
   const normalized = normalizeLegacyHtmlForTiptap(
     '<div style="display:flex"><img src="/one.png" alt="One"><div style="display:block"><p>Two</p></div></div>'
@@ -186,6 +196,24 @@ await test("normalizeLegacyHtmlForTiptap converts legacy media layouts into wiki
   assert.match(normalized, /class="wiki-media-row"/);
   assert.match(normalized, /class="wiki-media-cell"/);
   assert.doesNotMatch(normalized, /display:flex/);
+});
+
+await test("normalizeLegacyHtmlForTiptap wraps generated media cells in supported cell elements", function () {
+  const normalized = normalizeLegacyHtmlForTiptap(
+    '<div style="display:flex"><img src="/one.png" alt="One"><p>Text beside it</p></div>'
+  );
+
+  assert.match(normalized, /<div class="wiki-media-cell"><p>Text beside it<\/p><\/div>/);
+  assert.doesNotMatch(normalized, /<p class="wiki-media-cell"/);
+});
+
+await test("normalizeLegacyHtmlForTiptap preserves saved plugin-owned media cell wrappers", function () {
+  const normalized = normalizeLegacyHtmlForTiptap(
+    '<div class="wiki-media-row" data-wiki-node="media-row"><div class="wiki-media-cell" data-wiki-node="media-cell"><img data-wiki-node="image" src="/a.png"></div><div class="wiki-media-cell" data-wiki-node="media-cell"><p>B</p></div></div>'
+  );
+
+  assert.match(normalized, /<div class="wiki-media-cell" data-wiki-node="media-cell"><img data-wiki-node="image" src="\/a\.png"><\/div>/);
+  assert.doesNotMatch(normalized, /<p class="wiki-media-cell"/);
 });
 
 await test("normalizeLegacyHtmlForTiptap keeps supported image figures and normalizes presentational markup", function () {
@@ -788,6 +816,53 @@ await test("mediaRow two-up html round-trips without containerBlock wrappers man
   reopened.destroy();
 });
 
+await test("mediaRow commands add, delete, unwrap, and remove rows from an active cell", function () {
+  const editor = createEditor('<p>Before</p><div class="wiki-media-row"><div class="wiki-media-cell"><p>A</p></div><div class="wiki-media-cell"><p>B</p></div></div><p>After</p>');
+
+  editor.commands.setTextSelection(findNodePositions(editor, "mediaCell")[0] + 2);
+  assert.equal(editor.commands.addMediaCellAfter(), true);
+  assert.equal((editor.getHTML().match(/data-wiki-node="media-cell"/g) || []).length, 3);
+  assert.equal(editor.commands.deleteMediaCell(), true);
+  assert.equal((editor.getHTML().match(/data-wiki-node="media-cell"/g) || []).length, 2);
+  assert.equal(editor.commands.unwrapMediaRow(), true);
+  assert.doesNotMatch(editor.getHTML(), /data-wiki-node="media-row"/);
+  assert.match(editor.getHTML(), /<p>A<\/p>/);
+  assert.match(editor.getHTML(), /<p>B<\/p>/);
+
+  editor.destroy();
+});
+
+await test("mediaRow delete command removes the active row without deleting surrounding content", function () {
+  const editor = createEditor('<p>Before</p><div class="wiki-media-row"><div class="wiki-media-cell"><p>A</p></div><div class="wiki-media-cell"><p>B</p></div></div><p>After</p>');
+
+  editor.commands.setTextSelection(findNodePositions(editor, "mediaCell")[0] + 2);
+  assert.equal(editor.commands.deleteMediaRow(), true);
+
+  const rendered = editor.getHTML();
+  assert.doesNotMatch(rendered, /data-wiki-node="media-row"/);
+  assert.match(rendered, /<p>Before<\/p>/);
+  assert.match(rendered, /<p>After<\/p>/);
+  assert.doesNotMatch(rendered, /<p>A<\/p>/);
+  editor.destroy();
+});
+
+await test("media row contextual toolbar exposes explicit row and cell editing actions", function () {
+  [editorBundleSource, vendoredEditorBundleSource].forEach(function (source) {
+    assert.match(source, /media-cell-add-before/);
+    assert.match(source, /media-cell-add-after/);
+    assert.match(source, /media-cell-delete/);
+    assert.match(source, /media-row-unwrap/);
+    assert.match(source, /media-row-delete/);
+  });
+
+  assert.match(editorBundleSource, /function createMediaRowContextToolbar\(surface, editor\)/);
+  assert.match(editorBundleSource, /addMediaCellBefore/);
+  assert.match(editorBundleSource, /addMediaCellAfter/);
+  assert.match(editorBundleSource, /deleteMediaCell/);
+  assert.match(editorBundleSource, /unwrapMediaRow/);
+  assert.match(editorBundleSource, /deleteMediaRow/);
+});
+
 await test("populated media cell chrome clicks do not force the cursor to the cell start", function () {
   const editor = createEditor('<div class="wiki-media-row"><div class="wiki-media-cell"><p>First cell text</p></div><div class="wiki-media-cell"><p>Second cell text</p></div></div><p>After</p>');
   const firstCell = editor.view.dom.querySelector('[data-wiki-node="media-cell"]');
@@ -797,6 +872,29 @@ await test("populated media cell chrome clicks do not force the cursor to the ce
 
   assert.equal(focusMediaCell(editor, firstCell), false);
   assert.equal(editor.state.selection.from, initialSelection);
+  editor.destroy();
+});
+
+await test("media cell chrome clicks can select an outer cell that only contains nested media rows", function () {
+  const editor = createEditor('<div class="wiki-media-row"><div class="wiki-media-cell"><div class="wiki-media-row"><div class="wiki-media-cell"><p>Nested A</p></div><div class="wiki-media-cell"><p>Nested B</p></div></div></div><div class="wiki-media-cell"><p>Sibling</p></div></div><p>After</p>');
+  const outerCell = editor.view.dom.querySelector('[data-wiki-node="media-cell"]');
+
+  editor.commands.setTextSelection(editor.state.doc.content.size);
+
+  assert.equal(focusMediaCell(editor, outerCell), true);
+  assert.equal(editor.state.selection.node && editor.state.selection.node.type.name, "mediaCell");
+  assert.equal(editor.state.selection.from, findNodePositions(editor, "mediaCell")[0]);
+  editor.destroy();
+});
+
+await test("direct nested media row chrome is treated as the containing media cell surface", function () {
+  const editor = createEditor('<div class="wiki-media-row"><div class="wiki-media-cell"><div class="wiki-media-row"><div class="wiki-media-cell"><p>Nested A</p></div><div class="wiki-media-cell"><p>Nested B</p></div></div></div><div class="wiki-media-cell"><p>Sibling</p></div></div><p>After</p>');
+  const outerCell = editor.view.dom.querySelector('[data-wiki-node="media-cell"]');
+  const nestedRow = outerCell.querySelector('[data-wiki-node="media-row"]');
+  const nestedCell = nestedRow.querySelector('[data-wiki-node="media-cell"]');
+
+  assert.equal(isMediaCellSurfaceTarget(outerCell, nestedRow), true);
+  assert.equal(isMediaCellSurfaceTarget(outerCell, nestedCell), false);
   editor.destroy();
 });
 

@@ -45,6 +45,7 @@ import {
   focusMediaCell,
   getActiveImageNodeName,
   isImageLayoutActive,
+  isMediaCellSurfaceTarget,
   isImageSizeActive,
   selectClickedImageNode,
   setSelectedImageLayout,
@@ -109,6 +110,11 @@ const BUTTON_ICONS = {
   "image-upload": "fa-image",
   "media-row-2": "fa-columns",
   "media-row-3": "fa-th-large",
+  "media-cell-add-before": "fa-plus",
+  "media-cell-add-after": "fa-plus",
+  "media-cell-delete": "fa-minus",
+  "media-row-unwrap": "fa-outdent",
+  "media-row-delete": "fa-trash",
   "bullet-list": "fa-list-ul",
   "ordered-list": "fa-list-ol",
   "task-list": "fa-check-square-o",
@@ -1697,6 +1703,26 @@ function getActivePoetryQuoteElement(editor, surface) {
   return quote && surface.contains(quote) ? quote : null;
 }
 
+function getActiveMediaRowElement(editor, surface) {
+  const selectedDom = editor.view.nodeDOM(editor.state.selection.from);
+  if (selectedDom && selectedDom.nodeType === 1 && selectedDom.matches('[data-wiki-node="media-row"]') && surface.contains(selectedDom)) {
+    return selectedDom;
+  }
+  const selectionElement = getSelectionElement(editor);
+  const row = selectionElement && typeof selectionElement.closest === "function" ? selectionElement.closest('[data-wiki-node="media-row"]') : null;
+  return row && surface.contains(row) ? row : null;
+}
+
+function getActiveMediaCellElement(editor, surface) {
+  const selectedDom = editor.view.nodeDOM(editor.state.selection.from);
+  if (selectedDom && selectedDom.nodeType === 1 && selectedDom.matches('[data-wiki-node="media-cell"]') && surface.contains(selectedDom)) {
+    return selectedDom;
+  }
+  const selectionElement = getSelectionElement(editor);
+  const cell = selectionElement && typeof selectionElement.closest === "function" ? selectionElement.closest('[data-wiki-node="media-cell"]') : null;
+  return cell && surface.contains(cell) ? cell : null;
+}
+
 function selectPoetryQuote(editor, target, surface) {
   const element = target && typeof target.closest === "function" ? target.closest('[data-wiki-node="poetry-quote"], figure.wiki-poetry-quote') : null;
   if (!element || !surface.contains(element)) {
@@ -1902,6 +1928,88 @@ function createPoetryQuoteContextToolbar(surface, editor) {
   return {
     destroy: function () {
       window.removeEventListener("resize", syncPoetryQuoteTools);
+      if (panel.parentNode) {
+        panel.parentNode.removeChild(panel);
+      }
+    }
+  };
+}
+
+function createMediaRowContextToolbar(surface, editor) {
+  const panel = document.createElement("div");
+  panel.className = "wiki-editor-context-tools wiki-editor-media-row-tools";
+  panel.setAttribute("role", "toolbar");
+  panel.setAttribute("aria-label", "Media row tools");
+  panel.hidden = true;
+
+  const addBefore = createButton({
+    id: "media-cell-add-before",
+    title: "Add media cell before",
+    action: function () {
+      editor.chain().focus().addMediaCellBefore().run();
+    }
+  });
+  const addAfter = createButton({
+    id: "media-cell-add-after",
+    title: "Add media cell after",
+    action: function () {
+      editor.chain().focus().addMediaCellAfter().run();
+    }
+  });
+  const deleteCell = createButton({
+    id: "media-cell-delete",
+    title: "Delete media cell",
+    action: function () {
+      editor.chain().focus().deleteMediaCell().run();
+    }
+  });
+  const unwrapRow = createButton({
+    id: "media-row-unwrap",
+    title: "Unwrap media row",
+    action: function () {
+      editor.chain().focus().unwrapMediaRow().run();
+    }
+  });
+  const deleteRow = createButton({
+    id: "media-row-delete",
+    title: "Delete media row",
+    action: function () {
+      editor.chain().focus().deleteMediaRow().run();
+    }
+  });
+
+  [addBefore, addAfter, deleteCell, unwrapRow, deleteRow].forEach(function (button) {
+    panel.appendChild(button);
+  });
+
+  function syncMediaRowTools() {
+    const row = editor.isActive("mediaRow") ? getActiveMediaRowElement(editor, surface) : null;
+    const cell = editor.isActive("mediaCell") ? getActiveMediaCellElement(editor, surface) : null;
+    panel.hidden = !row;
+    if (!row) {
+      return;
+    }
+
+    addBefore.disabled = !cell;
+    addAfter.disabled = !cell;
+    deleteCell.disabled = !cell;
+    unwrapRow.disabled = false;
+    deleteRow.disabled = false;
+    positionContextPanel(panel, cell || row, surface);
+  }
+
+  editor.on("create", syncMediaRowTools);
+  editor.on("selectionUpdate", syncMediaRowTools);
+  editor.on("transaction", syncMediaRowTools);
+  editor.on("focus", syncMediaRowTools);
+  editor.on("blur", syncMediaRowTools);
+  window.addEventListener("resize", syncMediaRowTools);
+  surface.appendChild(panel);
+  syncMediaRowTools();
+
+  return {
+    destroy: function () {
+      window.removeEventListener("resize", syncMediaRowTools);
       if (panel.parentNode) {
         panel.parentNode.removeChild(panel);
       }
@@ -3044,7 +3152,7 @@ export async function createWikiEditor(element, options) {
             return true;
           }
 
-          if (mediaCell && target === mediaCell) {
+          if (mediaCell && isMediaCellSurfaceTarget(mediaCell, target)) {
             event.preventDefault();
             event.stopPropagation();
             return focusMediaCell(editor, mediaCell);
@@ -3126,6 +3234,7 @@ export async function createWikiEditor(element, options) {
   const tableAuthoring = createTableAuthoring(editorMount, editor);
   const alignmentTableContextToolbar = createAlignmentTableContextToolbar(editorMount, editor);
   const poetryQuoteContextToolbar = createPoetryQuoteContextToolbar(editorMount, editor);
+  const mediaRowContextToolbar = createMediaRowContextToolbar(editorMount, editor);
   linkContextToolbar = createLinkContextToolbar(editorMount, editor);
   const destroyLinkNavigationGuard = installEditorLinkNavigationGuard({
     editorMount,
@@ -3180,6 +3289,7 @@ export async function createWikiEditor(element, options) {
       tableAuthoring.destroy();
       alignmentTableContextToolbar.destroy();
       poetryQuoteContextToolbar.destroy();
+      mediaRowContextToolbar.destroy();
       linkContextToolbar.destroy();
       editorToc.destroy();
       return editor.destroy();

@@ -306,6 +306,14 @@ function isInsidePluginOwnedStructure(element) {
   return !!(element && element.closest && element.closest('[data-wiki-node="alignment-table"], figure.wiki-poetry-quote, [data-wiki-node="poetry-quote"]'));
 }
 
+function isPluginOwnedMediaLayoutElement(element) {
+  if (!element || !element.matches) {
+    return false;
+  }
+
+  return element.matches('[data-wiki-node="media-row"], [data-wiki-node="media-cell"], .wiki-media-row, .wiki-media-cell');
+}
+
 export function normalizeLegacyPresentationalTags(document, root) {
   [
     ["abbr", "span"],
@@ -586,7 +594,9 @@ export function normalizeLegacyMediaLayouts(document, root) {
     element.setAttribute("class", "wiki-media-row");
 
     directChildren.forEach(function (child) {
-      if (child.tagName.toLowerCase() === "img" || isSupportedImageFigure(child)) {
+      const childTagName = child.tagName.toLowerCase();
+      const isSupportedCellElement = ["article", "section", "div"].includes(childTagName);
+      if (childTagName === "img" || isSupportedImageFigure(child) || !isSupportedCellElement) {
         const wrapper = document.createElement("div");
         wrapper.setAttribute("class", "wiki-media-cell");
         child.parentNode.replaceChild(wrapper, child);
@@ -746,7 +756,7 @@ export function normalizeLegacyHtmlForTiptap(html) {
   }
 
   root.querySelectorAll("article, section, div").forEach(function (element) {
-    if (isInsidePluginOwnedStructure(element)) {
+    if (isInsidePluginOwnedStructure(element) || isPluginOwnedMediaLayoutElement(element)) {
       return;
     }
 
