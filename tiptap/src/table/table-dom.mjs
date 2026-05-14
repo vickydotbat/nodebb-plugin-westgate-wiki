@@ -97,8 +97,11 @@ export function positionContextPanel(panel, targetEl, surface, options) {
   const panelHeight = panel.offsetHeight || 40;
   const avoidTop = options && Number.isFinite(options.avoidTop) ? Math.max(8, options.avoidTop - 8) : 8;
   const left = Math.max(8, Math.min(targetRect.left - surfaceRect.left, surfaceRect.width - panelWidth - 8));
-  const preferredTop = targetRect.top - surfaceRect.top - panelHeight - 8;
-  const top = Math.max(avoidTop, preferredTop);
+  const preferredTop = options && options.placement === "bottom"
+    ? targetRect.bottom - surfaceRect.top + 8
+    : targetRect.top - surfaceRect.top - panelHeight - 8;
+  const maxTop = Math.max(8, surfaceRect.height - panelHeight - 8);
+  const top = Math.max(avoidTop, Math.min(preferredTop, maxTop));
   panel.style.left = `${left}px`;
   panel.style.top = `${top}px`;
 }

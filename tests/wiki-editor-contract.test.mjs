@@ -94,6 +94,7 @@ const editorCss = readFileSync(new URL("../tiptap/src/wiki-editor.css", import.m
 const vendoredEditorCss = readFileSync(new URL("../public/vendor/tiptap/wiki-tiptap.css", import.meta.url), "utf8");
 const editorBundleSource = readFileSync(new URL("../tiptap/src/wiki-editor-bundle.js", import.meta.url), "utf8");
 const vendoredEditorBundleSource = readFileSync(new URL("../public/vendor/tiptap/wiki-tiptap.bundle.js", import.meta.url), "utf8");
+const tableAuthoringSource = readFileSync(new URL("../tiptap/src/table/table-authoring-ui.mjs", import.meta.url), "utf8");
 
 let editorBundleContractImportCount = 0;
 
@@ -239,6 +240,14 @@ await test("sanitizeHtml preserves safe styles and removes unsafe ones on the cl
   assert.doesNotMatch(sanitized, /position:/);
 });
 
+await test("sanitizeHtml preserves table cell vertical alignment on the client contract", function () {
+  const sanitized = sanitizeHtml('<table><tbody><tr><td style="vertical-align: middle; position: fixed">Middle</td><td style="vertical-align: bottom">Bottom</td></tr></tbody></table>');
+
+  assert.match(sanitized, /<td style="[^"]*vertical-align:\s*middle;?[^"]*">Middle<\/td>/);
+  assert.match(sanitized, /<td style="[^"]*vertical-align:\s*bottom;?[^"]*">Bottom<\/td>/);
+  assert.doesNotMatch(sanitized, /position:/);
+});
+
 await test("article prose css renders Tiptap task lists without list bullets", function () {
   assert.match(articleBodyCss, /\.wiki-article-prose\s+ul\[data-type="taskList"\]/);
   assert.match(articleBodyCss, /ul\[data-type="taskList"\]\s*{[^}]*list-style:\s*none/);
@@ -296,7 +305,7 @@ await test("editor image mousedown selection preserves native drag start", funct
   assert.ok(vendoredMousedownHandler, "vendored editor bundle should expose a mousedown DOM handler before the click handler");
   assert.match(
     vendoredMousedownHandler[1],
-    /Fm\(E,\s*q,\s*g\),!1/,
+    /const\s+\w+=\w+\.target;return\s+\w+\(\w+,\s*\w+,\s*\w+\),!1/,
     "vendored image mousedown should select the node but return false so ProseMirror/native drag can continue"
   );
   assert.doesNotMatch(
@@ -1704,8 +1713,12 @@ await test("fullscreen source mode css supports resize and source hiding", funct
 await test("contextual table schema exposes row, column, cell merge, and delete tools", function () {
   assert.deepEqual(TABLE_CONTEXT_BUTTON_IDS, TABLE_STICKY_COMMAND_IDS);
   assert.ok(TABLE_CELL_POPOVER_COMMAND_IDS.includes("table-cell-background"));
+  assert.ok(TABLE_CELL_POPOVER_COMMAND_IDS.includes("table-cell-valign-top"));
+  assert.ok(TABLE_CELL_POPOVER_COMMAND_IDS.includes("table-cell-valign-middle"));
+  assert.ok(TABLE_CELL_POPOVER_COMMAND_IDS.includes("table-cell-valign-bottom"));
   assert.match(editorBundleSource, /createTableAuthoring\(editorMount,\s*editor\)/);
   assert.match(editorBundleSource, /openAlignmentTableDialog\(\{ editor \}\)/);
+  assert.match(tableAuthoringSource, /placement:\s*["']bottom["']/);
   assert.match(editorCss, /\.wiki-editor-context-tools__group\s*\{/);
   assert.match(vendoredEditorCss, /\.wiki-editor-context-tools__group\s*\{/);
   assert.match(editorCss, /\.westgate-wiki-compose\s+\.wiki-editor-table-sticky-row\s*\{/);

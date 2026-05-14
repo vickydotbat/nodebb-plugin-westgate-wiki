@@ -216,6 +216,26 @@ await test("positionContextPanel clamps panel within the editor surface", functi
   assert.equal(panel.style.top, "40px");
 });
 
+await test("positionContextPanel can anchor a panel below the target", function () {
+  const surface = document.createElement("div");
+  const target = document.createElement("div");
+  const panel = document.createElement("div");
+  Object.defineProperty(surface, "offsetWidth", { value: 600 });
+  Object.defineProperty(panel, "offsetWidth", { value: 180 });
+  Object.defineProperty(panel, "offsetHeight", { value: 32 });
+  surface.getBoundingClientRect = function () {
+    return { left: 10, top: 20, width: 600, height: 300, right: 610, bottom: 320 };
+  };
+  target.getBoundingClientRect = function () {
+    return { left: 580, top: 90, width: 80, height: 32, right: 660, bottom: 122 };
+  };
+
+  positionContextPanel(panel, target, surface, { placement: "bottom" });
+
+  assert.equal(panel.style.left, "412px");
+  assert.equal(panel.style.top, "110px");
+});
+
 await test("active table DOM helpers locate table, row, and cell inside the editor surface", function () {
   const surface = document.createElement("div");
   const table = document.createElement("table");
@@ -343,6 +363,9 @@ await test("table command registry exposes structural and cell formatting placem
     "table-cell-align-left",
     "table-cell-align-center",
     "table-cell-align-right",
+    "table-cell-valign-top",
+    "table-cell-valign-middle",
+    "table-cell-valign-bottom",
     "table-cell-clear-formatting"
   ];
 
@@ -362,6 +385,8 @@ await test("table command registry exposes structural and cell formatting placem
   assert.equal(getTableCommand("table-toggle-header-row").badge, "R");
   assert.equal(getTableCommand("table-toggle-header-column").badge, "C");
   assert.equal(getTableCommand("table-cell-background").placement, "cell-popover");
+  assert.equal(getTableCommand("table-cell-valign-middle").placement, "cell-popover");
+  assert.equal(getTableCommand("table-cell-valign-bottom").icon, "fa-long-arrow-down");
   assert.equal(getTableCommand("table-add-row-before").placement, "sticky");
   assert.equal(getTableCommand("missing-command"), null);
 });
@@ -482,8 +507,74 @@ await test("selected-cell text color command accepts value payload", function ()
   editor.destroy();
 });
 
+await test("selected-cell alignment command replaces parsed table cell align attrs", function () {
+  const editor = createTableEditor("<table><tbody><tr><td style=\"text-align: center\"><p>A1</p></td></tr></tbody></table>");
+  const positions = findCellPositions(editor);
+  editor.commands.setTextSelection(positions[0] + 2);
+  const context = deriveTableContext(editor, editor.view.dom);
+
+  assert.equal(editor.state.doc.nodeAt(positions[0]).attrs.align, "center");
+  assert.equal(executeTableCommand(editor, context, "table-cell-align-right"), true);
+
+  assert.equal(editor.state.doc.nodeAt(positions[0]).attrs.align, "right");
+  assert.match(editor.getHTML(), /<td[^>]*style="[^"]*\btext-align:\s*right;?[^"]*"/);
+  assert.doesNotMatch(editor.getHTML(), /text-align:\s*center/);
+  editor.destroy();
+});
+
+await test("selected-cell vertical alignment commands apply to every selected cell", function () {
+  const editor = createTableEditor("<table><tbody><tr><td><p>A1</p></td><td><p>B1</p></td></tr><tr><td><p>A2</p></td><td><p>B2</p></td></tr></tbody></table>");
+  const positions = findCellPositions(editor);
+  editor.view.dispatch(editor.state.tr.setSelection(CellSelection.create(editor.state.doc, positions[0], positions[3])));
+  const context = deriveTableContext(editor, editor.view.dom);
+
+  assert.equal(executeTableCommand(editor, context, "table-cell-valign-middle"), true);
+  assert.deepEqual(getCellStyles(editor), [
+    "vertical-align: middle",
+    "vertical-align: middle",
+    "vertical-align: middle",
+    "vertical-align: middle"
+  ]);
+
+  const nextContext = deriveTableContext(editor, editor.view.dom);
+  assert.equal(executeTableCommand(editor, nextContext, "table-cell-valign-bottom"), true);
+  assert.deepEqual(getCellStyles(editor), [
+    "vertical-align: bottom",
+    "vertical-align: bottom",
+    "vertical-align: bottom",
+    "vertical-align: bottom"
+  ]);
+  editor.destroy();
+});
+
+await test("selected-cell vertical alignment commands write durable class fallbacks", function () {
+  const editor = createTableEditor("<table><tbody><tr><td class=\"legacy-cell\" style=\"width: 64px\"><p>A1</p></td></tr></tbody></table>");
+  const positions = findCellPositions(editor);
+  editor.commands.setTextSelection(positions[0] + 2);
+  const context = deriveTableContext(editor, editor.view.dom);
+
+  assert.equal(executeTableCommand(editor, context, "table-cell-valign-middle"), true);
+
+  const middleAttrs = editor.state.doc.nodeAt(positions[0]).attrs;
+  assert.match(middleAttrs.class, /\blegacy-cell\b/);
+  assert.match(middleAttrs.class, /\bwiki-table-cell-valign-middle\b/);
+  assert.doesNotMatch(middleAttrs.class, /\bwiki-table-cell-valign-top\b/);
+  assert.doesNotMatch(middleAttrs.class, /\bwiki-table-cell-valign-bottom\b/);
+  assert.match(editor.getHTML(), /<td[^>]*class="[^"]*\bwiki-table-cell-valign-middle\b[^"]*"[^>]*style="[^"]*\bvertical-align:\s*middle;?[^"]*"/);
+
+  const nextContext = deriveTableContext(editor, editor.view.dom);
+  assert.equal(executeTableCommand(editor, nextContext, "table-cell-valign-bottom"), true);
+
+  const bottomAttrs = editor.state.doc.nodeAt(positions[0]).attrs;
+  assert.match(bottomAttrs.class, /\blegacy-cell\b/);
+  assert.match(bottomAttrs.class, /\bwiki-table-cell-valign-bottom\b/);
+  assert.doesNotMatch(bottomAttrs.class, /\bwiki-table-cell-valign-middle\b/);
+  assert.match(editor.getHTML(), /<td[^>]*class="[^"]*\bwiki-table-cell-valign-bottom\b[^"]*"[^>]*style="[^"]*\bvertical-align:\s*bottom;?[^"]*"/);
+  editor.destroy();
+});
+
 await test("selected-cell clear formatting removes supported cell styles", function () {
-  const editor = createTableEditor("<table><tbody><tr><td style=\"background-color: rgb(254, 240, 138); color: rgb(17, 24, 39); text-align: center; width: 40%;\"><p>A1</p></td><td style=\"background-color: rgb(59, 7, 100); color: rgb(249, 250, 251); text-align: right; border-color: red;\"><p>B1</p></td></tr></tbody></table>");
+  const editor = createTableEditor("<table><tbody><tr><td style=\"background-color: rgb(254, 240, 138); color: rgb(17, 24, 39); text-align: center; vertical-align: middle; width: 40%;\"><p>A1</p></td><td style=\"background-color: rgb(59, 7, 100); color: rgb(249, 250, 251); text-align: right; vertical-align: bottom; border-color: red;\"><p>B1</p></td></tr></tbody></table>");
   const positions = findCellPositions(editor);
   editor.view.dispatch(editor.state.tr.setSelection(CellSelection.create(editor.state.doc, positions[0], positions[1])));
   const context = deriveTableContext(editor, editor.view.dom);
@@ -501,6 +592,10 @@ await test("selected-cell clear formatting removes supported cell styles", funct
     "width: 40%",
     "border-color: red"
   ]);
+  assert.equal(editor.state.doc.nodeAt(positions[0]).attrs.align, null);
+  assert.equal(editor.state.doc.nodeAt(positions[1]).attrs.align, null);
+  assert.doesNotMatch(editor.getHTML(), /text-align/);
+  assert.doesNotMatch(editor.getHTML(), /vertical-align/);
   editor.destroy();
 });
 
@@ -654,6 +749,11 @@ await test("createTableAuthoring installs sticky table row and cell popover surf
   backgroundInput.value = "#dbeafe";
   backgroundInput.dispatchEvent(new window.Event("input", { bubbles: true }));
   assert.match(editor.getHTML(), /<td[^>]*style="[^"]*\bbackground-color:\s*rgb\(219,\s*234,\s*254\)/);
+
+  const verticalMiddleButton = popover.querySelector("[data-table-command-id='table-cell-valign-middle']");
+  assert(verticalMiddleButton);
+  verticalMiddleButton.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
+  assert.match(editor.getHTML(), /<td[^>]*style="[^"]*\bvertical-align:\s*middle;?[^"]*"/);
 
   authoring.destroy();
   assert.equal(shell.querySelector(".wiki-editor-table-sticky-row"), null);

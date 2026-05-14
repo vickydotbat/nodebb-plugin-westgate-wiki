@@ -400,7 +400,8 @@ export function createTableAuthoring(surface, editor) {
     const surfaceRect = surface.getBoundingClientRect();
     const stickyRect = stickyRow.getBoundingClientRect();
     positionContextPanel(cellPopover, currentContext.activeCellElement || currentContext.activeTableElement, surface, {
-      avoidTop: stickyRect.bottom - surfaceRect.top + 8
+      avoidTop: stickyRect.bottom - surfaceRect.top + 8,
+      placement: "bottom"
     });
     updateResizeHandles(currentContext);
     updateColorControls(currentContext);

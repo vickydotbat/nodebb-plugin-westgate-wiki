@@ -532,7 +532,23 @@ async function initWikiComposePage() {
           }
         }
 
-        if (isEdit) {
+        if (isEdit && payload.wikiPageSaveApiUrl) {
+          const saveForm = new FormData();
+          saveForm.set("tid", String(payload.tid || ""));
+          saveForm.set("pid", String(payload.mainPid || ""));
+          saveForm.set("content", content);
+          saveForm.set("title", title);
+          saveForm.set("wikiEditLockToken", payload.editLockToken || "");
+          res = await fetch(payload.wikiPageSaveApiUrl, {
+            method: "PUT",
+            credentials: "same-origin",
+            headers: {
+              "x-csrf-token": payload.csrfToken
+            },
+            body: saveForm
+          });
+          body = await res.json();
+        } else if (isEdit) {
           const postEditUrl = new URL(payload.postEditUrl, window.location.origin);
           postEditUrl.searchParams.set("wikiEditLockToken", payload.editLockToken || "");
           res = await fetch(postEditUrl.toString(), {
@@ -544,6 +560,7 @@ async function initWikiComposePage() {
             },
             body: JSON.stringify({
               content: content,
+              sourceContent: content,
               title: title,
               wikiEditLockToken: payload.editLockToken
             })
@@ -561,6 +578,7 @@ async function initWikiComposePage() {
               cid: payload.cid,
               title: title,
               content: content,
+              sourceContent: content,
               tags: []
             })
           });
@@ -710,7 +728,9 @@ async function initWikiComposePage() {
         }
 
         const slugLeaf = wikiSlug ? String(wikiSlug).split("/").filter(Boolean).pop() : "";
-        const cleanWikiPath = payload.sectionWikiPath && slugLeaf ? `${payload.sectionWikiPath}/${slugLeaf}` : "";
+        const cleanWikiPath = responsePayload && responsePayload.wikiPath
+          ? responsePayload.wikiPath
+          : (payload.sectionWikiPath && slugLeaf ? `${payload.sectionWikiPath}/${slugLeaf}` : "");
 
         if (!cleanWikiPath) {
           throw new Error("Unexpected API response");

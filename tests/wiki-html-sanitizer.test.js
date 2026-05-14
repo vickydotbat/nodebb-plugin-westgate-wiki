@@ -133,6 +133,15 @@ test("sanitizeWikiHtml preserves safe table alignment styles", function () {
   assert.doesNotMatch(sanitized, /position:/);
 });
 
+test("sanitizeWikiHtml preserves safe table cell vertical alignment styles", function () {
+  const html = '<table><tbody><tr><td style="vertical-align: middle; position: fixed">Middle</td><td style="vertical-align: bottom">Bottom</td></tr></tbody></table>';
+  const sanitized = wikiHtmlSanitizer.sanitizeWikiHtml(html);
+
+  assert.match(sanitized, /<td style="[^"]*vertical-align:middle;?[^"]*">Middle<\/td>/);
+  assert.match(sanitized, /<td style="[^"]*vertical-align:bottom;?[^"]*">Bottom<\/td>/);
+  assert.doesNotMatch(sanitized, /position:/);
+});
+
 test("sanitizeWikiHtml preserves wiki callout blocks and strips arbitrary styles", function () {
   const html = '<aside class="wiki-callout wiki-callout--danger bad-class" data-callout-type="danger" data-callout-title="Risk" style="position:fixed"><p><strong>Risk</strong></p><p>Check [[Page]].</p></aside>';
   const sanitized = wikiHtmlSanitizer.sanitizeWikiHtml(html);

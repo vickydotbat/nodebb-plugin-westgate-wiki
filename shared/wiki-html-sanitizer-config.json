@@ -149,7 +149,7 @@
         "^(?:none|underline|line-through|underline line-through|line-through underline)$"
       ],
       "vertical-align": [
-        "^(?:sub|super)$"
+        "^(?:sub|super|top|middle|bottom)$"
       ],
       "height": [
         "^(?:\\d+(?:\\.\\d+)?(?:px|em|rem|%)|auto)$"

@@ -127,6 +127,13 @@ plugin.registerApiRoutes = async function ({ router, middleware }) {
   routeHelpers.setupApiRoute(
     router,
     "put",
+    "/westgate-wiki/page/save",
+    [middleware.ensureLoggedIn],
+    wikiPageActions.saveWikiPage
+  );
+  routeHelpers.setupApiRoute(
+    router,
+    "put",
     "/westgate-wiki/page/move",
     [middleware.ensureLoggedIn, middleware.checkRequired.bind(null, ["tid", "cid", "title"])],
     wikiPageActions.moveWikiPage
@@ -227,6 +234,7 @@ plugin.clearWikiPostParseCache = cacheService.clearWikiPostParseCache;
 plugin.clearWikiPostEditCache = cacheService.clearWikiPostEditCache;
 plugin.onWikiTopicDelete = wikiTopicPurge.onTopicDelete;
 plugin.wikiFilterTopicPost = wikiPageValidation.validateTopicPost;
+plugin.wikiFilterPostEdit = wikiPageValidation.validatePostEdit;
 plugin.wikiFilterTopicEdit = wikiPageValidation.validateTopicEdit;
 plugin.wikiFilterTopicDelete = async function (data) {
   if (!data || !data.topicData) {
