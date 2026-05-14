@@ -666,6 +666,14 @@ await test("normalizeLegacyHtmlForTiptap preserves saved poetry quotes as plugin
   assert.match(normalized, /<p class="wiki-poetry-quote__attribution">- Author<\/p>/);
 });
 
+await test("normalizeLegacyHtmlForTiptap preserves saved poetry quote positioning", function () {
+  const savedHtml = '<figure class="wiki-poetry-quote wiki-poetry-quote--right" data-wiki-node="poetry-quote" data-wiki-quote-position="right"><blockquote class="wiki-poetry-quote__body"><p>Spoken words.</p><p class="wiki-poetry-quote__attribution">- Author</p></blockquote></figure>';
+  const normalized = normalizeLegacyHtmlForTiptap(savedHtml);
+
+  assert.match(normalized, /data-wiki-quote-position="right"/);
+  assert.match(normalized, /wiki-poetry-quote--right/);
+});
+
 await test("saved containerless poetry quotes reopen as editable quote widgets", function () {
   const savedHtml = '<figure class="wiki-poetry-quote wiki-poetry-quote--plain" data-wiki-node="poetry-quote" data-wiki-quote-container="false"><blockquote class="wiki-poetry-quote__body"><p>Spoken words.</p><p class="wiki-poetry-quote__attribution">- Author</p></blockquote></figure>';
   const editor = createEditor(normalizeLegacyHtmlForTiptap(savedHtml));
@@ -675,6 +683,18 @@ await test("saved containerless poetry quotes reopen as editable quote widgets",
   assert.equal(editor.getJSON().content[0].attrs.container, false);
   assert.match(rendered, /data-wiki-quote-container="false"/);
   assert.match(rendered, /wiki-poetry-quote--plain/);
+  editor.destroy();
+});
+
+await test("saved positioned poetry quotes reopen with their block position", function () {
+  const savedHtml = '<figure class="wiki-poetry-quote wiki-poetry-quote--center" data-wiki-node="poetry-quote" data-wiki-quote-position="center"><blockquote class="wiki-poetry-quote__body"><p>Spoken words.</p><p class="wiki-poetry-quote__attribution">- Author</p></blockquote></figure>';
+  const editor = createEditor(normalizeLegacyHtmlForTiptap(savedHtml));
+  const rendered = editor.getHTML();
+
+  assert.equal(editor.state.doc.child(0).type.name, "wikiPoetryQuote");
+  assert.equal(editor.getJSON().content[0].attrs.position, "center");
+  assert.match(rendered, /data-wiki-quote-position="center"/);
+  assert.match(rendered, /wiki-poetry-quote--center/);
   editor.destroy();
 });
 
@@ -1713,9 +1733,30 @@ await test("wikiPoetryQuote preserves and can retoggle container state after reo
   editor.destroy();
 });
 
+await test("wikiPoetryQuote stores horizontal block position without changing paragraph alignment", function () {
+  const editor = createEditor('<figure class="wiki-poetry-quote" data-wiki-node="poetry-quote"><blockquote class="wiki-poetry-quote__body"><p>Spoken words.</p><p class="wiki-poetry-quote__attribution">- Author</p></blockquote></figure>');
+
+  editor.commands.setTextSelection(3);
+  assert.equal(editor.commands.setWikiPoetryQuotePosition("right"), true);
+  assert.equal(editor.getJSON().content[0].attrs.position, "right");
+  assert.match(editor.getHTML(), /data-wiki-quote-position="right"/);
+  assert.match(editor.getHTML(), /wiki-poetry-quote--right/);
+  assert.doesNotMatch(editor.getHTML(), /text-align:\s*right/);
+
+  assert.equal(editor.commands.setWikiPoetryQuotePosition("left"), true);
+  assert.equal(editor.getJSON().content[0].attrs.position, "left");
+  assert.doesNotMatch(editor.getHTML(), /data-wiki-quote-position="right"/);
+  assert.doesNotMatch(editor.getHTML(), /wiki-poetry-quote--right/);
+  editor.destroy();
+});
+
 await test("poetry quote css renders a speech-like quote panel with attribution", function () {
   assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote\s*\{[\s\S]*margin:\s*1rem\s+0/);
   assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote\s*\{[\s\S]*width:\s*fit-content/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote--center\s*\{[\s\S]*margin-left:\s*auto/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote--center\s*\{[\s\S]*margin-right:\s*auto/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote--right\s*\{[\s\S]*margin-left:\s*auto/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote--right\s*\{[\s\S]*margin-right:\s*0/);
   assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote__body\s*\{[\s\S]*background:\s*var\(--wiki-poetry-quote-bg,[\s\S]*#1b101d/);
   assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote__body\s*\{[\s\S]*border:\s*1px\s+solid\s+var\(--wiki-poetry-quote-border/);
   assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-poetry-quote__body::before\s*\{[\s\S]*content:\s*"\\201C"/);
@@ -1740,6 +1781,12 @@ await test("blockquote toolbar action inserts the attributed quote tool instead 
 
 await test("poetry quote floating toolbar exposes container toggle and unwrap actions", function () {
   assert.match(editorBundleSource, /wiki-editor-poetry-quote-tools/);
+  assert.match(editorBundleSource, /poetry-quote-align-left/);
+  assert.match(editorBundleSource, /poetry-quote-align-center/);
+  assert.match(editorBundleSource, /poetry-quote-align-right/);
+  assert.match(editorBundleSource, /setWikiPoetryQuotePosition\("left"\)/);
+  assert.match(editorBundleSource, /setWikiPoetryQuotePosition\("center"\)/);
+  assert.match(editorBundleSource, /setWikiPoetryQuotePosition\("right"\)/);
   assert.match(editorBundleSource, /toggleWikiPoetryQuoteContainer/);
   assert.match(editorBundleSource, /unsetWikiPoetryQuote/);
   assert.match(editorBundleSource, /figure\.wiki-poetry-quote/);
@@ -1919,6 +1966,13 @@ await test("editor ToC updates are debounced and avoid transaction-only DOM rewr
   assert.match(editorBundleSource, /window\.setTimeout\(syncToc,\s*250\)/);
   assert.match(editorBundleSource, /signature\s*===\s*lastTocSignature/);
   assert.doesNotMatch(editorBundleSource, /editor\.on\("transaction",\s*syncToc\)/);
+});
+
+await test("editor ToC child sections start collapsed", function () {
+  assert.match(editorBundleSource, /row\.classList\.add\("wiki-editor-toc__entry--collapsed"\)/);
+  assert.match(editorBundleSource, /childList\.hidden\s*=\s*true/);
+  assert.match(editorBundleSource, /toggle\.setAttribute\("aria-expanded",\s*"false"\)/);
+  assert.match(editorBundleSource, /toggle\.setAttribute\("aria-label",\s*"Expand "\s*\+\s*\(item\.text\s*\|\|\s*"heading"\)\)/);
 });
 
 await test("editor ToC navigation dispatches a source sync event", function () {

@@ -78,13 +78,14 @@ test("directory navigation rows with descendants get a caret that hides child ro
   const toggle = parentRow.querySelector(".wiki-directory-tree-toggle");
 
   assert.ok(toggle, "parent row should receive a disclosure caret");
-  assert.equal(toggle.getAttribute("aria-expanded"), "true");
-  assert.equal(childRow.hidden, false);
-
-  toggle.click();
-
   assert.equal(toggle.getAttribute("aria-expanded"), "false");
   assert.equal(parentRow.classList.contains("wiki-directory-row--collapsed"), true);
   assert.equal(childRow.hidden, true);
+
+  toggle.click();
+
+  assert.equal(toggle.getAttribute("aria-expanded"), "true");
+  assert.equal(parentRow.classList.contains("wiki-directory-row--collapsed"), false);
+  assert.equal(childRow.hidden, false);
   assert.equal(siblingRow.hidden, false);
 });
