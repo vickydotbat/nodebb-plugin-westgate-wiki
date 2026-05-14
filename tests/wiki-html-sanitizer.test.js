@@ -142,6 +142,14 @@ test("sanitizeWikiHtml preserves safe table cell vertical alignment styles", fun
   assert.doesNotMatch(sanitized, /position:/);
 });
 
+test("sanitizeWikiHtml preserves Tiptap table column width attributes", function () {
+  const html = '<table><tbody><tr><td colwidth="82" colspan="1" rowspan="1">Icon</td><th colwidth="94" scope="col">Label</th></tr></tbody></table>';
+  const sanitized = wikiHtmlSanitizer.sanitizeWikiHtml(html);
+
+  assert.match(sanitized, /<td(?=[^>]*\bcolwidth="82")(?=[^>]*\bcolspan="1")(?=[^>]*\browspan="1")[^>]*>Icon<\/td>/);
+  assert.match(sanitized, /<th(?=[^>]*\bcolwidth="94")(?=[^>]*\bscope="col")[^>]*>Label<\/th>/);
+});
+
 test("sanitizeWikiHtml preserves wiki callout blocks and strips arbitrary styles", function () {
   const html = '<aside class="wiki-callout wiki-callout--danger bad-class" data-callout-type="danger" data-callout-title="Risk" style="position:fixed"><p><strong>Risk</strong></p><p>Check [[Page]].</p></aside>';
   const sanitized = wikiHtmlSanitizer.sanitizeWikiHtml(html);

@@ -90,11 +90,13 @@
     ],
     "td": [
       "colspan",
-      "rowspan"
+      "rowspan",
+      "colwidth"
     ],
     "th": [
       "colspan",
       "rowspan",
+      "colwidth",
       "scope"
     ],
     "ul": [

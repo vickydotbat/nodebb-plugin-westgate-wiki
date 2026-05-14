@@ -1,7 +1,4 @@
-import { TableMap } from "@tiptap/pm/tables";
-
 import {
-  getActiveTableRowElement,
   getStyleValue,
   getTableNodePosition,
   setClassToken,
@@ -18,74 +15,6 @@ function createDialogField(labelText, input) {
   return label;
 }
 
-function getTableColumnCellPositions(editor, context) {
-  const tablePos = context && context.activeTablePos;
-  const tableNode = Number.isFinite(tablePos) && editor && editor.state ? editor.state.doc.nodeAt(tablePos) : null;
-  const columnIndex = context && context.selectedColumnIndexes && context.selectedColumnIndexes.length
-    ? context.selectedColumnIndexes[0]
-    : -1;
-  if (!tableNode || !Number.isInteger(columnIndex) || columnIndex < 0) {
-    return [];
-  }
-
-  const tableMap = TableMap.get(tableNode);
-  if (columnIndex >= tableMap.width) {
-    return [];
-  }
-
-  const seen = new Set();
-  const positions = [];
-  for (let rowIndex = 0; rowIndex < tableMap.height; rowIndex += 1) {
-    const relativeCellPos = tableMap.map[(rowIndex * tableMap.width) + columnIndex];
-    const pos = tablePos + 1 + relativeCellPos;
-    if (seen.has(pos)) {
-      continue;
-    }
-    seen.add(pos);
-    const rect = tableMap.findCell(relativeCellPos);
-    positions.push({
-      pos,
-      colwidthIndex: rect ? columnIndex - rect.left : 0
-    });
-  }
-  return positions;
-}
-
-function getPixelWidth(value) {
-  const match = String(value || "").trim().match(/^(\d+(?:\.\d+)?)px$/i);
-  return match ? Math.round(parseFloat(match[1])) : null;
-}
-
-function getCellColumnWidthValue(node, fallbackStyle, colwidthIndex) {
-  const colwidth = node && node.attrs && Array.isArray(node.attrs.colwidth)
-    ? node.attrs.colwidth[colwidthIndex || 0]
-    : null;
-  if (Number.isFinite(colwidth) && colwidth > 0) {
-    return `${colwidth}px`;
-  }
-
-  return getStyleValue(node && node.attrs && node.attrs.style || fallbackStyle || "", "width");
-}
-
-function getActiveColumnWidthValue(editor, context) {
-  const columnCellPositions = getTableColumnCellPositions(editor, context);
-  for (const { pos, colwidthIndex } of columnCellPositions) {
-    const node = editor.state.doc.nodeAt(pos);
-    const value = getCellColumnWidthValue(node, "", colwidthIndex);
-    if (value) {
-      return value;
-    }
-  }
-  return "";
-}
-
-function getActiveRowHeightValue(editor, table) {
-  const activeRow = getActiveTableRowElement(editor, table);
-  const rowPos = activeRow ? getTableNodePosition(editor, activeRow) : null;
-  const rowNode = rowPos != null ? editor.state.doc.nodeAt(rowPos) : null;
-  return getStyleValue(rowNode && rowNode.attrs && rowNode.attrs.style || activeRow && activeRow.getAttribute("style") || "", "height");
-}
-
 function setNodeAttrsOnTransaction(tr, editor, pos, attrs) {
   const node = editor.state.doc.nodeAt(pos);
   if (!node) {
@@ -97,6 +26,74 @@ function setNodeAttrsOnTransaction(tr, editor, pos, attrs) {
     ...attrs
   }, node.marks);
   return true;
+}
+
+function isTableCellNode(node) {
+  return node && (node.type.name === "tableCell" || node.type.name === "tableHeader");
+}
+
+function clearTableColumnWidths(tr, editor, tablePos) {
+  const tableNode = editor.state.doc.nodeAt(tablePos);
+  if (!tableNode) {
+    return false;
+  }
+
+  let changed = false;
+  tableNode.descendants(function (node, pos) {
+    if (!isTableCellNode(node)) {
+      return;
+    }
+
+    const style = setStyleValue(node.attrs.style || "", "width", "");
+    changed = setNodeAttrsOnTransaction(tr, editor, tablePos + 1 + pos, {
+      style: style || null,
+      colwidth: null
+    }) || changed;
+  });
+  return changed;
+}
+
+function syncTableElementAttributes(table, attrs) {
+  if (!table) {
+    return;
+  }
+
+  const className = String(attrs.class || "").trim();
+  if (className) {
+    table.setAttribute("class", className);
+  } else {
+    table.removeAttribute("class");
+  }
+
+  const style = String(attrs.style || "").trim();
+  const minWidth = table.style.minWidth;
+  if (style) {
+    table.setAttribute("style", style);
+  } else {
+    table.removeAttribute("style");
+  }
+  if (minWidth && !getStyleValue(style, "min-width")) {
+    table.style.minWidth = minWidth;
+  }
+}
+
+function setBorderColorValue(style, value) {
+  const probe = document.createElement("div");
+  probe.setAttribute("style", String(style || ""));
+  if (value) {
+    probe.style.setProperty("border-color", value);
+  } else {
+    [
+      "border-top-color",
+      "border-right-color",
+      "border-bottom-color",
+      "border-left-color",
+      "border-color"
+    ].forEach(function (propertyName) {
+      probe.style.removeProperty(propertyName);
+    });
+  }
+  return (probe.getAttribute("style") || "").replace(/;\s*$/, "");
 }
 
 export function applyActiveTableProperties(editor, context, values) {
@@ -114,65 +111,36 @@ export function applyActiveTableProperties(editor, context, values) {
 
   let tr = editor.state.tr;
   let changed = false;
-  const columnCellPositions = getTableColumnCellPositions(editor, context);
-  const activeRow = getActiveTableRowElement(editor, table);
-  const rowPos = activeRow ? getTableNodePosition(editor, activeRow) : null;
-  const rowFallbackStyle = activeRow ? activeRow.getAttribute("style") || "" : "";
   const tableAttrs = context.tableAttrs || {};
+  const layout = values.layout === "auto" ? "auto" : "fixed";
+  const borderMode = values.borderMode === "hidden" ? "hidden" : "visible";
+  const previousClassName = tableAttrs.class || table.getAttribute("class") || "";
+  const wasAutoLayout = String(previousClassName).includes("wiki-table-layout-auto");
   let style = tableAttrs.style || table.getAttribute("style") || "";
-  style = setStyleValue(style, "width", values.tableWidth);
-  style = setStyleValue(style, "border-color", values.borderColor);
+  style = setStyleValue(style, "width", layout === "fixed" ? values.tableWidth : "");
+  style = setBorderColorValue(style, borderMode === "visible" ? values.borderColor : "");
 
   let className = setClassToken(
-    tableAttrs.class || table.getAttribute("class") || "",
+    previousClassName,
     "wiki-table-borderless",
-    values.borderMode === "hidden"
+    borderMode === "hidden"
   );
-  className = setClassToken(className, "wiki-table-layout-auto", values.layout === "auto");
-  className = setClassToken(className, "wiki-table-layout-fixed", values.layout !== "auto");
+  className = setClassToken(className, "wiki-table-layout-auto", layout === "auto");
+  className = setClassToken(className, "wiki-table-layout-fixed", layout === "fixed");
 
-  changed = setNodeAttrsOnTransaction(tr, editor, tablePos, {
+  const nextTableAttrs = {
     class: className || null,
     style: style || null
-  }) || changed;
+  };
+  changed = setNodeAttrsOnTransaction(tr, editor, tablePos, nextTableAttrs) || changed;
 
-  if (Object.prototype.hasOwnProperty.call(values, "columnWidth")) {
-    const pixelWidth = getPixelWidth(values.columnWidth);
-    columnCellPositions.forEach(function ({ pos, colwidthIndex }) {
-      const node = editor.state.doc.nodeAt(pos);
-      if (!node) {
-        return;
-      }
-
-      const cellStyle = setStyleValue(node.attrs.style || "", "width", values.columnWidth);
-      let colwidth = node.attrs.colwidth;
-      if (pixelWidth) {
-        colwidth = Array.isArray(colwidth) ? colwidth.slice() : new Array(node.attrs.colspan || 1).fill(0);
-        colwidth[colwidthIndex || 0] = pixelWidth;
-      } else if (Array.isArray(colwidth)) {
-        colwidth = colwidth.slice();
-        colwidth[colwidthIndex || 0] = 0;
-        if (!colwidth.some(function (width) {
-          return Number.isFinite(width) && width > 0;
-        })) {
-          colwidth = null;
-        }
-      }
-      changed = setNodeAttrsOnTransaction(tr, editor, pos, {
-        style: cellStyle || null,
-        colwidth
-      }) || changed;
-    });
-  }
-
-  if (values.rowHeight && rowPos != null) {
-    const rowNode = editor.state.doc.nodeAt(rowPos);
-    const rowStyle = setStyleValue(rowNode && rowNode.attrs.style || rowFallbackStyle, "height", values.rowHeight);
-    changed = setNodeAttrsOnTransaction(tr, editor, rowPos, { style: rowStyle || null }) || changed;
+  if (layout === "auto" && !wasAutoLayout) {
+    changed = clearTableColumnWidths(tr, editor, tablePos) || changed;
   }
 
   if (changed) {
     editor.view.dispatch(tr.scrollIntoView());
+    syncTableElementAttributes(table, nextTableAttrs);
   }
 
   return true;
@@ -208,30 +176,6 @@ export function openTablePropertiesDialog({ editor, context }) {
   dialog.appendChild(form);
 
   const attrs = context.tableAttrs || editor.getAttributes("table") || {};
-  const tableWidth = document.createElement("input");
-  tableWidth.className = "form-control form-control-sm";
-  tableWidth.placeholder = "100%, 32rem, auto";
-  tableWidth.value = getStyleValue(attrs.style, "width") || "100%";
-  form.appendChild(createDialogField("Table width", tableWidth));
-
-  const columnWidth = document.createElement("input");
-  columnWidth.className = "form-control form-control-sm";
-  columnWidth.placeholder = "12rem, 160px, 25%";
-  columnWidth.value = getActiveColumnWidthValue(editor, context);
-  form.appendChild(createDialogField("Current column width", columnWidth));
-
-  const rowHeight = document.createElement("input");
-  rowHeight.className = "form-control form-control-sm";
-  rowHeight.placeholder = "3rem, 48px";
-  rowHeight.value = getActiveRowHeightValue(editor, table);
-  form.appendChild(createDialogField("Current row height", rowHeight));
-
-  const borderColor = document.createElement("input");
-  borderColor.type = "color";
-  borderColor.className = "form-control form-control-color";
-  borderColor.value = "#caa55a";
-  form.appendChild(createDialogField("Border color", borderColor));
-
   const layout = document.createElement("select");
   layout.className = "form-select form-select-sm";
   [["fixed", "Fixed layout"], ["auto", "Auto layout"]].forEach(function ([value, label]) {
@@ -243,16 +187,41 @@ export function openTablePropertiesDialog({ editor, context }) {
   layout.value = String(attrs.class || "").includes("wiki-table-layout-auto") ? "auto" : "fixed";
   form.appendChild(createDialogField("Layout", layout));
 
+  const tableWidth = document.createElement("input");
+  tableWidth.className = "form-control form-control-sm";
+  tableWidth.placeholder = "100%, 32rem, auto";
+  tableWidth.value = getStyleValue(attrs.style, "width") || "100%";
+  const tableWidthField = createDialogField("Table width", tableWidth);
+  form.appendChild(tableWidthField);
+
   const borderMode = document.createElement("select");
   borderMode.className = "form-select form-select-sm";
-  [["visible", "Visible borders"], ["hidden", "No visible borders"]].forEach(function ([value, label]) {
+  [["visible", "Show borders"], ["hidden", "Hide borders"]].forEach(function ([value, label]) {
     const option = document.createElement("option");
     option.value = value;
     option.textContent = label;
     borderMode.appendChild(option);
   });
   borderMode.value = String(attrs.class || "").includes("wiki-table-borderless") ? "hidden" : "visible";
-  form.appendChild(createDialogField("Borders", borderMode));
+  form.appendChild(createDialogField("Show borders", borderMode));
+
+  const borderColor = document.createElement("input");
+  borderColor.type = "color";
+  borderColor.className = "form-control form-control-color";
+  borderColor.value = "#caa55a";
+  const borderColorField = createDialogField("Border color", borderColor);
+  form.appendChild(borderColorField);
+
+  function syncConditionalFields() {
+    tableWidthField.hidden = layout.value !== "fixed";
+    tableWidth.disabled = tableWidthField.hidden;
+    borderColorField.hidden = borderMode.value !== "visible";
+    borderColor.disabled = borderColorField.hidden;
+  }
+
+  layout.addEventListener("change", syncConditionalFields);
+  borderMode.addEventListener("change", syncConditionalFields);
+  syncConditionalFields();
 
   const actions = document.createElement("div");
   actions.className = "wiki-editor-entity-dialog__actions";
@@ -277,10 +246,8 @@ export function openTablePropertiesDialog({ editor, context }) {
   form.addEventListener("submit", function (event) {
     event.preventDefault();
     applyActiveTableProperties(editor, context, {
-      tableWidth: tableWidth.value.trim(),
-      columnWidth: columnWidth.value.trim(),
-      rowHeight: rowHeight.value.trim(),
-      borderColor: borderColor.value,
+      tableWidth: layout.value === "fixed" ? tableWidth.value.trim() : "",
+      borderColor: borderMode.value === "visible" ? borderColor.value : "",
       layout: layout.value,
       borderMode: borderMode.value
     });
@@ -288,6 +255,6 @@ export function openTablePropertiesDialog({ editor, context }) {
   });
 
   document.body.appendChild(shell);
-  tableWidth.focus();
+  layout.focus();
   return true;
 }

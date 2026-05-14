@@ -124,6 +124,18 @@ function getCellStyles(editor) {
   });
 }
 
+function getFirstTableStyle(editor) {
+  const table = editor.state.doc.nodeAt(0);
+  return table && table.attrs ? table.attrs.style || "" : "";
+}
+
+function getDialogFieldByLabel(dialog, labelText) {
+  return Array.from(dialog.querySelectorAll(".wiki-editor-dialog__field")).find(function (field) {
+    const label = field.querySelector("span");
+    return label && label.textContent === labelText;
+  }) || null;
+}
+
 function createSelectionEditorStub(selectionNode) {
   return {
     view: {
@@ -599,8 +611,8 @@ await test("selected-cell clear formatting removes supported cell styles", funct
   editor.destroy();
 });
 
-await test("applyActiveTableProperties preserves table width, layout, borders, column width, and row height", function () {
-  const editor = createTableEditor("<table><tbody><tr><td><p>A1</p></td><td><p>B1</p></td></tr></tbody></table>");
+await test("applyActiveTableProperties ignores stale size and border-color values when controls are unavailable", function () {
+  const editor = createTableEditor("<table><tbody><tr style=\"height: 48px;\"><td style=\"width: 160px;\"><p>A1</p></td><td><p>B1</p></td></tr></tbody></table>");
   const positions = findCellPositions(editor);
   editor.commands.setTextSelection(positions[0] + 2);
   const context = deriveTableContext(editor, editor.view.dom);
@@ -623,69 +635,130 @@ await test("applyActiveTableProperties preserves table width, layout, borders, c
   assert.equal(dispatchCount, 1);
   const html = editor.getHTML();
   assert.match(html, /<table[^>]*class="[^"]*\bwiki-table-borderless\b[^"]*\bwiki-table-layout-auto\b[^"]*"/);
-  assert.match(html, /<table[^>]*style="[^"]*\bwidth:\s*50%/);
-  assert.match(html, /<table[^>]*style="[^"]*\bborder-color:\s*rgb\(202,\s*165,\s*90\)/);
-  assert.match(html, /<tr[^>]*style="[^"]*\bheight:\s*3rem;?[^"]*"/);
-  assert.match(html, /<td[^>]*style="[^"]*\bwidth:\s*12rem;?[^"]*"/);
+  assert.equal(getStyleValue(getFirstTableStyle(editor), "width"), "");
+  assert.equal(getStyleValue(getFirstTableStyle(editor), "border-color"), "");
+  assert.match(html, /<tr[^>]*style="[^"]*\bheight:\s*48px;?[^"]*"/);
+  assert.doesNotMatch(html, /height:\s*3rem/);
+  assert.deepEqual(getCellStyles(editor), ["", ""]);
+  assert.doesNotMatch(html, /width:\s*12rem/);
   editor.destroy();
 });
 
-await test("applyActiveTableProperties applies column width to logical column through colspans", function () {
-  const editor = createTableEditor("<table><tbody><tr><td colspan=\"2\"><p>A</p></td><td><p>B</p></td></tr><tr><td><p>C</p></td><td><p>D</p></td><td><p>E</p></td></tr></tbody></table>");
+await test("applyActiveTableProperties keeps fixed layout table width and ignores direct size values", function () {
+  const editor = createTableEditor("<table><tbody><tr style=\"height: 48px;\"><td style=\"width: 160px;\"><p>A1</p></td><td><p>B1</p></td></tr></tbody></table>");
   const positions = findCellPositions(editor);
-  editor.commands.setTextSelection(positions[1] + 2);
+  editor.commands.setTextSelection(positions[0] + 2);
   const context = deriveTableContext(editor, editor.view.dom);
 
-  assert.deepEqual(context.selectedColumnIndexes, [2]);
   assert.equal(applyActiveTableProperties(editor, context, {
-    tableWidth: "",
+    tableWidth: "42rem",
     columnWidth: "12rem",
-    rowHeight: "",
+    rowHeight: "3rem",
     borderColor: "",
     layout: "fixed",
     borderMode: "visible"
   }), true);
 
+  const html = editor.getHTML();
+  assert.match(html, /<table[^>]*class="[^"]*\bwiki-table-layout-fixed\b/);
+  assert.match(html, /<table[^>]*style="[^"]*\bwidth:\s*42rem;?[^"]*"/);
+  assert.match(html, /<tr[^>]*style="[^"]*\bheight:\s*48px;?[^"]*"/);
+  assert.doesNotMatch(html, /height:\s*3rem/);
+  assert.match(html, /<td[^>]*style="[^"]*\bwidth:\s*160px;?[^"]*"/);
+  assert.doesNotMatch(html, /width:\s*12rem/);
+  editor.destroy();
+});
+
+await test("applyActiveTableProperties clears table width and every column width for auto layout", function () {
+  const editor = createTableEditor("<table class=\"wiki-table-layout-fixed\" style=\"width: 720px; border-color: rgb(10, 20, 30);\"><tbody><tr style=\"height: 48px;\"><td colwidth=\"160\" style=\"width: 160px;\"><p>A1</p></td><td style=\"width: 35%; background-color: rgb(254, 240, 138);\"><p>B1</p></td></tr><tr><td colwidth=\"120\" style=\"width: 120px;\"><p>A2</p></td><td><p>B2</p></td></tr></tbody></table>");
+  const positions = findCellPositions(editor);
+  editor.commands.setTextSelection(positions[0] + 2);
+  const context = deriveTableContext(editor, editor.view.dom);
+
+  assert.equal(applyActiveTableProperties(editor, context, {
+    tableWidth: "50%",
+    columnWidth: "12rem",
+    rowHeight: "3rem",
+    borderColor: "#caa55a",
+    layout: "auto",
+    borderMode: "visible"
+  }), true);
+
+  const html = editor.getHTML();
+  assert.match(html, /<table[^>]*class="[^"]*\bwiki-table-layout-auto\b/);
+  assert.doesNotMatch(html, /<table[^>]*class="[^"]*\bwiki-table-layout-fixed\b/);
+  assert.equal(getStyleValue(getFirstTableStyle(editor), "width"), "");
+  assert.match(html, /<table[^>]*style="[^"]*\bborder-color:\s*rgb\(202,\s*165,\s*90\)/);
+  assert.match(html, /<tr[^>]*style="[^"]*\bheight:\s*48px;?[^"]*"/);
+  assert.doesNotMatch(html, /height:\s*3rem/);
   assert.deepEqual(getCellStyles(editor), [
     "",
-    "width: 12rem",
+    "background-color: rgb(254, 240, 138)",
     "",
-    "",
-    "width: 12rem"
+    ""
   ]);
-  editor.destroy();
-});
-
-await test("applyActiveTableProperties writes pixel column width to TipTap colwidth attrs", function () {
-  const editor = createTableEditor("<table><tbody><tr><td><p>A1</p></td><td><p>B1</p></td></tr><tr><td><p>A2</p></td><td><p>B2</p></td></tr></tbody></table>");
-  const positions = findCellPositions(editor);
-  editor.commands.setTextSelection(positions[1] + 2);
-  const context = deriveTableContext(editor, editor.view.dom);
-
-  assert.equal(applyActiveTableProperties(editor, context, {
-    tableWidth: "",
-    columnWidth: "180px",
-    rowHeight: "",
-    borderColor: "",
-    layout: "fixed",
-    borderMode: "visible"
-  }), true);
-
   assert.deepEqual(findCellPositions(editor).map(function (pos) {
     return editor.state.doc.nodeAt(pos).attrs.colwidth;
   }), [
     null,
-    [180],
     null,
-    [180]
+    null,
+    null
   ]);
-  assert.match(editor.getHTML(), /<td[^>]*colwidth="180"/);
-  assert.match(editor.getHTML(), /<td[^>]*style="[^"]*\bwidth:\s*180px;?[^"]*"/);
   editor.destroy();
 });
 
-await test("table-properties dialog prefills selected column width and row height", function () {
-  const editor = createTableEditor("<table><tbody><tr style=\"height: 48px;\"><td><p>A1</p></td><td colwidth=\"180\"><p>B1</p></td></tr></tbody></table>");
+await test("applyActiveTableProperties preserves column widths on tables that are already auto layout", function () {
+  const editor = createTableEditor("<table class=\"wiki-table-layout-auto\" style=\"border-color: rgb(10, 20, 30);\"><tbody><tr><td colwidth=\"160\" style=\"width: 160px;\"><p>A1</p></td><td style=\"width: 35%; background-color: rgb(254, 240, 138);\"><p>B1</p></td></tr><tr><td colwidth=\"160\" style=\"width: 160px;\"><p>A2</p></td><td><p>B2</p></td></tr></tbody></table>");
+  const positions = findCellPositions(editor);
+  editor.commands.setTextSelection(positions[0] + 2);
+  const context = deriveTableContext(editor, editor.view.dom);
+  const initialColwidths = findCellPositions(editor).map(function (pos) {
+    return editor.state.doc.nodeAt(pos).attrs.colwidth;
+  });
+
+  assert.equal(applyActiveTableProperties(editor, context, {
+    tableWidth: "50%",
+    borderColor: "#caa55a",
+    layout: "auto",
+    borderMode: "visible"
+  }), true);
+
+  assert.equal(getStyleValue(getFirstTableStyle(editor), "width"), "");
+  assert.deepEqual(getCellStyles(editor), [
+    "width: 160px",
+    "width: 35%; background-color: rgb(254, 240, 138)",
+    "width: 160px",
+    ""
+  ]);
+  assert.deepEqual(findCellPositions(editor).map(function (pos) {
+    return editor.state.doc.nodeAt(pos).attrs.colwidth;
+  }), initialColwidths);
+  editor.destroy();
+});
+
+await test("applyActiveTableProperties clears border color when borders are hidden", function () {
+  const editor = createTableEditor("<table class=\"wiki-table-layout-fixed\" style=\"width: 720px; border-color: rgb(10, 20, 30);\"><tbody><tr><td><p>A1</p></td></tr></tbody></table>");
+  const positions = findCellPositions(editor);
+  editor.commands.setTextSelection(positions[0] + 2);
+  const context = deriveTableContext(editor, editor.view.dom);
+
+  assert.equal(applyActiveTableProperties(editor, context, {
+    tableWidth: "640px",
+    borderColor: "#caa55a",
+    layout: "fixed",
+    borderMode: "hidden"
+  }), true);
+
+  const html = editor.getHTML();
+  assert.match(html, /<table[^>]*class="[^"]*\bwiki-table-borderless\b/);
+  assert.match(html, /<table[^>]*style="[^"]*\bwidth:\s*640px;?[^"]*"/);
+  assert.doesNotMatch(html, /border-color/);
+  editor.destroy();
+});
+
+await test("table-properties dialog hides size fields and conditionally shows fixed-only controls", function () {
+  const editor = createTableEditor("<table class=\"wiki-table-layout-auto wiki-table-borderless\" style=\"width: 50%; border-color: rgb(202, 165, 90);\"><tbody><tr style=\"height: 48px;\"><td><p>A1</p></td><td colwidth=\"180\"><p>B1</p></td></tr></tbody></table>");
   const positions = findCellPositions(editor);
   editor.commands.setTextSelection(positions[1] + 2);
   const context = deriveTableContext(editor, editor.view.dom);
@@ -693,9 +766,28 @@ await test("table-properties dialog prefills selected column width and row heigh
   assert.equal(executeTableCommand(editor, context, "table-properties"), true);
 
   const dialog = document.querySelector(".wiki-editor-table-dialog");
-  const inputs = dialog.querySelectorAll("input");
-  assert.equal(inputs[1].value, "180px");
-  assert.equal(inputs[2].value, "48px");
+  const tableWidthField = getDialogFieldByLabel(dialog, "Table width");
+  const borderColorField = getDialogFieldByLabel(dialog, "Border color");
+  const layout = getDialogFieldByLabel(dialog, "Layout").querySelector("select");
+  const borderMode = getDialogFieldByLabel(dialog, "Show borders").querySelector("select");
+  const fieldLabels = Array.from(dialog.querySelectorAll(".wiki-editor-dialog__field > span")).map(function (label) {
+    return label.textContent;
+  });
+
+  assert.deepEqual(fieldLabels, ["Layout", "Table width", "Show borders", "Border color"]);
+  assert.equal(getDialogFieldByLabel(dialog, "Current column width"), null);
+  assert.equal(getDialogFieldByLabel(dialog, "Current row height"), null);
+  assert.equal(tableWidthField.hidden, true);
+  assert.equal(borderColorField.hidden, true);
+
+  layout.value = "fixed";
+  layout.dispatchEvent(new window.Event("change", { bubbles: true }));
+  assert.equal(tableWidthField.hidden, false);
+
+  borderMode.value = "visible";
+  borderMode.dispatchEvent(new window.Event("change", { bubbles: true }));
+  assert.equal(borderColorField.hidden, false);
+
   document.querySelector(".wiki-editor-entity-dialog-shell").remove();
   editor.destroy();
 });
@@ -759,6 +851,53 @@ await test("createTableAuthoring installs sticky table row and cell popover surf
   assert.equal(shell.querySelector(".wiki-editor-table-sticky-row"), null);
   assert.equal(shell.querySelector(".wiki-editor-table-cell-popover"), null);
   assert.equal(editor.view.dispatch, originalDispatch);
+  editor.destroy();
+  shell.remove();
+});
+
+await test("auto layout disables direct table width dragging", function () {
+  const editor = createTableEditor("<table class=\"wiki-table-layout-auto\" style=\"border-color: rgb(10, 20, 30);\"><tbody><tr><td><p>A1</p></td><td><p>B1</p></td></tr></tbody></table>");
+  const shell = createEditorShell(editor);
+  const authoring = createTableAuthoring(shell, editor);
+
+  shell.getBoundingClientRect = function () {
+    return { left: 0, top: 0, width: 640, height: 320, right: 640, bottom: 320 };
+  };
+  const table = editor.view.dom.querySelector("table");
+  const row = editor.view.dom.querySelector("tr");
+  table.getBoundingClientRect = function () {
+    return { left: 20, top: 40, width: 360, height: 80, right: 380, bottom: 120 };
+  };
+  row.getBoundingClientRect = function () {
+    return { left: 20, top: 40, width: 360, height: 40, right: 380, bottom: 80 };
+  };
+
+  editor.commands.setTextSelection(5);
+  editor.view.dispatch(editor.state.tr.scrollIntoView());
+
+  const widthHandle = shell.querySelector(".wiki-editor-table-resize-handle--width");
+  const rowHandle = shell.querySelector(".wiki-editor-table-resize-handle--row");
+  assert(widthHandle, "table width resize handle should be installed");
+  assert(rowHandle, "row resize handle should be installed");
+  assert.equal(widthHandle.hidden, true);
+  assert.equal(rowHandle.hidden, false);
+
+  widthHandle.dispatchEvent(new window.PointerEvent("pointerdown", {
+    bubbles: true,
+    cancelable: true,
+    clientX: 380,
+    clientY: 60
+  }));
+  window.dispatchEvent(new window.PointerEvent("pointermove", {
+    bubbles: true,
+    clientX: 520,
+    clientY: 60
+  }));
+  window.dispatchEvent(new window.PointerEvent("pointerup", { bubbles: true }));
+
+  assert.equal(getStyleValue(getFirstTableStyle(editor), "width"), "");
+
+  authoring.destroy();
   editor.destroy();
   shell.remove();
 });

@@ -447,6 +447,19 @@ await test("table cell paragraphs have no margins in article and editor prose", 
   });
 });
 
+await test("saved table colgroup widths reload into Tiptap column width attrs", function () {
+  const savedHtml = '<table class="wiki-table-borderless wiki-table-layout-fixed" style="width:100%"><colgroup><col style="width:82px"><col style="width:94px"><col></colgroup><tbody><tr><td style="width:64px" colspan="1" rowspan="1"><p>Icon</p></td><td class="wiki-table-cell-valign-top" style="text-align:right" colspan="1" rowspan="1"><p><strong>Bull Rush:</strong></p></td><td class="wiki-table-cell-valign-top" colspan="1" rowspan="1"><p>pushes the enemy away.</p></td></tr></tbody></table>';
+  const normalized = normalizeLegacyHtmlForTiptap(savedHtml);
+  const editor = createEditor(sanitizeHtml(normalized));
+  const rendered = editor.getHTML();
+
+  assert.match(normalized, /<td(?=[^>]*\bcolwidth="82")(?=[^>]*\bstyle="width:64px")[^>]*>/);
+  assert.match(normalized, /<td(?=[^>]*\bcolwidth="94")(?=[^>]*\bclass="wiki-table-cell-valign-top")(?=[^>]*\bstyle="text-align:right")[^>]*>/);
+  assert.match(rendered, /<col style="width: 82px/);
+  assert.match(rendered, /<col style="width: 94px/);
+  editor.destroy();
+});
+
 await test("table styles preserve flexible size and border controls", function () {
   const editor = createEditor('<table><tbody><tr><td><p>Flexible</p></td></tr></tbody></table>');
 
