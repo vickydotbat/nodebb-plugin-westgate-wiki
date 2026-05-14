@@ -1968,6 +1968,13 @@ await test("editor ToC updates are debounced and avoid transaction-only DOM rewr
   assert.doesNotMatch(editorBundleSource, /editor\.on\("transaction",\s*syncToc\)/);
 });
 
+await test("editor ToC child sections start collapsed", function () {
+  assert.match(editorBundleSource, /row\.classList\.add\("wiki-editor-toc__entry--collapsed"\)/);
+  assert.match(editorBundleSource, /childList\.hidden\s*=\s*true/);
+  assert.match(editorBundleSource, /toggle\.setAttribute\("aria-expanded",\s*"false"\)/);
+  assert.match(editorBundleSource, /toggle\.setAttribute\("aria-label",\s*"Expand "\s*\+\s*\(item\.text\s*\|\|\s*"heading"\)\)/);
+});
+
 await test("editor ToC navigation dispatches a source sync event", function () {
   assert.match(editorBundleSource, /new CustomEvent\("wiki-editor-toc-navigate"/);
   assert.match(editorBundleSource, /detail:\s*\{\s*item/);

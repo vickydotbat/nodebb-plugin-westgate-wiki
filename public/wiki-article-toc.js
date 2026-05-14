@@ -101,11 +101,13 @@
       if (next && nextLevel > level) {
         const sub = document.createElement("ol");
         sub.className = "wiki-article-toc__ol wiki-article-toc__ol--nest";
+        li.classList.add("wiki-article-toc__item--collapsed");
+        sub.hidden = true;
         const toggle = document.createElement("button");
         toggle.type = "button";
         toggle.className = "wiki-article-toc__toggle";
-        toggle.setAttribute("aria-expanded", "true");
-        toggle.setAttribute("aria-label", "Collapse " + (a.textContent || "section"));
+        toggle.setAttribute("aria-expanded", "false");
+        toggle.setAttribute("aria-label", "Expand " + (a.textContent || "section"));
         toggle.innerHTML = '<i class="fa fa-fw fa-caret-down" aria-hidden="true"></i>';
         toggle.addEventListener("click", function (event) {
           const collapsed = !li.classList.contains("wiki-article-toc__item--collapsed");

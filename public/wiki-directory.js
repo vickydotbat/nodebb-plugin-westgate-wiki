@@ -178,8 +178,9 @@
     var toggle = document.createElement("button");
     toggle.type = "button";
     toggle.className = "wiki-directory-tree-toggle";
-    toggle.setAttribute("aria-expanded", "true");
-    toggle.setAttribute("aria-label", "Collapse " + label);
+    row.classList.add("wiki-directory-row--collapsed");
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.setAttribute("aria-label", "Expand " + label);
     toggle.innerHTML = '<i class="fa fa-fw fa-caret-down" aria-hidden="true"></i>';
     toggle.addEventListener("click", function (event) {
       var collapsed = !row.classList.contains("wiki-directory-row--collapsed");
