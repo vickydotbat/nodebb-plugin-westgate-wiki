@@ -92,7 +92,7 @@ function runChainCommand(editor, commandName) {
     return false;
   }
 
-  const chain = editor.chain().focus();
+  const chain = editor.chain().focus(null, { scrollIntoView: false });
   return chain && typeof chain[commandName] === "function" ? chain[commandName]().run() : false;
 }
 
@@ -101,7 +101,7 @@ function canRunChainCommand(editor, commandName) {
     return false;
   }
 
-  const chain = editor.can().chain().focus();
+  const chain = editor.can().chain().focus(null, { scrollIntoView: false });
   return chain && typeof chain[commandName] === "function" ? chain[commandName]().run() : false;
 }
 
@@ -243,7 +243,7 @@ function applySelectedCellStyles(editor, context, id, payload) {
   });
 
   if (changed) {
-    editor.view.dispatch(tr.scrollIntoView());
+    editor.view.dispatch(tr);
   }
   return changed;
 }

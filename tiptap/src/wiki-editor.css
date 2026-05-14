@@ -837,10 +837,13 @@
   border-radius: var(--bs-border-radius, 0.5rem);
   background: color-mix(in srgb, var(--wiki-compose-editable-bg, var(--bs-body-bg, #fff)) 92%, var(--wiki-editor-focus-border, var(--bs-primary, #0d6efd)) 8%);
   box-shadow: 0 0.45rem 1.2rem color-mix(in srgb, #000 18%, transparent);
+  margin-left:0.8rem;
 }
 
-.westgate-wiki-compose .wiki-editor-table-sticky-row[hidden] {
-  display: none;
+.westgate-wiki-compose .wiki-editor-table-sticky-row--inactive {
+  visibility: hidden;
+  pointer-events: none;
+  box-shadow: none;
 }
 
 .westgate-wiki-compose .wiki-editor-table-cell-popover {

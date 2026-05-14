@@ -505,6 +505,24 @@ await test("selected-cell background command applies to every selected cell", fu
   editor.destroy();
 });
 
+await test("selected-cell formatting commands do not force selection scroll", function () {
+  const editor = createTableEditor("<table><tbody><tr><td><p>A1</p></td><td><p>B1</p></td></tr></tbody></table>");
+  const positions = findCellPositions(editor);
+  editor.view.dispatch(editor.state.tr.setSelection(CellSelection.create(editor.state.doc, positions[0], positions[1])));
+  const context = deriveTableContext(editor, editor.view.dom);
+  let requestedScroll = false;
+  const originalDispatch = editor.view.dispatch.bind(editor.view);
+  editor.view.dispatch = function (transaction) {
+    requestedScroll = requestedScroll || Boolean(transaction.scrolledIntoView);
+    originalDispatch(transaction);
+  };
+
+  assert.equal(executeTableCommand(editor, context, "table-cell-background", { value: "#dbeafe" }), true);
+
+  assert.equal(requestedScroll, false);
+  editor.destroy();
+});
+
 await test("selected-cell text color command accepts value payload", function () {
   const editor = createTableEditor("<table><tbody><tr><td><p>A1</p></td><td><p>B1</p></td></tr></tbody></table>");
   const positions = findCellPositions(editor);
@@ -641,6 +659,29 @@ await test("applyActiveTableProperties ignores stale size and border-color value
   assert.doesNotMatch(html, /height:\s*3rem/);
   assert.deepEqual(getCellStyles(editor), ["", ""]);
   assert.doesNotMatch(html, /width:\s*12rem/);
+  editor.destroy();
+});
+
+await test("applyActiveTableProperties does not force selection scroll", function () {
+  const editor = createTableEditor("<table><tbody><tr><td><p>A1</p></td></tr></tbody></table>");
+  const positions = findCellPositions(editor);
+  editor.commands.setTextSelection(positions[0] + 2);
+  const context = deriveTableContext(editor, editor.view.dom);
+  let requestedScroll = false;
+  const originalDispatch = editor.view.dispatch.bind(editor.view);
+  editor.view.dispatch = function (transaction) {
+    requestedScroll = requestedScroll || Boolean(transaction.scrolledIntoView);
+    originalDispatch(transaction);
+  };
+
+  assert.equal(applyActiveTableProperties(editor, context, {
+    tableWidth: "42rem",
+    borderColor: "#caa55a",
+    layout: "fixed",
+    borderMode: "visible"
+  }), true);
+
+  assert.equal(requestedScroll, false);
   editor.destroy();
 });
 
@@ -855,6 +896,32 @@ await test("createTableAuthoring installs sticky table row and cell popover surf
   shell.remove();
 });
 
+await test("inactive sticky table row reserves layout space to avoid selection jumps", function () {
+  const editor = createTableEditor("<p>Before table</p><table><tbody><tr><td><p>A1</p></td></tr></tbody></table><p>After table</p>");
+  const shell = createEditorShell(editor);
+
+  editor.commands.setTextSelection(2);
+  const authoring = createTableAuthoring(shell, editor);
+  const sticky = shell.querySelector(".wiki-editor-table-sticky-row");
+
+  assert(sticky, "sticky table row should be installed");
+  assert.equal(sticky.hidden, false);
+  assert.equal(sticky.classList.contains("wiki-editor-table-sticky-row--inactive"), true);
+  assert.equal(sticky.getAttribute("aria-hidden"), "true");
+  assert.equal(Array.from(sticky.querySelectorAll("button")).every(function (button) {
+    return button.disabled;
+  }), true);
+
+  editor.commands.setTextSelection(findCellPositions(editor)[0] + 2);
+  editor.view.dispatch(editor.state.tr);
+  assert.equal(sticky.classList.contains("wiki-editor-table-sticky-row--inactive"), false);
+  assert.equal(sticky.getAttribute("aria-hidden"), "false");
+
+  authoring.destroy();
+  editor.destroy();
+  shell.remove();
+});
+
 await test("auto layout disables direct table width dragging", function () {
   const editor = createTableEditor("<table class=\"wiki-table-layout-auto\" style=\"border-color: rgb(10, 20, 30);\"><tbody><tr><td><p>A1</p></td><td><p>B1</p></td></tr></tbody></table>");
   const shell = createEditorShell(editor);
@@ -904,6 +971,7 @@ await test("auto layout disables direct table width dragging", function () {
 
 await test("table authoring sticky row uses the sticky CSS contract", function () {
   const stickyRule = wikiEditorCss.match(/\.westgate-wiki-compose\s+\.wiki-editor-table-sticky-row\s*\{[^}]+\}/);
+  const inactiveRule = wikiEditorCss.match(/\.westgate-wiki-compose\s+\.wiki-editor-table-sticky-row--inactive\s*\{[^}]+\}/);
   const surfaceRule = wikiEditorCss.match(/\.westgate-wiki-compose\s+\.wiki-editor__surface\s*\{[^}]+\}/);
 
   assert(surfaceRule, "editor surface CSS rule should exist");
@@ -913,6 +981,10 @@ await test("table authoring sticky row uses the sticky CSS contract", function (
   assert.match(stickyRule[0], /\btop:\s*calc\(var\(--wiki-compose-toolbar-sticky-top,\s*0\.75rem\)\s*\+\s*var\(--wiki-editor-main-toolbar-height,\s*3\.25rem\)\);/);
   assert.match(stickyRule[0], /\bz-index:\s*8;/);
   assert.doesNotMatch(stickyRule[0], /\bposition:\s*absolute;/);
+  assert(inactiveRule, "inactive sticky row CSS rule should exist");
+  assert.match(inactiveRule[0], /\bvisibility:\s*hidden;/);
+  assert.match(inactiveRule[0], /\bpointer-events:\s*none;/);
+  assert.doesNotMatch(wikiEditorCss, /\.wiki-editor-table-sticky-row\[hidden\]\s*\{[^}]*display:\s*none/);
 });
 
 await test("table authoring resyncs floating controls on active table wrapper scroll", function () {

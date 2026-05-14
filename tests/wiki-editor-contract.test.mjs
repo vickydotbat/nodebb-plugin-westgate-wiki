@@ -188,6 +188,35 @@ function findNodePositions(editor, typeName) {
   return positions;
 }
 
+function nextAnimationFrame() {
+  return new Promise(function (resolve) {
+    requestAnimationFrame(resolve);
+  });
+}
+
+function countEditorScrollRequests(editor) {
+  let scrollRequests = 0;
+  const originalCommand = editor.commands.scrollIntoView;
+  editor.commands.scrollIntoView = function () {
+    scrollRequests += 1;
+    return originalCommand.apply(this, arguments);
+  };
+  return function getScrollRequests() {
+    return scrollRequests;
+  };
+}
+
+function moveFocusOutsideEditor() {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = "Outside editor";
+  document.body.appendChild(button);
+  button.focus();
+  return function cleanup() {
+    button.remove();
+  };
+}
+
 await test("normalizeLegacyHtmlForTiptap converts legacy media layouts into wiki media rows", function () {
   const normalized = normalizeLegacyHtmlForTiptap(
     '<div style="display:flex"><img src="/one.png" alt="One"><div style="display:block"><p>Two</p></div></div>'
@@ -745,6 +774,23 @@ await test("full-width image figures can be reselected by clicking the figure su
   editor.destroy();
 });
 
+await test("click-selecting image figures does not request editor scroll", async function () {
+  const editor = createEditor('<figure class="image image-style-block wiki-image-size-full"><img src="/full.png" alt="Full"><figcaption><p>Caption</p></figcaption></figure><p>After</p>');
+  const figure = editor.view.dom.querySelector('[data-wiki-node="image-figure"]');
+
+  editor.commands.setTextSelection(editor.state.doc.content.size);
+  const cleanupFocus = moveFocusOutsideEditor();
+  const getScrollRequests = countEditorScrollRequests(editor);
+
+  assert.equal(selectClickedImageNode(editor, figure, editor.view.dom), true);
+  await nextAnimationFrame();
+
+  assert.equal(editor.state.selection.node.type.name, "imageFigure");
+  assert.equal(getScrollRequests(), 0);
+  cleanupFocus();
+  editor.destroy();
+});
+
 await test("image figure captions remain editable instead of selecting the whole figure", function () {
   const editor = createEditor('<figure class="image"><img src="/full.png" alt="Full"><figcaption><p>Caption</p></figcaption></figure><p>After</p>');
   const captionText = editor.view.dom.querySelector("figcaption p").firstChild;
@@ -884,6 +930,23 @@ await test("media cell chrome clicks can select an outer cell that only contains
   assert.equal(focusMediaCell(editor, outerCell), true);
   assert.equal(editor.state.selection.node && editor.state.selection.node.type.name, "mediaCell");
   assert.equal(editor.state.selection.from, findNodePositions(editor, "mediaCell")[0]);
+  editor.destroy();
+});
+
+await test("click-selecting nested media cells does not request editor scroll", async function () {
+  const editor = createEditor('<div class="wiki-media-row"><div class="wiki-media-cell"><div class="wiki-media-row"><div class="wiki-media-cell"><p>Nested A</p></div><div class="wiki-media-cell"><p>Nested B</p></div></div></div><div class="wiki-media-cell"><p>Sibling</p></div></div><p>After</p>');
+  const outerCell = editor.view.dom.querySelector('[data-wiki-node="media-cell"]');
+
+  editor.commands.setTextSelection(editor.state.doc.content.size);
+  const cleanupFocus = moveFocusOutsideEditor();
+  const getScrollRequests = countEditorScrollRequests(editor);
+
+  assert.equal(focusMediaCell(editor, outerCell), true);
+  await nextAnimationFrame();
+
+  assert.equal(editor.state.selection.node && editor.state.selection.node.type.name, "mediaCell");
+  assert.equal(getScrollRequests(), 0);
+  cleanupFocus();
   editor.destroy();
 });
 

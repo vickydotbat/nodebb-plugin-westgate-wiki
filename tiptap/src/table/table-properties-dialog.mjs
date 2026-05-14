@@ -139,7 +139,7 @@ export function applyActiveTableProperties(editor, context, values) {
   }
 
   if (changed) {
-    editor.view.dispatch(tr.scrollIntoView());
+    editor.view.dispatch(tr);
     syncTableElementAttributes(table, nextTableAttrs);
   }
 
@@ -239,7 +239,7 @@ export function openTablePropertiesDialog({ editor, context }) {
 
   function close() {
     shell.remove();
-    editor.commands.focus();
+    editor.commands.focus(null, { scrollIntoView: false });
   }
 
   cancel.addEventListener("click", close);
