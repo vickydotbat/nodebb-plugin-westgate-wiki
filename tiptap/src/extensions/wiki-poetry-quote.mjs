@@ -1,5 +1,7 @@
 import { mergeAttributes, Node } from "@tiptap/core";
 
+const QUOTE_POSITIONS = new Set(["left", "center", "right"]);
+
 function normalizeQuoteText(value, fallback) {
   const text = String(value || "").replace(/\s+/g, " ").trim();
   return text || fallback;
@@ -8,6 +10,25 @@ function normalizeQuoteText(value, fallback) {
 function normalizeAttribution(value) {
   const text = normalizeQuoteText(value, "Author").replace(/^[\s-]+/, "").trim();
   return `— ${text || "Author"}`;
+}
+
+function normalizeQuotePosition(value) {
+  const position = String(value || "").trim().toLowerCase();
+  return QUOTE_POSITIONS.has(position) ? position : "left";
+}
+
+function parseQuotePosition(element) {
+  const storedPosition = element.getAttribute("data-wiki-quote-position");
+  if (storedPosition) {
+    return normalizeQuotePosition(storedPosition);
+  }
+  if (element.classList.contains("wiki-poetry-quote--right")) {
+    return "right";
+  }
+  if (element.classList.contains("wiki-poetry-quote--center")) {
+    return "center";
+  }
+  return "left";
 }
 
 const WikiPoetryQuote = Node.create({
@@ -23,6 +44,10 @@ const WikiPoetryQuote = Node.create({
         parseHTML: function (element) {
           return element.getAttribute("data-wiki-quote-container") !== "false";
         }
+      },
+      position: {
+        default: "left",
+        parseHTML: parseQuotePosition
       }
     };
   },
@@ -36,16 +61,25 @@ const WikiPoetryQuote = Node.create({
   },
   renderHTML({ HTMLAttributes }) {
     const hasContainer = HTMLAttributes.container !== false;
-    const className = hasContainer ? "wiki-poetry-quote" : "wiki-poetry-quote wiki-poetry-quote--plain";
+    const position = normalizeQuotePosition(HTMLAttributes.position);
+    const classNames = ["wiki-poetry-quote"];
+    if (!hasContainer) {
+      classNames.push("wiki-poetry-quote--plain");
+    }
+    if (position !== "left") {
+      classNames.push(`wiki-poetry-quote--${position}`);
+    }
     const attrs = mergeAttributes(
       HTMLAttributes,
       {
-        class: className,
+        class: classNames.join(" "),
         "data-wiki-node": "poetry-quote"
       },
-      hasContainer ? {} : { "data-wiki-quote-container": "false" }
+      hasContainer ? {} : { "data-wiki-quote-container": "false" },
+      position === "left" ? {} : { "data-wiki-quote-position": position }
     );
     delete attrs.container;
+    delete attrs.position;
 
     return [
       "figure",
@@ -77,6 +111,25 @@ const WikiPoetryQuote = Node.create({
               }
             ]
           });
+        },
+      setWikiPoetryQuotePosition:
+        (position) =>
+        ({ state, tr, dispatch }) => {
+          const normalizedPosition = normalizeQuotePosition(position);
+          const { $from } = state.selection;
+          for (let depth = $from.depth; depth > 0; depth -= 1) {
+            const node = $from.node(depth);
+            if (node.type.name === this.name) {
+              if (dispatch) {
+                tr.setNodeMarkup($from.before(depth), undefined, {
+                  ...node.attrs,
+                  position: normalizedPosition
+                });
+              }
+              return true;
+            }
+          }
+          return false;
         },
       toggleWikiPoetryQuoteContainer:
         () =>

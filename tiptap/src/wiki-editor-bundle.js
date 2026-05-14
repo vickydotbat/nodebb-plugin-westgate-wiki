@@ -144,6 +144,9 @@ const BUTTON_ICONS = {
   "table-toggle-header-column": "fa-header",
   "dnd-alignment-table-edit": "fa-th",
   "table-delete": "fa-trash",
+  "poetry-quote-align-left": "fa-align-left",
+  "poetry-quote-align-center": "fa-align-center",
+  "poetry-quote-align-right": "fa-align-right",
   "poetry-quote-container": "fa-square-o",
   "poetry-quote-unwrap": "fa-outdent",
   "image-align-center": "fa-align-center",
@@ -2049,6 +2052,36 @@ function createPoetryQuoteContextToolbar(surface, editor) {
   panel.setAttribute("aria-label", "Selected poetry quote tools");
   panel.hidden = true;
 
+  const alignLeft = createButton({
+    id: "poetry-quote-align-left",
+    title: "Position quote left",
+    action: function () {
+      editor.chain().focus().setWikiPoetryQuotePosition("left").run();
+    },
+    applyState: function (button) {
+      button.classList.toggle("active", (editor.getAttributes("wikiPoetryQuote").position || "left") === "left");
+    }
+  });
+  const alignCenter = createButton({
+    id: "poetry-quote-align-center",
+    title: "Position quote center",
+    action: function () {
+      editor.chain().focus().setWikiPoetryQuotePosition("center").run();
+    },
+    applyState: function (button) {
+      button.classList.toggle("active", editor.getAttributes("wikiPoetryQuote").position === "center");
+    }
+  });
+  const alignRight = createButton({
+    id: "poetry-quote-align-right",
+    title: "Position quote right",
+    action: function () {
+      editor.chain().focus().setWikiPoetryQuotePosition("right").run();
+    },
+    applyState: function (button) {
+      button.classList.toggle("active", editor.getAttributes("wikiPoetryQuote").position === "right");
+    }
+  });
   const container = createButton({
     id: "poetry-quote-container",
     title: "Toggle quote container",
@@ -2067,6 +2100,9 @@ function createPoetryQuoteContextToolbar(surface, editor) {
     },
     applyState: function () {}
   });
+  panel.appendChild(alignLeft);
+  panel.appendChild(alignCenter);
+  panel.appendChild(alignRight);
   panel.appendChild(container);
   panel.appendChild(unwrap);
 
@@ -2076,6 +2112,13 @@ function createPoetryQuoteContextToolbar(surface, editor) {
     if (!quote) {
       return;
     }
+    const activePosition = editor.getAttributes("wikiPoetryQuote").position || "left";
+    alignLeft.disabled = false;
+    alignCenter.disabled = false;
+    alignRight.disabled = false;
+    alignLeft.classList.toggle("active", activePosition === "left");
+    alignCenter.classList.toggle("active", activePosition === "center");
+    alignRight.classList.toggle("active", activePosition === "right");
     container.classList.remove("active");
     container.disabled = false;
     unwrap.disabled = false;
