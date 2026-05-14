@@ -306,6 +306,14 @@ function isInsidePluginOwnedStructure(element) {
   return !!(element && element.closest && element.closest('[data-wiki-node="alignment-table"], figure.wiki-poetry-quote, [data-wiki-node="poetry-quote"]'));
 }
 
+function isPluginOwnedMediaLayoutElement(element) {
+  if (!element || !element.matches) {
+    return false;
+  }
+
+  return element.matches('[data-wiki-node="media-row"], [data-wiki-node="media-cell"], .wiki-media-row, .wiki-media-cell');
+}
+
 export function normalizeLegacyPresentationalTags(document, root) {
   [
     ["abbr", "span"],
@@ -441,6 +449,101 @@ export function normalizeLegacyTableStructures(document, root) {
 
     replaceElement(figure, table);
   });
+
+  root.querySelectorAll("table").forEach(normalizeTableColgroupWidths);
+}
+
+function getPositiveIntegerAttribute(element, attrName, fallback) {
+  const value = parseInt(element.getAttribute(attrName), 10);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function getPixelWidth(value) {
+  const match = String(value || "").trim().match(/^(\d+(?:\.\d+)?)px$/i);
+  if (!match) {
+    return null;
+  }
+  const width = Math.round(parseFloat(match[1]));
+  return Number.isFinite(width) && width > 0 ? width : null;
+}
+
+function getColgroupWidths(table) {
+  const colgroup = table.querySelector(":scope > colgroup");
+  if (!colgroup) {
+    return [];
+  }
+
+  return Array.from(colgroup.querySelectorAll(":scope > col")).map(function (col) {
+    return getPixelWidth(col.style && col.style.getPropertyValue("width") || col.getAttribute("width"));
+  });
+}
+
+function getExistingColwidths(cell, colspan) {
+  return String(cell.getAttribute("colwidth") || "")
+    .split(",")
+    .slice(0, colspan)
+    .map(function (value) {
+      const width = parseInt(value, 10);
+      return Number.isFinite(width) && width > 0 ? width : null;
+    });
+}
+
+function applyColgroupWidthsToCell(cell, colgroupWidths, columnIndex) {
+  const colspan = getPositiveIntegerAttribute(cell, "colspan", 1);
+  const existingColwidths = getExistingColwidths(cell, colspan);
+  const nextColwidths = [];
+  let hasWidth = false;
+
+  for (let offset = 0; offset < colspan; offset += 1) {
+    const width = existingColwidths[offset] || colgroupWidths[columnIndex + offset] || 0;
+    nextColwidths.push(width);
+    hasWidth = hasWidth || width > 0;
+  }
+
+  if (hasWidth) {
+    cell.setAttribute("colwidth", nextColwidths.join(","));
+  }
+}
+
+function normalizeTableColgroupWidths(table) {
+  const colgroupWidths = getColgroupWidths(table);
+  if (!colgroupWidths.some(function (width) {
+    return Number.isFinite(width) && width > 0;
+  })) {
+    return;
+  }
+
+  const occupiedColumns = [];
+  Array.from(table.rows || table.querySelectorAll("tr")).forEach(function (row) {
+    let columnIndex = 0;
+    Array.from(row.children || []).forEach(function (cell) {
+      const tagName = cell.tagName ? cell.tagName.toLowerCase() : "";
+      if (tagName !== "td" && tagName !== "th") {
+        return;
+      }
+
+      while (occupiedColumns[columnIndex] > 0) {
+        columnIndex += 1;
+      }
+
+      const colspan = getPositiveIntegerAttribute(cell, "colspan", 1);
+      const rowspan = getPositiveIntegerAttribute(cell, "rowspan", 1);
+      applyColgroupWidthsToCell(cell, colgroupWidths, columnIndex);
+      if (rowspan > 1) {
+        for (let offset = 0; offset < colspan; offset += 1) {
+          const logicalColumn = columnIndex + offset;
+          occupiedColumns[logicalColumn] = Math.max(occupiedColumns[logicalColumn] || 0, rowspan);
+        }
+      }
+      columnIndex += colspan;
+    });
+
+    for (let index = 0; index < occupiedColumns.length; index += 1) {
+      if (occupiedColumns[index] > 0) {
+        occupiedColumns[index] -= 1;
+      }
+    }
+  });
 }
 
 export function normalizeLegacyListTags(document, root) {
@@ -491,7 +594,9 @@ export function normalizeLegacyMediaLayouts(document, root) {
     element.setAttribute("class", "wiki-media-row");
 
     directChildren.forEach(function (child) {
-      if (child.tagName.toLowerCase() === "img" || isSupportedImageFigure(child)) {
+      const childTagName = child.tagName.toLowerCase();
+      const isSupportedCellElement = ["article", "section", "div"].includes(childTagName);
+      if (childTagName === "img" || isSupportedImageFigure(child) || !isSupportedCellElement) {
         const wrapper = document.createElement("div");
         wrapper.setAttribute("class", "wiki-media-cell");
         child.parentNode.replaceChild(wrapper, child);
@@ -651,7 +756,7 @@ export function normalizeLegacyHtmlForTiptap(html) {
   }
 
   root.querySelectorAll("article, section, div").forEach(function (element) {
-    if (isInsidePluginOwnedStructure(element)) {
+    if (isInsidePluginOwnedStructure(element) || isPluginOwnedMediaLayoutElement(element)) {
       return;
     }
 

@@ -89,6 +89,10 @@
       "method": "wikiFilterTopicPost"
     },
     {
+      "hook": "filter:post.edit",
+      "method": "wikiFilterPostEdit"
+    },
+    {
       "hook": "filter:topic.edit",
       "method": "wikiFilterTopicEdit"
     },

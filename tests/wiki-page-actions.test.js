@@ -109,6 +109,26 @@ assert(
   "move endpoint should be registered"
 );
 assert(
+  library.includes("/westgate-wiki/page/save"),
+  "wiki page save endpoint should be registered"
+);
+{
+  const routeStart = library.indexOf('"/westgate-wiki/page/save"');
+  const routeEnd = library.indexOf("wikiPageActions.saveWikiPage", routeStart);
+  assert.notStrictEqual(routeStart, -1, "wiki page save route should be present");
+  assert.notStrictEqual(routeEnd, -1, "wiki page save route should point to saveWikiPage");
+  const saveRouteRegistration = library.slice(routeStart, routeEnd);
+  assert(
+    !saveRouteRegistration.includes("checkRequired"),
+    "multipart wiki page save route should not use NodeBB checkRequired because multer bodies may not inherit hasOwnProperty"
+  );
+}
+assert(
   library.includes("/westgate-wiki/page/owner"),
   "owner endpoint should be registered"
+);
+assert.strictEqual(
+  typeof actions.saveWikiPage,
+  "function",
+  "wiki page save action should be exported"
 );

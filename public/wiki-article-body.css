@@ -435,6 +435,18 @@
   margin: 0;
 }
 
+.wiki-article-prose :where(td, th).wiki-table-cell-valign-top {
+  vertical-align: top;
+}
+
+.wiki-article-prose :where(td, th).wiki-table-cell-valign-middle {
+  vertical-align: middle;
+}
+
+.wiki-article-prose :where(td, th).wiki-table-cell-valign-bottom {
+  vertical-align: bottom;
+}
+
 .wiki-article-prose :where(td, th) :where(img, figure.image) {
   clear: none !important;
   display: block;

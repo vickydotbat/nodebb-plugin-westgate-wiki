@@ -79,7 +79,7 @@ const { IMAGE_CONTEXT_BUTTON_IDS, TABLE_CELL_POPOVER_COMMAND_IDS, TABLE_CONTEXT_
 const { buildHeadingToc, navigateToHeading } = editorTocModule;
 const { installEditorLinkNavigationGuard, selectEditorLink } = linkInteractionsModule;
 const { calculateResizedImageWidth, getSelectedImageElement, setSelectedImageWidth } = imageResizeModule;
-const { focusMediaCell, selectClickedImageNode } = mediaSelectionModule;
+const { focusMediaCell, isMediaCellSurfaceTarget, selectClickedImageNode } = mediaSelectionModule;
 const {
   detectUnsupportedContent,
   getNormalizationNotice,
@@ -94,6 +94,7 @@ const editorCss = readFileSync(new URL("../tiptap/src/wiki-editor.css", import.m
 const vendoredEditorCss = readFileSync(new URL("../public/vendor/tiptap/wiki-tiptap.css", import.meta.url), "utf8");
 const editorBundleSource = readFileSync(new URL("../tiptap/src/wiki-editor-bundle.js", import.meta.url), "utf8");
 const vendoredEditorBundleSource = readFileSync(new URL("../public/vendor/tiptap/wiki-tiptap.bundle.js", import.meta.url), "utf8");
+const tableAuthoringSource = readFileSync(new URL("../tiptap/src/table/table-authoring-ui.mjs", import.meta.url), "utf8");
 
 let editorBundleContractImportCount = 0;
 
@@ -177,6 +178,64 @@ function createEditor(content) {
   });
 }
 
+function findNodePositions(editor, typeName) {
+  const positions = [];
+  editor.state.doc.descendants(function (node, pos) {
+    if (node.type.name === typeName) {
+      positions.push(pos);
+    }
+  });
+  return positions;
+}
+
+function findTextRange(editor, text) {
+  let range = null;
+  editor.state.doc.descendants(function (node, pos) {
+    if (!node.isText || range) {
+      return !range;
+    }
+    const index = node.text.indexOf(text);
+    if (index === -1) {
+      return true;
+    }
+    range = {
+      from: pos + index,
+      to: pos + index + text.length
+    };
+    return false;
+  });
+  return range;
+}
+
+function nextAnimationFrame() {
+  return new Promise(function (resolve) {
+    requestAnimationFrame(resolve);
+  });
+}
+
+function countEditorScrollRequests(editor) {
+  let scrollRequests = 0;
+  const originalCommand = editor.commands.scrollIntoView;
+  editor.commands.scrollIntoView = function () {
+    scrollRequests += 1;
+    return originalCommand.apply(this, arguments);
+  };
+  return function getScrollRequests() {
+    return scrollRequests;
+  };
+}
+
+function moveFocusOutsideEditor() {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = "Outside editor";
+  document.body.appendChild(button);
+  button.focus();
+  return function cleanup() {
+    button.remove();
+  };
+}
+
 await test("normalizeLegacyHtmlForTiptap converts legacy media layouts into wiki media rows", function () {
   const normalized = normalizeLegacyHtmlForTiptap(
     '<div style="display:flex"><img src="/one.png" alt="One"><div style="display:block"><p>Two</p></div></div>'
@@ -185,6 +244,24 @@ await test("normalizeLegacyHtmlForTiptap converts legacy media layouts into wiki
   assert.match(normalized, /class="wiki-media-row"/);
   assert.match(normalized, /class="wiki-media-cell"/);
   assert.doesNotMatch(normalized, /display:flex/);
+});
+
+await test("normalizeLegacyHtmlForTiptap wraps generated media cells in supported cell elements", function () {
+  const normalized = normalizeLegacyHtmlForTiptap(
+    '<div style="display:flex"><img src="/one.png" alt="One"><p>Text beside it</p></div>'
+  );
+
+  assert.match(normalized, /<div class="wiki-media-cell"><p>Text beside it<\/p><\/div>/);
+  assert.doesNotMatch(normalized, /<p class="wiki-media-cell"/);
+});
+
+await test("normalizeLegacyHtmlForTiptap preserves saved plugin-owned media cell wrappers", function () {
+  const normalized = normalizeLegacyHtmlForTiptap(
+    '<div class="wiki-media-row" data-wiki-node="media-row"><div class="wiki-media-cell" data-wiki-node="media-cell"><img data-wiki-node="image" src="/a.png"></div><div class="wiki-media-cell" data-wiki-node="media-cell"><p>B</p></div></div>'
+  );
+
+  assert.match(normalized, /<div class="wiki-media-cell" data-wiki-node="media-cell"><img data-wiki-node="image" src="\/a\.png"><\/div>/);
+  assert.doesNotMatch(normalized, /<p class="wiki-media-cell"/);
 });
 
 await test("normalizeLegacyHtmlForTiptap keeps supported image figures and normalizes presentational markup", function () {
@@ -236,6 +313,14 @@ await test("sanitizeHtml preserves safe styles and removes unsafe ones on the cl
 
   assert.match(sanitized, /text-align:\s*center/);
   assert.match(sanitized, /color:\s*rgb\(10, 20, 30\)/);
+  assert.doesNotMatch(sanitized, /position:/);
+});
+
+await test("sanitizeHtml preserves table cell vertical alignment on the client contract", function () {
+  const sanitized = sanitizeHtml('<table><tbody><tr><td style="vertical-align: middle; position: fixed">Middle</td><td style="vertical-align: bottom">Bottom</td></tr></tbody></table>');
+
+  assert.match(sanitized, /<td style="[^"]*vertical-align:\s*middle;?[^"]*">Middle<\/td>/);
+  assert.match(sanitized, /<td style="[^"]*vertical-align:\s*bottom;?[^"]*">Bottom<\/td>/);
   assert.doesNotMatch(sanitized, /position:/);
 });
 
@@ -296,7 +381,7 @@ await test("editor image mousedown selection preserves native drag start", funct
   assert.ok(vendoredMousedownHandler, "vendored editor bundle should expose a mousedown DOM handler before the click handler");
   assert.match(
     vendoredMousedownHandler[1],
-    /Fm\(E,\s*q,\s*g\),!1/,
+    /const\s+\w+=\w+\.target;return\s+\w+\(\w+,\s*\w+,\s*\w+\),!1/,
     "vendored image mousedown should select the node but return false so ProseMirror/native drag can continue"
   );
   assert.doesNotMatch(
@@ -436,6 +521,19 @@ await test("table cell paragraphs have no margins in article and editor prose", 
   [editorCss, vendoredEditorCss].forEach(function (css) {
     assert.match(css, /\.westgate-wiki-compose\s+\.wiki-editor__content\s+:where\(td,\s*th\)\s*>\s*p\s*\{[^}]*margin:\s*0/s);
   });
+});
+
+await test("saved table colgroup widths reload into Tiptap column width attrs", function () {
+  const savedHtml = '<table class="wiki-table-borderless wiki-table-layout-fixed" style="width:100%"><colgroup><col style="width:82px"><col style="width:94px"><col></colgroup><tbody><tr><td style="width:64px" colspan="1" rowspan="1"><p>Icon</p></td><td class="wiki-table-cell-valign-top" style="text-align:right" colspan="1" rowspan="1"><p><strong>Bull Rush:</strong></p></td><td class="wiki-table-cell-valign-top" colspan="1" rowspan="1"><p>pushes the enemy away.</p></td></tr></tbody></table>';
+  const normalized = normalizeLegacyHtmlForTiptap(savedHtml);
+  const editor = createEditor(sanitizeHtml(normalized));
+  const rendered = editor.getHTML();
+
+  assert.match(normalized, /<td(?=[^>]*\bcolwidth="82")(?=[^>]*\bstyle="width:64px")[^>]*>/);
+  assert.match(normalized, /<td(?=[^>]*\bcolwidth="94")(?=[^>]*\bclass="wiki-table-cell-valign-top")(?=[^>]*\bstyle="text-align:right")[^>]*>/);
+  assert.match(rendered, /<col style="width: 82px/);
+  assert.match(rendered, /<col style="width: 94px/);
+  editor.destroy();
 });
 
 await test("table styles preserve flexible size and border controls", function () {
@@ -695,6 +793,23 @@ await test("full-width image figures can be reselected by clicking the figure su
   editor.destroy();
 });
 
+await test("click-selecting image figures does not request editor scroll", async function () {
+  const editor = createEditor('<figure class="image image-style-block wiki-image-size-full"><img src="/full.png" alt="Full"><figcaption><p>Caption</p></figcaption></figure><p>After</p>');
+  const figure = editor.view.dom.querySelector('[data-wiki-node="image-figure"]');
+
+  editor.commands.setTextSelection(editor.state.doc.content.size);
+  const cleanupFocus = moveFocusOutsideEditor();
+  const getScrollRequests = countEditorScrollRequests(editor);
+
+  assert.equal(selectClickedImageNode(editor, figure, editor.view.dom), true);
+  await nextAnimationFrame();
+
+  assert.equal(editor.state.selection.node.type.name, "imageFigure");
+  assert.equal(getScrollRequests(), 0);
+  cleanupFocus();
+  editor.destroy();
+});
+
 await test("image figure captions remain editable instead of selecting the whole figure", function () {
   const editor = createEditor('<figure class="image"><img src="/full.png" alt="Full"><figcaption><p>Caption</p></figcaption></figure><p>After</p>');
   const captionText = editor.view.dom.querySelector("figcaption p").firstChild;
@@ -766,6 +881,53 @@ await test("mediaRow two-up html round-trips without containerBlock wrappers man
   reopened.destroy();
 });
 
+await test("mediaRow commands add, delete, unwrap, and remove rows from an active cell", function () {
+  const editor = createEditor('<p>Before</p><div class="wiki-media-row"><div class="wiki-media-cell"><p>A</p></div><div class="wiki-media-cell"><p>B</p></div></div><p>After</p>');
+
+  editor.commands.setTextSelection(findNodePositions(editor, "mediaCell")[0] + 2);
+  assert.equal(editor.commands.addMediaCellAfter(), true);
+  assert.equal((editor.getHTML().match(/data-wiki-node="media-cell"/g) || []).length, 3);
+  assert.equal(editor.commands.deleteMediaCell(), true);
+  assert.equal((editor.getHTML().match(/data-wiki-node="media-cell"/g) || []).length, 2);
+  assert.equal(editor.commands.unwrapMediaRow(), true);
+  assert.doesNotMatch(editor.getHTML(), /data-wiki-node="media-row"/);
+  assert.match(editor.getHTML(), /<p>A<\/p>/);
+  assert.match(editor.getHTML(), /<p>B<\/p>/);
+
+  editor.destroy();
+});
+
+await test("mediaRow delete command removes the active row without deleting surrounding content", function () {
+  const editor = createEditor('<p>Before</p><div class="wiki-media-row"><div class="wiki-media-cell"><p>A</p></div><div class="wiki-media-cell"><p>B</p></div></div><p>After</p>');
+
+  editor.commands.setTextSelection(findNodePositions(editor, "mediaCell")[0] + 2);
+  assert.equal(editor.commands.deleteMediaRow(), true);
+
+  const rendered = editor.getHTML();
+  assert.doesNotMatch(rendered, /data-wiki-node="media-row"/);
+  assert.match(rendered, /<p>Before<\/p>/);
+  assert.match(rendered, /<p>After<\/p>/);
+  assert.doesNotMatch(rendered, /<p>A<\/p>/);
+  editor.destroy();
+});
+
+await test("media row contextual toolbar exposes explicit row and cell editing actions", function () {
+  [editorBundleSource, vendoredEditorBundleSource].forEach(function (source) {
+    assert.match(source, /media-cell-add-before/);
+    assert.match(source, /media-cell-add-after/);
+    assert.match(source, /media-cell-delete/);
+    assert.match(source, /media-row-unwrap/);
+    assert.match(source, /media-row-delete/);
+  });
+
+  assert.match(editorBundleSource, /function createMediaRowContextToolbar\(surface, editor\)/);
+  assert.match(editorBundleSource, /addMediaCellBefore/);
+  assert.match(editorBundleSource, /addMediaCellAfter/);
+  assert.match(editorBundleSource, /deleteMediaCell/);
+  assert.match(editorBundleSource, /unwrapMediaRow/);
+  assert.match(editorBundleSource, /deleteMediaRow/);
+});
+
 await test("populated media cell chrome clicks do not force the cursor to the cell start", function () {
   const editor = createEditor('<div class="wiki-media-row"><div class="wiki-media-cell"><p>First cell text</p></div><div class="wiki-media-cell"><p>Second cell text</p></div></div><p>After</p>');
   const firstCell = editor.view.dom.querySelector('[data-wiki-node="media-cell"]');
@@ -775,6 +937,46 @@ await test("populated media cell chrome clicks do not force the cursor to the ce
 
   assert.equal(focusMediaCell(editor, firstCell), false);
   assert.equal(editor.state.selection.from, initialSelection);
+  editor.destroy();
+});
+
+await test("media cell chrome clicks can select an outer cell that only contains nested media rows", function () {
+  const editor = createEditor('<div class="wiki-media-row"><div class="wiki-media-cell"><div class="wiki-media-row"><div class="wiki-media-cell"><p>Nested A</p></div><div class="wiki-media-cell"><p>Nested B</p></div></div></div><div class="wiki-media-cell"><p>Sibling</p></div></div><p>After</p>');
+  const outerCell = editor.view.dom.querySelector('[data-wiki-node="media-cell"]');
+
+  editor.commands.setTextSelection(editor.state.doc.content.size);
+
+  assert.equal(focusMediaCell(editor, outerCell), true);
+  assert.equal(editor.state.selection.node && editor.state.selection.node.type.name, "mediaCell");
+  assert.equal(editor.state.selection.from, findNodePositions(editor, "mediaCell")[0]);
+  editor.destroy();
+});
+
+await test("click-selecting nested media cells does not request editor scroll", async function () {
+  const editor = createEditor('<div class="wiki-media-row"><div class="wiki-media-cell"><div class="wiki-media-row"><div class="wiki-media-cell"><p>Nested A</p></div><div class="wiki-media-cell"><p>Nested B</p></div></div></div><div class="wiki-media-cell"><p>Sibling</p></div></div><p>After</p>');
+  const outerCell = editor.view.dom.querySelector('[data-wiki-node="media-cell"]');
+
+  editor.commands.setTextSelection(editor.state.doc.content.size);
+  const cleanupFocus = moveFocusOutsideEditor();
+  const getScrollRequests = countEditorScrollRequests(editor);
+
+  assert.equal(focusMediaCell(editor, outerCell), true);
+  await nextAnimationFrame();
+
+  assert.equal(editor.state.selection.node && editor.state.selection.node.type.name, "mediaCell");
+  assert.equal(getScrollRequests(), 0);
+  cleanupFocus();
+  editor.destroy();
+});
+
+await test("direct nested media row chrome is treated as the containing media cell surface", function () {
+  const editor = createEditor('<div class="wiki-media-row"><div class="wiki-media-cell"><div class="wiki-media-row"><div class="wiki-media-cell"><p>Nested A</p></div><div class="wiki-media-cell"><p>Nested B</p></div></div></div><div class="wiki-media-cell"><p>Sibling</p></div></div><p>After</p>');
+  const outerCell = editor.view.dom.querySelector('[data-wiki-node="media-cell"]');
+  const nestedRow = outerCell.querySelector('[data-wiki-node="media-row"]');
+  const nestedCell = nestedRow.querySelector('[data-wiki-node="media-cell"]');
+
+  assert.equal(isMediaCellSurfaceTarget(outerCell, nestedRow), true);
+  assert.equal(isMediaCellSurfaceTarget(outerCell, nestedCell), false);
   editor.destroy();
 });
 
@@ -801,6 +1003,87 @@ await test("wiki link mark stores regular links as inert spans in the editor con
   assert.equal(editor.getAttributes("link").href, "https://google.com");
 
   editor.destroy();
+});
+
+await test("wiki link mark does not consume separators typed after existing links", function () {
+  const firstUrl = "https://one.example";
+  const secondUrl = "https://two.example";
+  const editor = createEditor(`<p><a href="${firstUrl}">${firstUrl}</a><a href="${secondUrl}">${secondUrl}</a></p>`);
+  const firstRange = findTextRange(editor, firstUrl);
+
+  assert.ok(firstRange, "expected to find the first link text");
+  editor.commands.setTextSelection(firstRange.to);
+  editor.commands.insertContent(" ");
+
+  const rendered = editor.getHTML();
+  assert.match(rendered, /data-wiki-link-href="https:\/\/one\.example"[^>]*>https:\/\/one\.example<\/span> /);
+  assert.match(rendered, /data-wiki-link-href="https:\/\/two\.example"[^>]*>https:\/\/two\.example<\/span>/);
+  assert.doesNotMatch(rendered, /data-wiki-link-href="https:\/\/one\.example"[^>]*>https:\/\/one\.example /);
+
+  const reopened = createEditor(sanitizeHtml(rendered));
+  const reopenedHtml = reopened.getHTML();
+  assert.equal((reopenedHtml.match(/data-wiki-link-href=/g) || []).length, 2);
+  assert.match(reopenedHtml, /data-wiki-link-href="https:\/\/one\.example"[^>]*>https:\/\/one\.example<\/span> /);
+  assert.match(reopenedHtml, /data-wiki-link-href="https:\/\/two\.example"[^>]*>https:\/\/two\.example<\/span>/);
+
+  editor.destroy();
+  reopened.destroy();
+});
+
+await test("external link dialog state uses selected text as the default link text", async function () {
+  const { getExternalLinkDialogState, applyExternalLinkEdit } = await importEditorBundleForContract();
+  const editor = createEditor("<p>Turn this into a link.</p>");
+  const selectedRange = findTextRange(editor, "Turn this");
+
+  assert.ok(selectedRange, "expected selected text range");
+  editor.commands.setTextSelection(selectedRange);
+
+  assert.deepEqual(getExternalLinkDialogState(editor), {
+    href: "",
+    text: "Turn this"
+  });
+
+  assert.equal(applyExternalLinkEdit(editor, {
+    href: "https://example.com/page",
+    text: "Example page"
+  }), true);
+
+  const rendered = editor.getHTML();
+  assert.match(rendered, /data-wiki-link-href="https:\/\/example\.com\/page"[^>]*>Example page<\/span>/);
+  assert.doesNotMatch(rendered, /Turn this/);
+
+  editor.destroy();
+});
+
+await test("external link dialog state and save can replace existing link text", async function () {
+  const { getExternalLinkDialogState, applyExternalLinkEdit } = await importEditorBundleForContract();
+  const editor = createEditor('<p><a href="https://old.example">Old link text</a> remains.</p>');
+  const oldLinkRange = findTextRange(editor, "Old link text");
+
+  assert.ok(oldLinkRange, "expected old link text range");
+  editor.commands.setTextSelection(oldLinkRange.from + 2);
+
+  assert.deepEqual(getExternalLinkDialogState(editor), {
+    href: "https://old.example",
+    text: "Old link text"
+  });
+
+  assert.equal(applyExternalLinkEdit(editor, {
+    href: "https://new.example",
+    text: "New link text"
+  }), true);
+
+  const rendered = editor.getHTML();
+  assert.match(rendered, /data-wiki-link-href="https:\/\/new\.example"[^>]*>New link text<\/span>/);
+  assert.doesNotMatch(rendered, /Old link text/);
+
+  editor.destroy();
+});
+
+await test("external link creation uses the shared dialog instead of URL prompts", function () {
+  assert.doesNotMatch(editorBundleSource, /window\.prompt\("Link URL"/);
+  assert.doesNotMatch(vendoredEditorBundleSource, /window\.prompt\("Link URL"/);
+  assert.match(editorBundleSource, /function openExternalLinkDialog/);
 });
 
 await test("wiki entity marks and nodes round-trip as inert editor spans", function () {
@@ -1704,8 +1987,12 @@ await test("fullscreen source mode css supports resize and source hiding", funct
 await test("contextual table schema exposes row, column, cell merge, and delete tools", function () {
   assert.deepEqual(TABLE_CONTEXT_BUTTON_IDS, TABLE_STICKY_COMMAND_IDS);
   assert.ok(TABLE_CELL_POPOVER_COMMAND_IDS.includes("table-cell-background"));
+  assert.ok(TABLE_CELL_POPOVER_COMMAND_IDS.includes("table-cell-valign-top"));
+  assert.ok(TABLE_CELL_POPOVER_COMMAND_IDS.includes("table-cell-valign-middle"));
+  assert.ok(TABLE_CELL_POPOVER_COMMAND_IDS.includes("table-cell-valign-bottom"));
   assert.match(editorBundleSource, /createTableAuthoring\(editorMount,\s*editor\)/);
   assert.match(editorBundleSource, /openAlignmentTableDialog\(\{ editor \}\)/);
+  assert.match(tableAuthoringSource, /placement:\s*["']bottom["']/);
   assert.match(editorCss, /\.wiki-editor-context-tools__group\s*\{/);
   assert.match(vendoredEditorCss, /\.wiki-editor-context-tools__group\s*\{/);
   assert.match(editorCss, /\.westgate-wiki-compose\s+\.wiki-editor-table-sticky-row\s*\{/);

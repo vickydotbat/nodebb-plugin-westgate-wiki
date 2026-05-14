@@ -70,6 +70,16 @@ assert.match(
   /\.wiki-article-prose :where\(td, th\) :where\(img, figure\.image\)\s*\{[\s\S]*float:\s*none\s*!important;[\s\S]*height:\s*auto;[\s\S]*margin:\s*0\.25rem auto;[\s\S]*max-width:\s*100%;[\s\S]*\}/,
   "images inside article tables should stay in normal cell flow instead of floating over adjacent cells"
 );
+assert.match(
+  articleBodyCss,
+  /\.wiki-article-prose :where\(td, th\)\.wiki-table-cell-valign-middle\s*\{[\s\S]*vertical-align:\s*middle;[\s\S]*\}/,
+  "table cell vertical alignment should have a class fallback for post-render sanitizers that drop the inline style"
+);
+assert.match(
+  articleBodyCss,
+  /\.wiki-article-prose :where\(td, th\)\.wiki-table-cell-valign-bottom\s*\{[\s\S]*vertical-align:\s*bottom;[\s\S]*\}/,
+  "bottom table cell vertical alignment should render from the durable class fallback"
+);
 
 assert.match(libraryJs, /const wikiArticleCss = require\("\.\/lib\/wiki-article-css"\)/);
 assert.match(libraryJs, /"\/westgate-wiki\/article-css"/);

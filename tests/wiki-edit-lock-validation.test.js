@@ -62,6 +62,22 @@ require.main.require = function requireNodebbStub(id) {
         })
       }
     },
+    "./src/posts": {
+      getPostFields: async (pid, fields) => {
+        if (parseInt(pid, 10) === 100) {
+          const post = {
+            pid: 100,
+            tid: 10,
+            content: "<p>Stored</p>",
+            sourceContent: "<p>Stored</p>"
+          };
+          return Array.isArray(fields)
+            ? Object.fromEntries(fields.map((field) => [field, post[field]]))
+            : post;
+        }
+        return null;
+      }
+    },
     "./src/slugify": slugify,
     "./src/topics": {
       getTopicField: async (tid, field) => {
@@ -104,9 +120,53 @@ function resetRuntime() {
       uid: 2,
       wikiEditLockToken: lock.token,
       topic: { tid: 10, cid: 1, title: "Locked Page" },
-      post: { pid: 100, content: "<p>Updated</p>" }
+      post: { pid: 100, content: "<p>Updated</p>", sourceContent: "<p>Updated</p>" }
     });
     assert.equal(data.post.content, "<p>Updated</p>");
+    assert.equal(data.post.sourceContent, "<p>Updated</p>");
+  }
+
+  resetRuntime();
+  {
+    const lock = await wikiEditLocks.acquireLock(10, 2);
+    const data = await wikiPageValidation.validatePostEdit({
+      uid: 2,
+      data: { pid: 100, wikiEditLockToken: lock.token },
+      post: {
+        content: '<p style="text-align: center; position: fixed">Updated</p>',
+        sourceContent: '<p style="text-align: center; position: fixed">Updated</p>'
+      }
+    });
+    assert.equal(data.post.content, '<p style="text-align:center">Updated</p>');
+    assert.equal(data.post.sourceContent, '<p style="text-align:center">Updated</p>');
+  }
+
+  resetRuntime();
+  {
+    const lock = await wikiEditLocks.acquireLock(10, 2);
+    const data = await wikiPageValidation.validatePostEdit({
+      uid: 2,
+      data: { pid: 100, wikiEditLockToken: lock.token },
+      post: {
+        content: '<table><tbody><tr><td style="text-align: right"><p>Updated</p></td></tr></tbody></table>'
+      }
+    });
+    assert.equal(data.post.content, '<table><tbody><tr><td style="text-align:right"><p>Updated</p></td></tr></tbody></table>');
+    assert.equal(data.post.sourceContent, data.post.content);
+  }
+
+  resetRuntime();
+  {
+    const data = await wikiPageValidation.validatePostEdit({
+      uid: 2,
+      data: { pid: 100 },
+      post: {
+        content: "<p>Stored</p>",
+        sourceContent: "<p>Stored</p>"
+      }
+    });
+    assert.equal(data.post.content, "<p>Stored</p>");
+    assert.equal(data.post.sourceContent, "<p>Stored</p>");
   }
 
   resetRuntime();

@@ -129,6 +129,29 @@ function setElementHidden(element, hidden) {
   element.setAttribute("aria-hidden", hidden ? "true" : "false");
 }
 
+function setElementInert(element, inert) {
+  if ("inert" in element) {
+    element.inert = inert;
+  }
+  if (inert) {
+    element.setAttribute("inert", "");
+  } else {
+    element.removeAttribute("inert");
+  }
+}
+
+function setControlsDisabled(element, disabled) {
+  Array.from(element.querySelectorAll("button, input, select, textarea")).forEach(function (control) {
+    control.disabled = disabled;
+  });
+}
+
+function isAutoLayoutTable(context) {
+  const table = context && context.activeTableElement;
+  const className = String(context && context.tableAttrs && context.tableAttrs.class || table && table.getAttribute("class") || "");
+  return className.split(/\s+/).includes("wiki-table-layout-auto");
+}
+
 function positionHandle(handle, targetRect, surfaceRect, options) {
   const left = options.left(targetRect, surfaceRect);
   const top = options.top(targetRect, surfaceRect);
@@ -220,11 +243,12 @@ function createDragController(options) {
 
 export function createTableAuthoring(surface, editor) {
   const stickyRow = document.createElement("div");
-  stickyRow.className = "wiki-editor-table-sticky-row";
+  stickyRow.className = "wiki-editor-table-sticky-row wiki-editor-table-sticky-row--inactive";
   stickyRow.setAttribute("role", "toolbar");
   stickyRow.setAttribute("aria-label", "Table tools");
   stickyRow.setAttribute("contenteditable", "false");
-  stickyRow.hidden = true;
+  stickyRow.setAttribute("aria-hidden", "true");
+  setElementInert(stickyRow, true);
 
   const cellPopover = document.createElement("div");
   cellPopover.className = "wiki-editor-table-cell-popover";
@@ -299,20 +323,23 @@ export function createTableAuthoring(surface, editor) {
     const surfaceRect = surface.getBoundingClientRect();
     const tableRect = table.getBoundingClientRect();
     const rowRect = row.getBoundingClientRect();
-    positionHandle(widthHandle, tableRect, surfaceRect, {
-      left: function (target) {
-        return target.right - surfaceRect.left - 5;
-      },
-      top: function (target) {
-        return target.top - surfaceRect.top;
-      },
-      width: function () {
-        return 10;
-      },
-      height: function (target) {
-        return Math.max(24, target.height);
-      }
-    });
+    const tableWidthResizeAllowed = !isAutoLayoutTable(context);
+    if (tableWidthResizeAllowed) {
+      positionHandle(widthHandle, tableRect, surfaceRect, {
+        left: function (target) {
+          return target.right - surfaceRect.left - 5;
+        },
+        top: function (target) {
+          return target.top - surfaceRect.top;
+        },
+        width: function () {
+          return 10;
+        },
+        height: function (target) {
+          return Math.max(24, target.height);
+        }
+      });
+    }
     positionHandle(rowHandle, rowRect, surfaceRect, {
       left: function (target) {
         return target.left - surfaceRect.left;
@@ -327,7 +354,8 @@ export function createTableAuthoring(surface, editor) {
         return 10;
       }
     });
-    setElementHidden(widthHandle, false);
+    widthHandle.disabled = !tableWidthResizeAllowed;
+    setElementHidden(widthHandle, !tableWidthResizeAllowed);
     setElementHidden(rowHandle, false);
   }
 
@@ -377,6 +405,16 @@ export function createTableAuthoring(surface, editor) {
     }
   }
 
+  function setStickyRowInactive(inactive) {
+    stickyRow.hidden = false;
+    stickyRow.classList.toggle("wiki-editor-table-sticky-row--inactive", inactive);
+    stickyRow.setAttribute("aria-hidden", inactive ? "true" : "false");
+    setElementInert(stickyRow, inactive);
+    if (inactive) {
+      setControlsDisabled(stickyRow, true);
+    }
+  }
+
   function update() {
     if (destroyed) {
       return;
@@ -385,7 +423,7 @@ export function createTableAuthoring(surface, editor) {
     ensureInstalled();
     currentContext = deriveTableContext(editor, surface);
     const visible = Boolean(currentContext && currentContext.isActive);
-    setElementHidden(stickyRow, !visible);
+    setStickyRowInactive(!visible);
     setElementHidden(cellPopover, !visible);
     setElementHidden(widthHandle, !visible);
     setElementHidden(rowHandle, !visible);
@@ -400,7 +438,8 @@ export function createTableAuthoring(surface, editor) {
     const surfaceRect = surface.getBoundingClientRect();
     const stickyRect = stickyRow.getBoundingClientRect();
     positionContextPanel(cellPopover, currentContext.activeCellElement || currentContext.activeTableElement, surface, {
-      avoidTop: stickyRect.bottom - surfaceRect.top + 8
+      avoidTop: stickyRect.bottom - surfaceRect.top + 8,
+      placement: "bottom"
     });
     updateResizeHandles(currentContext);
     updateColorControls(currentContext);
@@ -410,7 +449,7 @@ export function createTableAuthoring(surface, editor) {
   widthHandle.addEventListener("pointerdown", function (event) {
     const context = deriveTableContext(editor, surface);
     const table = context.activeTableElement;
-    if (!table) {
+    if (!table || isAutoLayoutTable(context)) {
       return;
     }
 

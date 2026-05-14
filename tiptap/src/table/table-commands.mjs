@@ -1,6 +1,14 @@
 import { getReadableTextColor } from "../shared/color-contrast.mjs";
-import { setStyleValue } from "./table-dom.mjs";
+import { setClassToken, setStyleValue } from "./table-dom.mjs";
 import { openTablePropertiesDialog } from "./table-properties-dialog.mjs";
+
+const CELL_VALIGN_CLASS_BY_VALUE = {
+  top: "wiki-table-cell-valign-top",
+  middle: "wiki-table-cell-valign-middle",
+  bottom: "wiki-table-cell-valign-bottom"
+};
+
+const CELL_VALIGN_CLASSES = Object.values(CELL_VALIGN_CLASS_BY_VALUE);
 
 const STRUCTURAL_COMMANDS = {
   "table-add-row-before": "addRowBefore",
@@ -37,6 +45,9 @@ export const TABLE_CELL_POPOVER_COMMAND_IDS = [
   "table-cell-align-left",
   "table-cell-align-center",
   "table-cell-align-right",
+  "table-cell-valign-top",
+  "table-cell-valign-middle",
+  "table-cell-valign-bottom",
   "table-cell-clear-formatting"
 ];
 
@@ -58,6 +69,9 @@ export const TABLE_COMMANDS = [
   { id: "table-cell-align-left", label: "Align cell left", scope: "cell-formatting", placement: "cell-popover", icon: "fa-align-left", group: "cell-alignment" },
   { id: "table-cell-align-center", label: "Align cell center", scope: "cell-formatting", placement: "cell-popover", icon: "fa-align-center", group: "cell-alignment" },
   { id: "table-cell-align-right", label: "Align cell right", scope: "cell-formatting", placement: "cell-popover", icon: "fa-align-right", group: "cell-alignment" },
+  { id: "table-cell-valign-top", label: "Align cell top", scope: "cell-formatting", placement: "cell-popover", icon: "fa-long-arrow-up", group: "cell-vertical-alignment" },
+  { id: "table-cell-valign-middle", label: "Align cell middle", scope: "cell-formatting", placement: "cell-popover", icon: "fa-arrows-v", group: "cell-vertical-alignment" },
+  { id: "table-cell-valign-bottom", label: "Align cell bottom", scope: "cell-formatting", placement: "cell-popover", icon: "fa-long-arrow-down", group: "cell-vertical-alignment" },
   { id: "table-cell-clear-formatting", label: "Clear cell formatting", scope: "cell-formatting", placement: "cell-popover", icon: "fa-eraser", group: "cell-formatting" }
 ];
 
@@ -78,7 +92,7 @@ function runChainCommand(editor, commandName) {
     return false;
   }
 
-  const chain = editor.chain().focus();
+  const chain = editor.chain().focus(null, { scrollIntoView: false });
   return chain && typeof chain[commandName] === "function" ? chain[commandName]().run() : false;
 }
 
@@ -87,7 +101,7 @@ function canRunChainCommand(editor, commandName) {
     return false;
   }
 
-  const chain = editor.can().chain().focus();
+  const chain = editor.can().chain().focus(null, { scrollIntoView: false });
   return chain && typeof chain[commandName] === "function" ? chain[commandName]().run() : false;
 }
 
@@ -120,19 +134,91 @@ function updateCellStyle(style, id, payload) {
     return setStyleValue(style, "text-align", "right");
   }
 
+  if (id === "table-cell-valign-top") {
+    return setStyleValue(style, "vertical-align", "top");
+  }
+
+  if (id === "table-cell-valign-middle") {
+    return setStyleValue(style, "vertical-align", "middle");
+  }
+
+  if (id === "table-cell-valign-bottom") {
+    return setStyleValue(style, "vertical-align", "bottom");
+  }
+
   if (id === "table-cell-clear-formatting") {
     return setStyleValue(
       setStyleValue(
-        setStyleValue(style, "background-color", ""),
-        "color",
+        setStyleValue(
+          setStyleValue(style, "background-color", ""),
+          "color",
+          ""
+        ),
+        "text-align",
         ""
       ),
-      "text-align",
+      "vertical-align",
       ""
     );
   }
 
   return style;
+}
+
+function getCellAlignValue(id) {
+  if (id === "table-cell-align-left") {
+    return "left";
+  }
+  if (id === "table-cell-align-center") {
+    return "center";
+  }
+  if (id === "table-cell-align-right") {
+    return "right";
+  }
+  return null;
+}
+
+function getCellVerticalAlignValue(id) {
+  if (id === "table-cell-valign-top") {
+    return "top";
+  }
+  if (id === "table-cell-valign-middle") {
+    return "middle";
+  }
+  if (id === "table-cell-valign-bottom") {
+    return "bottom";
+  }
+  return null;
+}
+
+function setCellVerticalAlignClass(className, value) {
+  let nextClassName = String(className || "");
+  CELL_VALIGN_CLASSES.forEach(function (token) {
+    nextClassName = setClassToken(nextClassName, token, false);
+  });
+  if (value && CELL_VALIGN_CLASS_BY_VALUE[value]) {
+    nextClassName = setClassToken(nextClassName, CELL_VALIGN_CLASS_BY_VALUE[value], true);
+  }
+  return nextClassName || null;
+}
+
+function updateCellAttrs(attrs, id, nextStyle) {
+  const nextAttrs = {
+    ...attrs,
+    style: nextStyle || null
+  };
+  const align = getCellAlignValue(id);
+  const verticalAlign = getCellVerticalAlignValue(id);
+  if (align) {
+    nextAttrs.align = align;
+  }
+  if (verticalAlign) {
+    nextAttrs.class = setCellVerticalAlignClass(nextAttrs.class, verticalAlign);
+  } else if (id === "table-cell-clear-formatting") {
+    nextAttrs.align = null;
+    nextAttrs.class = setCellVerticalAlignClass(nextAttrs.class, null);
+  }
+  return nextAttrs;
 }
 
 function applySelectedCellStyles(editor, context, id, payload) {
@@ -152,15 +238,12 @@ function applySelectedCellStyles(editor, context, id, payload) {
 
     const currentStyle = node.attrs.style || entry.fallbackStyle || "";
     const nextStyle = updateCellStyle(currentStyle, id, payload);
-    tr.setNodeMarkup(pos, undefined, {
-      ...node.attrs,
-      style: nextStyle || null
-    }, node.marks);
+    tr.setNodeMarkup(pos, undefined, updateCellAttrs(node.attrs, id, nextStyle), node.marks);
     changed = true;
   });
 
   if (changed) {
-    editor.view.dispatch(tr.scrollIntoView());
+    editor.view.dispatch(tr);
   }
   return changed;
 }

@@ -23,6 +23,11 @@ function isExternalHref(href) {
 }
 
 const WikiLink = Link.extend({
+  // Autolink still runs through the Link plugin, but typed separators must not
+  // become part of an existing link mark.
+  inclusive() {
+    return false;
+  },
   addAttributes() {
     return {
       href: {

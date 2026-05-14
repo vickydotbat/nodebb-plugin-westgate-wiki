@@ -78,9 +78,42 @@ function isEffectivelyEmptyMediaCell(cellElement) {
   return !cellElement.querySelector("img, figure, table, ul, ol, blockquote, pre, h1, h2, h3, h4, hr");
 }
 
+function hasOnlyDirectMediaRows(cellElement) {
+  const children = Array.from(cellElement && cellElement.children || []);
+  if (!children.length) {
+    return false;
+  }
+
+  return children.every(function (child) {
+    return child.matches && child.matches('[data-wiki-node="media-row"], .wiki-media-row');
+  });
+}
+
+export function isMediaCellSurfaceTarget(cellElement, target) {
+  if (!cellElement || !target) {
+    return false;
+  }
+
+  if (target === cellElement) {
+    return true;
+  }
+
+  return target.parentElement === cellElement &&
+    target.matches &&
+    target.matches('[data-wiki-node="media-row"], .wiki-media-row');
+}
+
 export function focusMediaCell(editor, cellElement) {
   if (!editor || !cellElement) {
     return false;
+  }
+
+  if (hasOnlyDirectMediaRows(cellElement)) {
+    const selectionPos = findNodeSelectionPos(editor, cellElement, ["mediaCell"]);
+    if (selectionPos == null) {
+      return false;
+    }
+    return editor.chain().focus().setNodeSelection(selectionPos).run();
   }
 
   if (!isEffectivelyEmptyMediaCell(cellElement)) {
