@@ -1002,8 +1002,26 @@ await test("media cell command targets selected cells before active cell", funct
   editor.destroy();
 });
 
+await test("media cell custom colors can apply to captured cells after selection moves", function () {
+  const editor = createEditor('<p>Intro</p><div class="wiki-media-row"><div class="wiki-media-cell"><p>A</p></div><div class="wiki-media-cell"><p>B</p></div></div><p>Outro</p>');
+  const cells = findNodePositions(editor, "mediaCell");
+  const outro = findTextRange(editor, "Outro");
+
+  editor.commands.setTextSelection(outro);
+
+  assert.equal(editor.commands.setMediaCellColorsAtPositions([cells[0]], {
+    backgroundColor: "#26a269",
+    borderColor: "#d4b16a"
+  }), true);
+
+  const rendered = editor.getHTML();
+  assert.match(rendered, /<div class="wiki-media-cell wiki-media-cell--custom" data-wiki-node="media-cell" style="[^"]*background-color: rgb\(38, 162, 105\);[^"]*border-color: rgb\(212, 177, 106\);?[^"]*"><p>A<\/p><\/div>/);
+  assert.match(rendered, /<div class="wiki-media-cell" data-wiki-node="media-cell"><p>B<\/p><\/div>/);
+  editor.destroy();
+});
+
 await test("editor bundle wires media cell selection helpers and style controls", function () {
-  assert.match(editorBundleSource, /import\s+MediaCellSelection/);
+  assert.match(editorBundleSource, /import\s+MediaCellSelection,\s*\{\s*getTargetMediaCellPositions\s*\}/);
   assert.match(editorBundleSource, /handleMediaCellSelectionClick\(editor,\s*mediaCell,\s*event\)/);
   assert.match(editorBundleSource, /id:\s*"media-cell-style-shadow"/);
   assert.match(editorBundleSource, /id:\s*"media-cell-style-gilded"/);
@@ -1011,8 +1029,8 @@ await test("editor bundle wires media cell selection helpers and style controls"
   assert.match(editorBundleSource, /id:\s*"media-cell-style-colors"/);
   assert.match(editorBundleSource, /id:\s*"media-cell-style-clear"/);
   assert.match(editorBundleSource, /setMediaCellStyle\("shadow"\)/);
-  assert.match(editorBundleSource, /setMediaCellColors\(\{/);
-  assert.match(editorBundleSource, /clearMediaCellStyle\(\)/);
+  assert.match(editorBundleSource, /setMediaCellColorsAtPositions\(targetPositions,/);
+  assert.match(editorBundleSource, /clearMediaCellStyleAtPositions\(targetPositions\)/);
 });
 
 await test("media cell color menu uses labelled color picker fields", function () {

@@ -134,15 +134,32 @@ export function clearMediaCellStyleAttrs() {
   };
 }
 
-function updateTargetMediaCells(state, dispatch, attrs) {
-  const positions = getTargetMediaCellPositions(state);
-  if (!positions.length) {
+function normalizeMediaCellPositions(state, positions) {
+  const seen = new Set();
+  return (positions || []).filter(function (pos) {
+    if (typeof pos !== "number" || seen.has(pos)) {
+      return false;
+    }
+    const node = state.doc.nodeAt(pos);
+    if (!node || node.type.name !== "mediaCell") {
+      return false;
+    }
+    seen.add(pos);
+    return true;
+  }).sort(function (a, b) {
+    return a - b;
+  });
+}
+
+function updateMediaCellsAtPositions(state, dispatch, positions, attrs) {
+  const targetPositions = normalizeMediaCellPositions(state, positions);
+  if (!targetPositions.length) {
     return false;
   }
 
   if (dispatch) {
     const tr = state.tr;
-    positions.forEach(function (pos) {
+    targetPositions.forEach(function (pos) {
       const node = tr.doc.nodeAt(pos);
       if (node && node.type.name === "mediaCell") {
         tr.setNodeMarkup(pos, undefined, {
@@ -154,6 +171,15 @@ function updateTargetMediaCells(state, dispatch, attrs) {
     dispatch(tr.scrollIntoView());
   }
   return true;
+}
+
+function updateTargetMediaCells(state, dispatch, attrs) {
+  const positions = getTargetMediaCellPositions(state);
+  if (!positions.length) {
+    return false;
+  }
+
+  return updateMediaCellsAtPositions(state, dispatch, positions, attrs);
 }
 
 export const MediaCell = Node.create({
@@ -243,9 +269,19 @@ export const MediaRow = Node.create({
           backgroundColor: colors && colors.backgroundColor,
           borderColor: colors && colors.borderColor
         })),
+      setMediaCellColorsAtPositions:
+        (positions, colors) =>
+        ({ state, dispatch }) => updateMediaCellsAtPositions(state, dispatch, positions, getMediaCellStyleAttrs({
+          stylePreset: "custom",
+          backgroundColor: colors && colors.backgroundColor,
+          borderColor: colors && colors.borderColor
+        })),
       clearMediaCellStyle:
         () =>
         ({ state, dispatch }) => updateTargetMediaCells(state, dispatch, clearMediaCellStyleAttrs()),
+      clearMediaCellStyleAtPositions:
+        (positions) =>
+        ({ state, dispatch }) => updateMediaCellsAtPositions(state, dispatch, positions, clearMediaCellStyleAttrs()),
       addMediaCellBefore:
         () =>
         ({ state, dispatch }) => {

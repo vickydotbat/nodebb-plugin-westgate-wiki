@@ -52,7 +52,7 @@ import {
   setSelectedImageLayout,
   setSelectedImageSize
 } from "./selection/media-selection.mjs";
-import MediaCellSelection from "./selection/media-cell-selection.mjs";
+import MediaCellSelection, { getTargetMediaCellPositions } from "./selection/media-cell-selection.mjs";
 import {
   handleEditorLinkClick,
   installEditorLinkNavigationGuard
@@ -2207,6 +2207,7 @@ function createMediaCellColorMenu(button, editor) {
   menu.setAttribute("role", "dialog");
   menu.setAttribute("aria-label", "Media cell colors");
 
+  const targetPositions = getTargetMediaCellPositions(editor.state);
   const attrs = editor.getAttributes("mediaCell") || {};
   const backgroundInput = document.createElement("input");
   backgroundInput.type = "color";
@@ -2226,7 +2227,10 @@ function createMediaCellColorMenu(button, editor) {
   apply.textContent = "Apply";
   apply.addEventListener("click", function (event) {
     event.preventDefault();
-    editor.chain().focus().setMediaCellColors({ backgroundColor: backgroundInput.value, borderColor: borderInput.value }).run();
+    editor.chain().focus().setMediaCellColorsAtPositions(targetPositions, {
+      backgroundColor: backgroundInput.value,
+      borderColor: borderInput.value
+    }).run();
     document.removeEventListener("mousedown", closeOnOutside);
     menu.remove();
   });
@@ -2236,7 +2240,7 @@ function createMediaCellColorMenu(button, editor) {
   clear.textContent = "Clear";
   clear.addEventListener("click", function (event) {
     event.preventDefault();
-    editor.chain().focus().clearMediaCellStyle().run();
+    editor.chain().focus().clearMediaCellStyleAtPositions(targetPositions).run();
     document.removeEventListener("mousedown", closeOnOutside);
     menu.remove();
   });
