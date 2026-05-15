@@ -153,6 +153,22 @@
     });
   }
 
+  function getTreeRowLabel(row) {
+    var title = row && row.querySelector(".wiki-sidebar-page-title, .wiki-topic-title-leaf");
+    return (title && title.textContent || "page").replace(/\s+/g, " ").trim();
+  }
+
+  function setTreeRowCollapsed(row, collapsed) {
+    var label = getTreeRowLabel(row);
+    var toggle = row && row.querySelector(":scope > .wiki-directory-tree-toggle");
+
+    row.classList.toggle("wiki-directory-row--collapsed", !!collapsed);
+    if (toggle) {
+      toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      toggle.setAttribute("aria-label", (collapsed ? "Expand " : "Collapse ") + label);
+    }
+  }
+
   function refreshTreeVisibility(list) {
     var rows = getTreeRows(list);
     var collapsedAncestors = [];
@@ -173,28 +189,40 @@
     if (row.querySelector(":scope > .wiki-directory-tree-toggle")) {
       return;
     }
-    var title = row.querySelector(".wiki-sidebar-page-title, .wiki-topic-title-leaf");
-    var label = (title && title.textContent || "page").replace(/\s+/g, " ").trim();
     var toggle = document.createElement("button");
     toggle.type = "button";
     toggle.className = "wiki-directory-tree-toggle";
-    row.classList.add("wiki-directory-row--collapsed");
-    toggle.setAttribute("aria-expanded", "false");
-    toggle.setAttribute("aria-label", "Expand " + label);
     toggle.innerHTML = '<i class="fa fa-fw fa-caret-down" aria-hidden="true"></i>';
     toggle.addEventListener("click", function (event) {
       var collapsed = !row.classList.contains("wiki-directory-row--collapsed");
       event.preventDefault();
       event.stopPropagation();
-      row.classList.toggle("wiki-directory-row--collapsed", collapsed);
-      toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
-      toggle.setAttribute("aria-label", (collapsed ? "Expand " : "Collapse ") + label);
+      setTreeRowCollapsed(row, collapsed);
       refreshTreeVisibility(list);
     });
     row.insertBefore(toggle, row.firstElementChild);
+    setTreeRowCollapsed(row, true);
   }
 
-  function decorateTreeRows(list) {
+  function expandActiveNavAncestors(list) {
+    var activeRow = list && list.querySelector(".wiki-sidebar-nav-row--page.is-active");
+    if (!activeRow) {
+      return;
+    }
+    var activePath = getRowTitlePath(activeRow);
+    if (!activePath || activePath.length <= 1) {
+      return;
+    }
+
+    getTreeRows(list).forEach(function (row) {
+      var path = getRowTitlePath(row);
+      if (path.length < activePath.length && isDescendantPath(activePath, path)) {
+        setTreeRowCollapsed(row, false);
+      }
+    });
+  }
+
+  function decorateTreeRows(list, options) {
     var rows = getTreeRows(list);
     rows.forEach(function (row, index) {
       var path = getRowTitlePath(row);
@@ -207,6 +235,9 @@
         addTreeToggle(row, list);
       }
     });
+    if (options && options.navMode) {
+      expandActiveNavAncestors(list);
+    }
     refreshTreeVisibility(list);
   }
 
@@ -341,7 +372,7 @@
       } else {
         list.insertAdjacentHTML("beforeend", html);
       }
-      decorateTreeRows(list);
+      decorateTreeRows(list, { navMode: navMode });
     }
 
     function loadMore(isReset) {
@@ -460,7 +491,7 @@
       markActiveNav();
     }
     if (list) {
-      decorateTreeRows(list);
+      decorateTreeRows(list, { navMode: navMode });
     }
   }
 
