@@ -57,7 +57,7 @@ test("existing directory and ToC mounts remain compatible", function () {
   assert.match(pageTemplate, /data-wiki-article-toc/);
 });
 
-test("drawer CSS defines desktop hover drawers and mobile off-canvas drawers", function () {
+test("drawer CSS defines desktop hover drawers and mobile bottom sheet drawers", function () {
   assert.match(wikiCss, /\.wiki-article-drawer\s*{/);
   assert.match(wikiCss, /\.wiki-article-drawer__tab\s*{/);
   assert.match(wikiCss, /\.wiki-article-drawer\s*{[^}]*position:\s*fixed/s);
@@ -78,8 +78,8 @@ test("drawer CSS defines desktop hover drawers and mobile off-canvas drawers", f
   assert.match(wikiCss, /\.wiki-article-drawer--nav:hover/);
   assert.match(wikiCss, /\.wiki-article-drawer--toc:hover/);
   assert.match(wikiCss, /@media\s*\(min-width:\s*1200px\)[\s\S]*?\.wiki-article-drawer__close\s*{[^}]*display:\s*none/);
-  assert.match(wikiCss, /@media\s*\(max-width:\s*1199\.98px\)/);
-  assert.match(wikiCss, /@media\s*\(max-width:\s*1199\.98px\)[\s\S]*?\.wiki-article-drawer__close\s*{[^}]*display:\s*inline-flex/);
+  assert.match(wikiCss, /@media\s*\(max-width:\s*992px\)/);
+  assert.match(wikiCss, /@media\s*\(max-width:\s*992px\)[\s\S]*?\.wiki-article-drawer__close\s*{[^}]*display:\s*inline-flex/);
   assert.match(wikiCss, /\.wiki-article-drawer-backdrop/);
   assert.match(wikiCss, /env\(safe-area-inset-left,\s*0px\)/);
   assert.match(wikiCss, /env\(safe-area-inset-right,\s*0px\)/);
