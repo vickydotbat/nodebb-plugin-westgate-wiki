@@ -44,6 +44,7 @@ import {
 import {
   focusMediaCell,
   getActiveImageNodeName,
+  handleMediaCellSelectionClick,
   isImageLayoutActive,
   isMediaCellSurfaceTarget,
   isImageSizeActive,
@@ -114,6 +115,11 @@ const BUTTON_ICONS = {
   "media-cell-add-before": "fa-plus",
   "media-cell-add-after": "fa-plus",
   "media-cell-delete": "fa-minus",
+  "media-cell-style-shadow": "fa-moon-o",
+  "media-cell-style-gilded": "fa-square-o",
+  "media-cell-style-well": "fa-inbox",
+  "media-cell-style-colors": "fa-eyedropper",
+  "media-cell-style-clear": "fa-eraser",
   "media-row-unwrap": "fa-outdent",
   "media-row-delete": "fa-trash",
   "bullet-list": "fa-list-ul",
@@ -2146,6 +2152,80 @@ function createPoetryQuoteContextToolbar(surface, editor) {
   };
 }
 
+function createMediaCellColorMenu(button, editor) {
+  const existing = document.querySelector(".wiki-editor-media-cell-color-menu");
+  if (existing && existing.parentNode) {
+    existing.parentNode.removeChild(existing);
+  }
+
+  const menu = document.createElement("div");
+  menu.className = "wiki-editor-color-menu wiki-editor-media-cell-color-menu";
+  menu.setAttribute("role", "dialog");
+  menu.setAttribute("aria-label", "Media cell colors");
+
+  const backgroundWrap = document.createElement("label");
+  backgroundWrap.className = "wiki-editor-color-custom";
+  backgroundWrap.textContent = "Background";
+  const backgroundInput = document.createElement("input");
+  backgroundInput.type = "color";
+  backgroundInput.value = "#22172d";
+  backgroundWrap.appendChild(backgroundInput);
+  menu.appendChild(backgroundWrap);
+
+  const borderWrap = document.createElement("label");
+  borderWrap.className = "wiki-editor-color-custom";
+  borderWrap.textContent = "Border";
+  const borderInput = document.createElement("input");
+  borderInput.type = "color";
+  borderInput.value = "#7b617f";
+  borderWrap.appendChild(borderInput);
+  menu.appendChild(borderWrap);
+
+  const actions = document.createElement("div");
+  actions.className = "wiki-editor-media-cell-color-menu__actions";
+  const apply = document.createElement("button");
+  apply.type = "button";
+  apply.className = "btn btn-primary btn-sm";
+  apply.textContent = "Apply";
+  apply.addEventListener("click", function (event) {
+    event.preventDefault();
+    editor.chain().focus().setMediaCellColors({ backgroundColor: backgroundInput.value, borderColor: borderInput.value }).run();
+    document.removeEventListener("mousedown", closeOnOutside);
+    menu.remove();
+  });
+  const clear = document.createElement("button");
+  clear.type = "button";
+  clear.className = "btn btn-outline-secondary btn-sm";
+  clear.textContent = "Clear";
+  clear.addEventListener("click", function (event) {
+    event.preventDefault();
+    editor.chain().focus().clearMediaCellStyle().run();
+    document.removeEventListener("mousedown", closeOnOutside);
+    menu.remove();
+  });
+  actions.appendChild(apply);
+  actions.appendChild(clear);
+  menu.appendChild(actions);
+
+  function closeOnOutside(event) {
+    if (!menu.contains(event.target)) {
+      menu.remove();
+      document.removeEventListener("mousedown", closeOnOutside);
+    }
+  }
+
+  menu.addEventListener("mousedown", function (event) {
+    event.stopPropagation();
+  });
+  document.body.appendChild(menu);
+  const rect = button.getBoundingClientRect();
+  menu.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8))}px`;
+  menu.style.top = `${Math.min(rect.bottom + 6, window.innerHeight - menu.offsetHeight - 8)}px`;
+  window.setTimeout(function () {
+    document.addEventListener("mousedown", closeOnOutside);
+  }, 0);
+}
+
 function createMediaRowContextToolbar(surface, editor) {
   const panel = document.createElement("div");
   panel.className = "wiki-editor-context-tools wiki-editor-media-row-tools";
@@ -2188,14 +2268,50 @@ function createMediaRowContextToolbar(surface, editor) {
       editor.chain().focus().deleteMediaRow().run();
     }
   });
+  const styleShadow = createButton({
+    id: "media-cell-style-shadow",
+    title: "Shadow media cell",
+    action: function () {
+      editor.chain().focus().setMediaCellStyle("shadow").run();
+    }
+  });
+  const styleGilded = createButton({
+    id: "media-cell-style-gilded",
+    title: "Gilded media cell",
+    action: function () {
+      editor.chain().focus().setMediaCellStyle("gilded").run();
+    }
+  });
+  const styleWell = createButton({
+    id: "media-cell-style-well",
+    title: "Well media cell",
+    action: function () {
+      editor.chain().focus().setMediaCellStyle("well").run();
+    }
+  });
+  const styleColors = createButton({
+    id: "media-cell-style-colors",
+    title: "Media cell colors",
+    action: function ({ button }) {
+      createMediaCellColorMenu(button, editor);
+    }
+  });
+  const styleClear = createButton({
+    id: "media-cell-style-clear",
+    title: "Clear media cell style",
+    action: function () {
+      editor.chain().focus().clearMediaCellStyle().run();
+    }
+  });
 
-  [addBefore, addAfter, deleteCell, unwrapRow, deleteRow].forEach(function (button) {
+  [addBefore, addAfter, deleteCell, unwrapRow, deleteRow, styleShadow, styleGilded, styleWell, styleColors, styleClear].forEach(function (button) {
     panel.appendChild(button);
   });
 
   function syncMediaRowTools() {
     const row = editor.isActive("mediaRow") ? getActiveMediaRowElement(editor, surface) : null;
     const cell = editor.isActive("mediaCell") ? getActiveMediaCellElement(editor, surface) : null;
+    const activePreset = editor.getAttributes("mediaCell").stylePreset || "";
     panel.hidden = !row;
     if (!row) {
       return;
@@ -2206,6 +2322,13 @@ function createMediaRowContextToolbar(surface, editor) {
     deleteCell.disabled = !cell;
     unwrapRow.disabled = false;
     deleteRow.disabled = false;
+    [styleShadow, styleGilded, styleWell, styleColors, styleClear].forEach(function (button) {
+      button.disabled = !cell;
+    });
+    styleShadow.classList.toggle("active", activePreset === "shadow");
+    styleGilded.classList.toggle("active", activePreset === "gilded");
+    styleWell.classList.toggle("active", activePreset === "well");
+    styleColors.classList.toggle("active", activePreset === "custom");
     positionContextPanel(panel, cell || row, surface);
   }
 
@@ -3348,6 +3471,10 @@ export async function createWikiEditor(element, options) {
           if (selectPoetryQuote(editor, target, editorMount)) {
             event.preventDefault();
             event.stopPropagation();
+            return true;
+          }
+
+          if (mediaCell && handleMediaCellSelectionClick(editor, mediaCell, event)) {
             return true;
           }
 

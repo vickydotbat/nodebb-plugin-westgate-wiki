@@ -87,7 +87,12 @@ const { IMAGE_CONTEXT_BUTTON_IDS, TABLE_CELL_POPOVER_COMMAND_IDS, TABLE_CONTEXT_
 const { buildHeadingToc, navigateToHeading } = editorTocModule;
 const { installEditorLinkNavigationGuard, selectEditorLink } = linkInteractionsModule;
 const { calculateResizedImageWidth, getSelectedImageElement, setSelectedImageWidth } = imageResizeModule;
-const { focusMediaCell, isMediaCellSurfaceTarget, selectClickedImageNode } = mediaSelectionModule;
+const {
+  focusMediaCell,
+  handleMediaCellSelectionClick,
+  isMediaCellSurfaceTarget,
+  selectClickedImageNode
+} = mediaSelectionModule;
 const {
   MEDIA_CELL_SELECTION_PLUGIN_KEY,
   default: MediaCellSelection,
@@ -980,6 +985,35 @@ await test("media cell command targets selected cells before active cell", funct
   assert.equal(editor.commands.setMediaCellStyle("shadow"), true);
   const rendered = editor.getHTML();
   assert.equal((rendered.match(/wiki-media-cell--shadow/g) || []).length, 2);
+  editor.destroy();
+});
+
+await test("editor bundle wires media cell selection helpers and style controls", function () {
+  assert.match(editorBundleSource, /import\s+MediaCellSelection/);
+  assert.match(editorBundleSource, /handleMediaCellSelectionClick\(editor,\s*mediaCell,\s*event\)/);
+  assert.match(editorBundleSource, /id:\s*"media-cell-style-shadow"/);
+  assert.match(editorBundleSource, /id:\s*"media-cell-style-gilded"/);
+  assert.match(editorBundleSource, /id:\s*"media-cell-style-well"/);
+  assert.match(editorBundleSource, /id:\s*"media-cell-style-colors"/);
+  assert.match(editorBundleSource, /id:\s*"media-cell-style-clear"/);
+  assert.match(editorBundleSource, /setMediaCellStyle\("shadow"\)/);
+  assert.match(editorBundleSource, /setMediaCellColors\(\{/);
+  assert.match(editorBundleSource, /clearMediaCellStyle\(\)/);
+});
+
+await test("media cell style click helper toggles multi-selection on modified click", function () {
+  const editor = createEditor('<div class="wiki-media-row"><div class="wiki-media-cell"><p>A</p></div><div class="wiki-media-cell"><p>B</p></div></div>');
+  const firstCell = editor.view.dom.querySelector('[data-wiki-node="media-cell"]');
+  const handled = handleMediaCellSelectionClick(editor, firstCell, {
+    ctrlKey: true,
+    metaKey: false,
+    shiftKey: false,
+    preventDefault: function () {},
+    stopPropagation: function () {}
+  });
+
+  assert.equal(handled, true);
+  assert.deepEqual(getSelectedMediaCellPositions(editor.state), [findNodePositions(editor, "mediaCell")[0]]);
   editor.destroy();
 });
 
