@@ -130,7 +130,7 @@ test("desktop ToC link scrolls and releases focus so focus-within does not pin d
   assert.notEqual(document.activeElement, anchor);
 });
 
-test("article ToC headings with children get an accessible collapse caret", function () {
+test("article ToC headings with children start expanded with an accessible collapse caret", function () {
   const dom = createDom("<h2>Parent</h2><h3>Child</h3><h2>Sibling</h2>");
   const { document } = dom.window;
   const parentItem = document.querySelector(".wiki-article-toc__item");
@@ -138,15 +138,15 @@ test("article ToC headings with children get an accessible collapse caret", func
   const childList = parentItem.querySelector(".wiki-article-toc__ol--nest");
 
   assert.ok(toggle, "parent heading should receive a disclosure caret");
-  assert.equal(toggle.getAttribute("aria-expanded"), "false");
-  assert.equal(parentItem.classList.contains("wiki-article-toc__item--collapsed"), true);
-  assert.equal(childList.hidden, true);
-
-  toggle.click();
-
   assert.equal(toggle.getAttribute("aria-expanded"), "true");
   assert.equal(parentItem.classList.contains("wiki-article-toc__item--collapsed"), false);
   assert.equal(childList.hidden, false);
+
+  toggle.click();
+
+  assert.equal(toggle.getAttribute("aria-expanded"), "false");
+  assert.equal(parentItem.classList.contains("wiki-article-toc__item--collapsed"), true);
+  assert.equal(childList.hidden, true);
 });
 
 test("article headings scroll to the current hash after generated ids are assigned", function () {

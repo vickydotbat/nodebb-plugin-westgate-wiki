@@ -2341,12 +2341,11 @@ function createEditorToc(root, surface, editor) {
       line.appendChild(button);
 
       if (item.children && item.children.length) {
-        row.classList.add("wiki-editor-toc__entry--collapsed");
         const toggle = document.createElement("button");
         toggle.type = "button";
         toggle.className = "wiki-editor-toc__toggle";
-        toggle.setAttribute("aria-expanded", "false");
-        toggle.setAttribute("aria-label", "Expand " + (item.text || "heading"));
+        toggle.setAttribute("aria-expanded", "true");
+        toggle.setAttribute("aria-label", "Collapse " + (item.text || "heading"));
         toggle.innerHTML = '<i class="fa fa-fw fa-caret-down" aria-hidden="true"></i>';
         toggle.addEventListener("mousedown", function (event) {
           event.preventDefault();
@@ -2365,10 +2364,6 @@ function createEditorToc(root, surface, editor) {
         });
         line.insertBefore(toggle, button);
         renderItems(item.children, row);
-        const childList = row.querySelector(":scope > .wiki-editor-toc__entries");
-        if (childList) {
-          childList.hidden = true;
-        }
       }
       list.appendChild(row);
     });
