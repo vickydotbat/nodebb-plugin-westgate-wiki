@@ -527,6 +527,17 @@ await test("paragraph block backgrounds shrink to the text width in article and 
   assert.match(articleBodyCss, /\.wiki-article-prose p\[style\*="background-color"\]\s*\{[^}]*width:\s*fit-content/s);
 });
 
+await test("media cell style css exists in article and editor prose", function () {
+  [articleBodyCss, editorCss].forEach(function (css) {
+    assert.match(css, /\.wiki-media-cell--shadow\s*\{/);
+    assert.match(css, /\.wiki-media-cell--gilded\s*\{/);
+    assert.match(css, /\.wiki-media-cell--custom\s*\{/);
+    assert.match(css, /\.wiki-media-cell--well\s*\{/);
+  });
+  assert.match(editorCss, /\.wiki-media-cell--multi-selected\s*\{/);
+  assert.match(editorCss, /\.wiki-editor-media-cell-color-menu\s*\{/);
+});
+
 await test("table cell block backgrounds keep their paired foreground color", function () {
   const editor = createEditor("<table><tbody><tr><td><p>Cell background</p></td></tr></tbody></table>");
 
