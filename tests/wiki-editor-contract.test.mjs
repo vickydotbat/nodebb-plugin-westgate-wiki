@@ -64,7 +64,14 @@ const { TableRow } = TableRowModule;
 const PreservedNodeAttributes = PreservedNodeAttributesModule.default;
 const StyledSpan = StyledSpanModule.default;
 const ContainerBlock = ContainerBlockModule.default;
-const { MediaCell, MediaRow } = MediaRowModule;
+const {
+  MEDIA_CELL_STYLE_PRESETS,
+  MediaCell,
+  MediaRow,
+  clearMediaCellStyleAttrs,
+  getMediaCellStyleAttrs,
+  mergeMediaCellColorStyle
+} = MediaRowModule;
 const ImageFigure = ImageFigureModule.default;
 const WikiAlignmentTable = WikiAlignmentTableModule.default;
 const WikiCallout = WikiCalloutModule.default;
@@ -880,6 +887,60 @@ await test("mediaRow insert command renders bounded two- and three-cell layouts"
   assert.match(rendered, /data-wiki-node="media-row"/);
   assert.equal(cellCount, 3);
   editor.destroy();
+});
+
+await test("mediaCell parses and renders supported style presets", function () {
+  const editor = createEditor(
+    '<div class="wiki-media-row"><div class="wiki-media-cell wiki-media-cell--gilded" data-wiki-node="media-cell"><p>Portrait</p></div><div class="wiki-media-cell wiki-media-cell--well" data-wiki-node="media-cell"><p>Notes</p></div></div>'
+  );
+  const json = editor.getJSON();
+  const rendered = editor.getHTML();
+
+  assert.equal(MEDIA_CELL_STYLE_PRESETS.includes("gilded"), true);
+  assert.equal(json.content[0].content[0].attrs.stylePreset, "gilded");
+  assert.equal(json.content[0].content[1].attrs.stylePreset, "well");
+  assert.match(rendered, /class="wiki-media-cell wiki-media-cell--gilded"/);
+  assert.match(rendered, /class="wiki-media-cell wiki-media-cell--well"/);
+  editor.destroy();
+});
+
+await test("mediaCell parses and renders custom background and border colors", function () {
+  const editor = createEditor(
+    '<div class="wiki-media-row"><div class="wiki-media-cell wiki-media-cell--custom" data-wiki-node="media-cell" style="background-color: #22172d; border-color: #7b617f; position: fixed"><p>Custom</p></div></div>'
+  );
+  const json = editor.getJSON();
+  const rendered = editor.getHTML();
+
+  assert.equal(json.content[0].content[0].attrs.stylePreset, "custom");
+  assert.equal(json.content[0].content[0].attrs.backgroundColor, "rgb(34, 23, 45)");
+  assert.equal(json.content[0].content[0].attrs.borderColor, "rgb(123, 97, 127)");
+  assert.match(rendered, /class="wiki-media-cell wiki-media-cell--custom"/);
+  assert.match(rendered, /style="background-color: rgb\(34, 23, 45\); border-color: rgb\(123, 97, 127\);?"/);
+  assert.doesNotMatch(rendered, /position:/);
+  editor.destroy();
+});
+
+await test("mediaCell style helpers clear presets and custom colors", function () {
+  assert.deepEqual(getMediaCellStyleAttrs({ stylePreset: "shadow" }), {
+    stylePreset: "shadow",
+    backgroundColor: null,
+    borderColor: null
+  });
+  assert.deepEqual(getMediaCellStyleAttrs({
+    stylePreset: "custom",
+    backgroundColor: "#22172d",
+    borderColor: "#7b617f"
+  }), {
+    stylePreset: "custom",
+    backgroundColor: "rgb(34, 23, 45)",
+    borderColor: "rgb(123, 97, 127)"
+  });
+  assert.deepEqual(clearMediaCellStyleAttrs(), {
+    stylePreset: null,
+    backgroundColor: null,
+    borderColor: null
+  });
+  assert.equal(mergeMediaCellColorStyle("position: fixed; background-color: #111827", "#22172d", "#7b617f"), "background-color: rgb(34, 23, 45); border-color: rgb(123, 97, 127)");
 });
 
 await test("mediaRow two-up html round-trips without containerBlock wrappers manufacturing extra cells", function () {

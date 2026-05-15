@@ -1,6 +1,15 @@
 import { Node } from "@tiptap/core";
 import { Selection } from "@tiptap/pm/state";
 
+import { sanitizeStyleAttribute } from "../shared/sanitizer-contract.mjs";
+
+export const MEDIA_CELL_STYLE_PRESETS = ["shadow", "gilded", "custom", "well"];
+
+const MEDIA_CELL_STYLE_CLASS_PREFIX = "wiki-media-cell--";
+const MEDIA_CELL_STYLE_CLASS_MAP = new Map(MEDIA_CELL_STYLE_PRESETS.map(function (preset) {
+  return [`${MEDIA_CELL_STYLE_CLASS_PREFIX}${preset}`, preset];
+}));
+
 function selectionContainsNode(selection, pos, node) {
   return selection.from >= pos && selection.to <= pos + node.nodeSize;
 }
@@ -57,10 +66,112 @@ function deleteMediaRowFromContext(state, dispatch, context) {
   return true;
 }
 
+function sanitizeMediaCellColor(value, propertyName) {
+  const sanitized = sanitizeStyleAttribute(`${propertyName}: ${value}`, "div");
+  const match = sanitized.match(new RegExp(`(?:^|;\\s*)${propertyName}:\\s*([^;]+)`, "i"));
+  return match ? match[1].trim() : "";
+}
+
+function readMediaCellPreset(element) {
+  const classList = element && element.classList ? Array.from(element.classList) : [];
+  const token = classList.find(function (className) {
+    return MEDIA_CELL_STYLE_CLASS_MAP.has(className);
+  });
+  return token ? MEDIA_CELL_STYLE_CLASS_MAP.get(token) : "";
+}
+
+function readMediaCellStyleColor(element, propertyName) {
+  if (!element) {
+    return "";
+  }
+  return sanitizeMediaCellColor(element.style.getPropertyValue(propertyName), propertyName);
+}
+
+export function mergeMediaCellColorStyle(styleValue, backgroundColor, borderColor) {
+  const safeStyleValue = sanitizeStyleAttribute(styleValue, "div");
+  const safeBackground = sanitizeMediaCellColor(backgroundColor, "background-color") ||
+    sanitizeMediaCellColor((safeStyleValue.match(/(?:^|;\s*)background-color:\s*([^;]+)/i) || [])[1], "background-color");
+  const safeBorder = sanitizeMediaCellColor(borderColor, "border-color") ||
+    sanitizeMediaCellColor((safeStyleValue.match(/(?:^|;\s*)border-color:\s*([^;]+)/i) || [])[1], "border-color");
+  const entries = [];
+
+  if (safeBackground) {
+    entries.push(["background-color", safeBackground]);
+  }
+  if (safeBorder) {
+    entries.push(["border-color", safeBorder]);
+  }
+
+  return entries.map(function ([propertyName, value]) {
+    return `${propertyName}: ${value}`;
+  }).join("; ");
+}
+
+export function getMediaCellStyleAttrs(options) {
+  const preset = MEDIA_CELL_STYLE_PRESETS.includes(options && options.stylePreset) ? options.stylePreset : "";
+  if (preset === "custom") {
+    return {
+      stylePreset: "custom",
+      backgroundColor: sanitizeMediaCellColor(options && options.backgroundColor, "background-color") || null,
+      borderColor: sanitizeMediaCellColor(options && options.borderColor, "border-color") || null
+    };
+  }
+  return {
+    stylePreset: preset || null,
+    backgroundColor: null,
+    borderColor: null
+  };
+}
+
+export function clearMediaCellStyleAttrs() {
+  return {
+    stylePreset: null,
+    backgroundColor: null,
+    borderColor: null
+  };
+}
+
+function updateActiveMediaCellStyle(state, dispatch, attrs) {
+  const context = findActiveMediaContext(state);
+  if (!context || context.cellPos == null || !context.cellNode) {
+    return false;
+  }
+
+  if (dispatch) {
+    dispatch(state.tr.setNodeMarkup(context.cellPos, undefined, {
+      ...context.cellNode.attrs,
+      ...attrs
+    }, context.cellNode.marks).scrollIntoView());
+  }
+  return true;
+}
+
 export const MediaCell = Node.create({
   name: "mediaCell",
   content: "block+",
   defining: true,
+  addAttributes() {
+    return {
+      stylePreset: {
+        default: null,
+        parseHTML: function (element) {
+          return readMediaCellPreset(element) || null;
+        }
+      },
+      backgroundColor: {
+        default: null,
+        parseHTML: function (element) {
+          return readMediaCellPreset(element) === "custom" ? readMediaCellStyleColor(element, "background-color") || null : null;
+        }
+      },
+      borderColor: {
+        default: null,
+        parseHTML: function (element) {
+          return readMediaCellPreset(element) === "custom" ? readMediaCellStyleColor(element, "border-color") || null : null;
+        }
+      }
+    };
+  },
   parseHTML() {
     return [
       { tag: "div.wiki-media-cell" },
@@ -68,8 +179,26 @@ export const MediaCell = Node.create({
       { tag: "article.wiki-media-cell" }
     ];
   },
-  renderHTML() {
-    return ["div", { class: "wiki-media-cell", "data-wiki-node": "media-cell" }, 0];
+  renderHTML({ HTMLAttributes }) {
+    const attrs = getMediaCellStyleAttrs(HTMLAttributes || {});
+    const classes = ["wiki-media-cell"];
+    const outputAttrs = {
+      class: classes.join(" "),
+      "data-wiki-node": "media-cell"
+    };
+
+    if (attrs.stylePreset) {
+      classes.push(`${MEDIA_CELL_STYLE_CLASS_PREFIX}${attrs.stylePreset}`);
+      outputAttrs.class = classes.join(" ");
+    }
+    if (attrs.stylePreset === "custom") {
+      const style = mergeMediaCellColorStyle("", attrs.backgroundColor, attrs.borderColor);
+      if (style) {
+        outputAttrs.style = style;
+      }
+    }
+
+    return ["div", outputAttrs, 0];
   }
 });
 
@@ -94,6 +223,19 @@ export const MediaRow = Node.create({
             })
           });
         },
+      setMediaCellStyle:
+        (stylePreset) =>
+        ({ state, dispatch }) => updateActiveMediaCellStyle(state, dispatch, getMediaCellStyleAttrs({ stylePreset })),
+      setMediaCellColors:
+        (colors) =>
+        ({ state, dispatch }) => updateActiveMediaCellStyle(state, dispatch, getMediaCellStyleAttrs({
+          stylePreset: "custom",
+          backgroundColor: colors && colors.backgroundColor,
+          borderColor: colors && colors.borderColor
+        })),
+      clearMediaCellStyle:
+        () =>
+        ({ state, dispatch }) => updateActiveMediaCellStyle(state, dispatch, clearMediaCellStyleAttrs()),
       addMediaCellBefore:
         () =>
         ({ state, dispatch }) => {
