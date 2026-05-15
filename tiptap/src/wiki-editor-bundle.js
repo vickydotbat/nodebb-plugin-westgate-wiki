@@ -2219,6 +2219,18 @@ function createMediaCellColorMenu(button, editor) {
   borderInput.value = colorValueToInputHex(attrs.borderColor, "#7b617f");
   menu.appendChild(createMediaCellColorField("Border color", borderInput));
 
+  function applyColorValues() {
+    editor.commands.setMediaCellColorsAtPositions(targetPositions, {
+      backgroundColor: backgroundInput.value,
+      borderColor: borderInput.value
+    });
+  }
+
+  [backgroundInput, borderInput].forEach(function (input) {
+    input.addEventListener("input", applyColorValues);
+    input.addEventListener("change", applyColorValues);
+  });
+
   const actions = document.createElement("div");
   actions.className = "wiki-editor-media-cell-color-menu__actions";
   const apply = document.createElement("button");
@@ -2227,10 +2239,8 @@ function createMediaCellColorMenu(button, editor) {
   apply.textContent = "Apply";
   apply.addEventListener("click", function (event) {
     event.preventDefault();
-    editor.chain().focus().setMediaCellColorsAtPositions(targetPositions, {
-      backgroundColor: backgroundInput.value,
-      borderColor: borderInput.value
-    }).run();
+    applyColorValues();
+    editor.commands.focus();
     document.removeEventListener("mousedown", closeOnOutside);
     menu.remove();
   });

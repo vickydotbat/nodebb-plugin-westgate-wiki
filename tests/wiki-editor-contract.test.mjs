@@ -1038,6 +1038,36 @@ await test("media cell custom colors update the node style attribute directly", 
   editor.destroy();
 });
 
+await test("media cell color picker input updates the source without a separate apply click", async function () {
+  const { createWikiEditor } = await importEditorBundleForContract();
+  const host = document.createElement("div");
+  host.className = "westgate-wiki-compose";
+  document.body.appendChild(host);
+
+  const wikiEditor = await createWikiEditor(host, {
+    initialData: '<div class="wiki-media-row"><div class="wiki-media-cell wiki-media-cell--custom" data-wiki-node="media-cell" style="background-color: rgb(34, 23, 45)"><p>colorful</p></div></div>'
+  });
+
+  const cell = host.querySelector('[data-wiki-node="media-cell"]');
+  cell.dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true, view: window }));
+  await nextAnimationFrame();
+
+  const colorButton = host.querySelector('[data-toolbar-id="media-cell-style-colors"]');
+  assert.ok(colorButton, "media cell color button should exist");
+  colorButton.click();
+
+  const inputs = Array.from(document.querySelectorAll(".wiki-editor-media-cell-color-menu input[type='color']"));
+  assert.equal(inputs.length, 2);
+  inputs[1].value = "#d4b16a";
+  inputs[1].dispatchEvent(new window.Event("input", { bubbles: true }));
+
+  assert.match(wikiEditor.getHTML(), /style="[^"]*background-color: rgb\(34, 23, 45\);[^"]*border-color: rgb\(212, 177, 106\);?[^"]*"/);
+
+  wikiEditor.destroy();
+  document.querySelector(".wiki-editor-media-cell-color-menu")?.remove();
+  host.remove();
+});
+
 await test("editor bundle wires media cell selection helpers and style controls", function () {
   assert.match(editorBundleSource, /import\s+MediaCellSelection,\s*\{\s*getTargetMediaCellPositions\s*\}/);
   assert.match(editorBundleSource, /handleMediaCellSelectionClick\(editor,\s*mediaCell,\s*event\)/);
