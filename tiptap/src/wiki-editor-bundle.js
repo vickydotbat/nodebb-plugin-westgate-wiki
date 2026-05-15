@@ -51,6 +51,7 @@ import {
   setSelectedImageLayout,
   setSelectedImageSize
 } from "./selection/media-selection.mjs";
+import MediaCellSelection from "./selection/media-cell-selection.mjs";
 import {
   handleEditorLinkClick,
   installEditorLinkNavigationGuard
@@ -3227,6 +3228,7 @@ export async function createWikiEditor(element, options) {
       ContainerBlock,
       MediaCell,
       MediaRow,
+      MediaCellSelection,
       ImageFigure,
       WikiAlignmentTable,
       WikiCodeBlock,

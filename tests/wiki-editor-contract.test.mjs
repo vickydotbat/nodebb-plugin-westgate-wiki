@@ -21,7 +21,7 @@ function test(name, fn) {
 
 installJsdomGlobals();
 
-const [{ Editor }, StarterKitModule, HighlightModule, ImageModule, TableModule, TableCellModule, TableHeaderModule, TableRowModule, PreservedNodeAttributesModule, StyledSpanModule, ContainerBlockModule, MediaRowModule, ImageFigureModule, WikiAlignmentTableModule, WikiCalloutModule, WikiPoetryQuoteModule, WikiEditingKeymapModule, SlashCommandModule, WikiCodeBlockModule, WikiBlockBackgroundModule, WikiLinkModule, WikiEntitiesModule, toolbarSchemaModule, editorTocModule, linkInteractionsModule, imageResizeModule, mediaSelectionModule, legacyHtmlModule, sanitizerContractModule, colorContrastModule] = await Promise.all([
+const [{ Editor }, StarterKitModule, HighlightModule, ImageModule, TableModule, TableCellModule, TableHeaderModule, TableRowModule, PreservedNodeAttributesModule, StyledSpanModule, ContainerBlockModule, MediaRowModule, ImageFigureModule, WikiAlignmentTableModule, WikiCalloutModule, WikiPoetryQuoteModule, WikiEditingKeymapModule, SlashCommandModule, WikiCodeBlockModule, WikiBlockBackgroundModule, WikiLinkModule, WikiEntitiesModule, toolbarSchemaModule, editorTocModule, linkInteractionsModule, imageResizeModule, mediaSelectionModule, mediaCellSelectionModule, legacyHtmlModule, sanitizerContractModule, colorContrastModule] = await Promise.all([
   import("@tiptap/core"),
   import("@tiptap/starter-kit"),
   import("../tiptap/src/extensions/wiki-highlight.mjs"),
@@ -49,6 +49,7 @@ const [{ Editor }, StarterKitModule, HighlightModule, ImageModule, TableModule, 
   import("../tiptap/src/selection/link-interactions.mjs"),
   import("../tiptap/src/selection/image-resize.mjs"),
   import("../tiptap/src/selection/media-selection.mjs"),
+  import("../tiptap/src/selection/media-cell-selection.mjs"),
   import("../tiptap/src/normalization/legacy-html.mjs"),
   import("../tiptap/src/shared/sanitizer-contract.mjs"),
   import("../tiptap/src/shared/color-contrast.mjs")
@@ -87,6 +88,13 @@ const { buildHeadingToc, navigateToHeading } = editorTocModule;
 const { installEditorLinkNavigationGuard, selectEditorLink } = linkInteractionsModule;
 const { calculateResizedImageWidth, getSelectedImageElement, setSelectedImageWidth } = imageResizeModule;
 const { focusMediaCell, isMediaCellSurfaceTarget, selectClickedImageNode } = mediaSelectionModule;
+const {
+  MEDIA_CELL_SELECTION_PLUGIN_KEY,
+  default: MediaCellSelection,
+  getSelectedMediaCellPositions,
+  getTargetMediaCellPositions,
+  toggleMediaCellSelectionAt
+} = mediaCellSelectionModule;
 const {
   detectUnsupportedContent,
   getNormalizationNotice,
@@ -137,6 +145,7 @@ function createEditor(content) {
       ContainerBlock,
       MediaCell,
       MediaRow,
+      MediaCellSelection,
       ImageFigure,
       WikiAlignmentTable,
       WikiCallout,
@@ -941,6 +950,37 @@ await test("mediaCell style helpers clear presets and custom colors", function (
     borderColor: null
   });
   assert.equal(mergeMediaCellColorStyle("position: fixed; background-color: #111827", "#22172d", "#7b617f"), "background-color: rgb(34, 23, 45); border-color: rgb(123, 97, 127)");
+});
+
+await test("media cell selection toggles individual cell positions", function () {
+  const editor = createEditor('<div class="wiki-media-row"><div class="wiki-media-cell"><p>A</p></div><div class="wiki-media-cell"><p>B</p></div></div>');
+  const cells = findNodePositions(editor, "mediaCell");
+
+  assert.ok(MEDIA_CELL_SELECTION_PLUGIN_KEY.getState(editor.state), "selection plugin state should be registered");
+
+  editor.view.dispatch(toggleMediaCellSelectionAt(editor.state.tr, cells[0]));
+  assert.deepEqual(getSelectedMediaCellPositions(editor.state), [cells[0]]);
+
+  editor.view.dispatch(toggleMediaCellSelectionAt(editor.state.tr, cells[1]));
+  assert.deepEqual(getSelectedMediaCellPositions(editor.state), [cells[0], cells[1]]);
+
+  editor.view.dispatch(toggleMediaCellSelectionAt(editor.state.tr, cells[0]));
+  assert.deepEqual(getSelectedMediaCellPositions(editor.state), [cells[1]]);
+  editor.destroy();
+});
+
+await test("media cell command targets selected cells before active cell", function () {
+  const editor = createEditor('<div class="wiki-media-row"><div class="wiki-media-cell"><p>A</p></div><div class="wiki-media-cell"><p>B</p></div></div>');
+  const cells = findNodePositions(editor, "mediaCell");
+
+  editor.view.dispatch(toggleMediaCellSelectionAt(editor.state.tr, cells[0]));
+  editor.view.dispatch(toggleMediaCellSelectionAt(editor.state.tr, cells[1]));
+  assert.deepEqual(getTargetMediaCellPositions(editor.state), cells);
+
+  assert.equal(editor.commands.setMediaCellStyle("shadow"), true);
+  const rendered = editor.getHTML();
+  assert.equal((rendered.match(/wiki-media-cell--shadow/g) || []).length, 2);
+  editor.destroy();
 });
 
 await test("mediaRow two-up html round-trips without containerBlock wrappers manufacturing extra cells", function () {

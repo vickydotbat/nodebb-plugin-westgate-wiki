@@ -1,6 +1,7 @@
 import { Node } from "@tiptap/core";
 import { Selection } from "@tiptap/pm/state";
 
+import { getTargetMediaCellPositions } from "../selection/media-cell-selection.mjs";
 import { sanitizeStyleAttribute } from "../shared/sanitizer-contract.mjs";
 
 export const MEDIA_CELL_STYLE_PRESETS = ["shadow", "gilded", "custom", "well"];
@@ -131,17 +132,24 @@ export function clearMediaCellStyleAttrs() {
   };
 }
 
-function updateActiveMediaCellStyle(state, dispatch, attrs) {
-  const context = findActiveMediaContext(state);
-  if (!context || context.cellPos == null || !context.cellNode) {
+function updateTargetMediaCells(state, dispatch, attrs) {
+  const positions = getTargetMediaCellPositions(state);
+  if (!positions.length) {
     return false;
   }
 
   if (dispatch) {
-    dispatch(state.tr.setNodeMarkup(context.cellPos, undefined, {
-      ...context.cellNode.attrs,
-      ...attrs
-    }, context.cellNode.marks).scrollIntoView());
+    const tr = state.tr;
+    positions.forEach(function (pos) {
+      const node = tr.doc.nodeAt(pos);
+      if (node && node.type.name === "mediaCell") {
+        tr.setNodeMarkup(pos, undefined, {
+          ...node.attrs,
+          ...attrs
+        }, node.marks);
+      }
+    });
+    dispatch(tr.scrollIntoView());
   }
   return true;
 }
@@ -225,17 +233,17 @@ export const MediaRow = Node.create({
         },
       setMediaCellStyle:
         (stylePreset) =>
-        ({ state, dispatch }) => updateActiveMediaCellStyle(state, dispatch, getMediaCellStyleAttrs({ stylePreset })),
+        ({ state, dispatch }) => updateTargetMediaCells(state, dispatch, getMediaCellStyleAttrs({ stylePreset })),
       setMediaCellColors:
         (colors) =>
-        ({ state, dispatch }) => updateActiveMediaCellStyle(state, dispatch, getMediaCellStyleAttrs({
+        ({ state, dispatch }) => updateTargetMediaCells(state, dispatch, getMediaCellStyleAttrs({
           stylePreset: "custom",
           backgroundColor: colors && colors.backgroundColor,
           borderColor: colors && colors.borderColor
         })),
       clearMediaCellStyle:
         () =>
-        ({ state, dispatch }) => updateActiveMediaCellStyle(state, dispatch, clearMediaCellStyleAttrs()),
+        ({ state, dispatch }) => updateTargetMediaCells(state, dispatch, clearMediaCellStyleAttrs()),
       addMediaCellBefore:
         () =>
         ({ state, dispatch }) => {
