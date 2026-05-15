@@ -88,6 +88,11 @@ function readMediaCellStyleColor(element, propertyName) {
   return sanitizeMediaCellColor(element.style.getPropertyValue(propertyName), propertyName);
 }
 
+function readStyleColor(styleValue, propertyName) {
+  const safeStyleValue = sanitizeStyleAttribute(styleValue, "div");
+  return sanitizeMediaCellColor((safeStyleValue.match(new RegExp(`(?:^|;\\s*)${propertyName}:\\s*([^;]+)`, "i")) || [])[1], propertyName);
+}
+
 export function mergeMediaCellColorStyle(styleValue, backgroundColor, borderColor) {
   const safeStyleValue = sanitizeStyleAttribute(styleValue, "div");
   const safeBackground = sanitizeMediaCellColor(backgroundColor, "background-color") ||
@@ -97,11 +102,9 @@ export function mergeMediaCellColorStyle(styleValue, backgroundColor, borderColo
   const entries = [];
 
   if (safeBackground) {
-    entries.push(["--wiki-media-cell-custom-bg", safeBackground]);
     entries.push(["background-color", safeBackground]);
   }
   if (safeBorder) {
-    entries.push(["--wiki-media-cell-custom-border", safeBorder]);
     entries.push(["border-color", safeBorder]);
   }
 
@@ -113,16 +116,19 @@ export function mergeMediaCellColorStyle(styleValue, backgroundColor, borderColo
 export function getMediaCellStyleAttrs(options) {
   const preset = MEDIA_CELL_STYLE_PRESETS.includes(options && options.stylePreset) ? options.stylePreset : "";
   if (preset === "custom") {
+    const style = mergeMediaCellColorStyle(options && options.style, options && options.backgroundColor, options && options.borderColor);
     return {
       stylePreset: "custom",
-      backgroundColor: sanitizeMediaCellColor(options && options.backgroundColor, "background-color") || null,
-      borderColor: sanitizeMediaCellColor(options && options.borderColor, "border-color") || null
+      backgroundColor: readStyleColor(style, "background-color") || null,
+      borderColor: readStyleColor(style, "border-color") || null,
+      style: style || null
     };
   }
   return {
     stylePreset: preset || null,
     backgroundColor: null,
-    borderColor: null
+    borderColor: null,
+    style: null
   };
 }
 
@@ -130,7 +136,8 @@ export function clearMediaCellStyleAttrs() {
   return {
     stylePreset: null,
     backgroundColor: null,
-    borderColor: null
+    borderColor: null,
+    style: null
   };
 }
 
@@ -151,7 +158,7 @@ function normalizeMediaCellPositions(state, positions) {
   });
 }
 
-function updateMediaCellsAtPositions(state, dispatch, positions, attrs) {
+function updateMediaCellsAtPositions(state, dispatch, positions, attrsOrResolver) {
   const targetPositions = normalizeMediaCellPositions(state, positions);
   if (!targetPositions.length) {
     return false;
@@ -162,6 +169,7 @@ function updateMediaCellsAtPositions(state, dispatch, positions, attrs) {
     targetPositions.forEach(function (pos) {
       const node = tr.doc.nodeAt(pos);
       if (node && node.type.name === "mediaCell") {
+        const attrs = typeof attrsOrResolver === "function" ? attrsOrResolver(node) : attrsOrResolver;
         tr.setNodeMarkup(pos, undefined, {
           ...node.attrs,
           ...attrs
@@ -264,18 +272,24 @@ export const MediaRow = Node.create({
         ({ state, dispatch }) => updateTargetMediaCells(state, dispatch, getMediaCellStyleAttrs({ stylePreset })),
       setMediaCellColors:
         (colors) =>
-        ({ state, dispatch }) => updateTargetMediaCells(state, dispatch, getMediaCellStyleAttrs({
-          stylePreset: "custom",
-          backgroundColor: colors && colors.backgroundColor,
-          borderColor: colors && colors.borderColor
-        })),
+        ({ state, dispatch }) => updateTargetMediaCells(state, dispatch, function (node) {
+          return getMediaCellStyleAttrs({
+            stylePreset: "custom",
+            style: node && node.attrs && node.attrs.style,
+            backgroundColor: colors && colors.backgroundColor,
+            borderColor: colors && colors.borderColor
+          });
+        }),
       setMediaCellColorsAtPositions:
         (positions, colors) =>
-        ({ state, dispatch }) => updateMediaCellsAtPositions(state, dispatch, positions, getMediaCellStyleAttrs({
-          stylePreset: "custom",
-          backgroundColor: colors && colors.backgroundColor,
-          borderColor: colors && colors.borderColor
-        })),
+        ({ state, dispatch }) => updateMediaCellsAtPositions(state, dispatch, positions, function (node) {
+          return getMediaCellStyleAttrs({
+            stylePreset: "custom",
+            style: node && node.attrs && node.attrs.style,
+            backgroundColor: colors && colors.backgroundColor,
+            borderColor: colors && colors.borderColor
+          });
+        }),
       clearMediaCellStyle:
         () =>
         ({ state, dispatch }) => updateTargetMediaCells(state, dispatch, clearMediaCellStyleAttrs()),

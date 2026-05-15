@@ -943,7 +943,7 @@ await test("mediaCell parses and renders custom background and border colors", f
   assert.equal(json.content[0].content[0].attrs.backgroundColor, "rgb(34, 23, 45)");
   assert.equal(json.content[0].content[0].attrs.borderColor, "rgb(123, 97, 127)");
   assert.match(rendered, /class="wiki-media-cell wiki-media-cell--custom"/);
-  assert.match(rendered, /style="--wiki-media-cell-custom-bg: rgb\(34, 23, 45\); background-color: rgb\(34, 23, 45\); --wiki-media-cell-custom-border: rgb\(123, 97, 127\); border-color: rgb\(123, 97, 127\);?"/);
+  assert.match(rendered, /style="background-color: rgb\(34, 23, 45\); border-color: rgb\(123, 97, 127\);?"/);
   assert.doesNotMatch(rendered, /position:/);
   editor.destroy();
 });
@@ -952,7 +952,8 @@ await test("mediaCell style helpers clear presets and custom colors", function (
   assert.deepEqual(getMediaCellStyleAttrs({ stylePreset: "shadow" }), {
     stylePreset: "shadow",
     backgroundColor: null,
-    borderColor: null
+    borderColor: null,
+    style: null
   });
   assert.deepEqual(getMediaCellStyleAttrs({
     stylePreset: "custom",
@@ -961,14 +962,16 @@ await test("mediaCell style helpers clear presets and custom colors", function (
   }), {
     stylePreset: "custom",
     backgroundColor: "rgb(34, 23, 45)",
-    borderColor: "rgb(123, 97, 127)"
+    borderColor: "rgb(123, 97, 127)",
+    style: "background-color: rgb(34, 23, 45); border-color: rgb(123, 97, 127)"
   });
   assert.deepEqual(clearMediaCellStyleAttrs(), {
     stylePreset: null,
     backgroundColor: null,
-    borderColor: null
+    borderColor: null,
+    style: null
   });
-  assert.equal(mergeMediaCellColorStyle("position: fixed; background-color: #111827", "#22172d", "#7b617f"), "--wiki-media-cell-custom-bg: rgb(34, 23, 45); background-color: rgb(34, 23, 45); --wiki-media-cell-custom-border: rgb(123, 97, 127); border-color: rgb(123, 97, 127)");
+  assert.equal(mergeMediaCellColorStyle("position: fixed; background-color: #111827", "#22172d", "#7b617f"), "background-color: rgb(34, 23, 45); border-color: rgb(123, 97, 127)");
 });
 
 await test("media cell selection toggles individual cell positions", function () {
@@ -1017,6 +1020,21 @@ await test("media cell custom colors can apply to captured cells after selection
   const rendered = editor.getHTML();
   assert.match(rendered, /<div class="wiki-media-cell wiki-media-cell--custom" data-wiki-node="media-cell" style="[^"]*background-color: rgb\(38, 162, 105\);[^"]*border-color: rgb\(212, 177, 106\);?[^"]*"><p>A<\/p><\/div>/);
   assert.match(rendered, /<div class="wiki-media-cell" data-wiki-node="media-cell"><p>B<\/p><\/div>/);
+  editor.destroy();
+});
+
+await test("media cell custom colors update the node style attribute directly", function () {
+  const editor = createEditor('<div class="wiki-media-row"><div class="wiki-media-cell wiki-media-cell--custom" data-wiki-node="media-cell" style="background-color: #26a269"><p>A</p></div></div>');
+  const cells = findNodePositions(editor, "mediaCell");
+
+  assert.equal(editor.commands.setMediaCellColorsAtPositions([cells[0]], {
+    borderColor: "#d4b16a"
+  }), true);
+
+  const attrs = editor.getJSON().content[0].content[0].attrs;
+  assert.match(attrs.style, /background-color: rgb\(38, 162, 105\)/);
+  assert.match(attrs.style, /border-color: rgb\(212, 177, 106\)/);
+  assert.match(editor.getHTML(), /style="[^"]*background-color: rgb\(38, 162, 105\);[^"]*border-color: rgb\(212, 177, 106\);?[^"]*"/);
   editor.destroy();
 });
 
