@@ -536,6 +536,9 @@ await test("media cell style css exists in article and editor prose", function (
   });
   assert.match(editorCss, /\.wiki-media-cell--multi-selected\s*\{/);
   assert.match(editorCss, /\.wiki-editor-media-cell-color-menu\s*\{/);
+  assert.match(editorCss, /\.wiki-editor-media-cell-color-menu__field\s*\{/);
+  assert.match(editorCss, /\.wiki-editor-media-cell-color-menu__input\s*\{/);
+  assert.match(editorCss, /\.wiki-editor-media-cell-color-menu__value\s*\{/);
 });
 
 await test("table cell block backgrounds keep their paired foreground color", function () {
@@ -940,7 +943,7 @@ await test("mediaCell parses and renders custom background and border colors", f
   assert.equal(json.content[0].content[0].attrs.backgroundColor, "rgb(34, 23, 45)");
   assert.equal(json.content[0].content[0].attrs.borderColor, "rgb(123, 97, 127)");
   assert.match(rendered, /class="wiki-media-cell wiki-media-cell--custom"/);
-  assert.match(rendered, /style="background-color: rgb\(34, 23, 45\); border-color: rgb\(123, 97, 127\);?"/);
+  assert.match(rendered, /style="--wiki-media-cell-custom-bg: rgb\(34, 23, 45\); background-color: rgb\(34, 23, 45\); --wiki-media-cell-custom-border: rgb\(123, 97, 127\); border-color: rgb\(123, 97, 127\);?"/);
   assert.doesNotMatch(rendered, /position:/);
   editor.destroy();
 });
@@ -965,7 +968,7 @@ await test("mediaCell style helpers clear presets and custom colors", function (
     backgroundColor: null,
     borderColor: null
   });
-  assert.equal(mergeMediaCellColorStyle("position: fixed; background-color: #111827", "#22172d", "#7b617f"), "background-color: rgb(34, 23, 45); border-color: rgb(123, 97, 127)");
+  assert.equal(mergeMediaCellColorStyle("position: fixed; background-color: #111827", "#22172d", "#7b617f"), "--wiki-media-cell-custom-bg: rgb(34, 23, 45); background-color: rgb(34, 23, 45); --wiki-media-cell-custom-border: rgb(123, 97, 127); border-color: rgb(123, 97, 127)");
 });
 
 await test("media cell selection toggles individual cell positions", function () {
@@ -1010,6 +1013,18 @@ await test("editor bundle wires media cell selection helpers and style controls"
   assert.match(editorBundleSource, /setMediaCellStyle\("shadow"\)/);
   assert.match(editorBundleSource, /setMediaCellColors\(\{/);
   assert.match(editorBundleSource, /clearMediaCellStyle\(\)/);
+});
+
+await test("media cell color menu uses labelled color picker fields", function () {
+  const match = editorBundleSource.match(/function createMediaCellColorMenu\(button, editor\) \{[\s\S]*?\nfunction createMediaRowContextToolbar/);
+  assert.ok(match, "media cell color menu source should be present");
+  assert.match(editorBundleSource, /function createMediaCellColorField/);
+  assert.match(editorBundleSource, /wiki-editor-media-cell-color-menu__field/);
+  assert.match(editorBundleSource, /wiki-editor-media-cell-color-menu__input/);
+  assert.match(editorBundleSource, /wiki-editor-media-cell-color-menu__value/);
+  assert.match(match[0], /Background color/);
+  assert.match(match[0], /Border color/);
+  assert.doesNotMatch(match[0], /className\s*=\s*"wiki-editor-color-custom"/);
 });
 
 await test("media cell style click helper toggles multi-selection on modified click", function () {

@@ -97,9 +97,11 @@ export function mergeMediaCellColorStyle(styleValue, backgroundColor, borderColo
   const entries = [];
 
   if (safeBackground) {
+    entries.push(["--wiki-media-cell-custom-bg", safeBackground]);
     entries.push(["background-color", safeBackground]);
   }
   if (safeBorder) {
+    entries.push(["--wiki-media-cell-custom-border", safeBorder]);
     entries.push(["border-color", safeBorder]);
   }
 

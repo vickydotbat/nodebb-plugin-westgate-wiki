@@ -2152,6 +2152,50 @@ function createPoetryQuoteContextToolbar(surface, editor) {
   };
 }
 
+function colorValueToInputHex(value, fallback) {
+  const directHex = normalizeHexColor(value);
+  if (directHex) {
+    return directHex;
+  }
+
+  const match = String(value || "").match(/rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})/i);
+  if (!match) {
+    return fallback;
+  }
+
+  const channels = match.slice(1, 4).map(function (channel) {
+    const valueNumber = Math.max(0, Math.min(255, parseInt(channel, 10) || 0));
+    return valueNumber.toString(16).padStart(2, "0");
+  });
+  return `#${channels.join("")}`;
+}
+
+function createMediaCellColorField(labelText, input) {
+  const field = document.createElement("label");
+  field.className = "wiki-editor-media-cell-color-menu__field";
+
+  const label = document.createElement("span");
+  label.className = "wiki-editor-media-cell-color-menu__label";
+  label.textContent = labelText;
+  field.appendChild(label);
+
+  input.className = "wiki-editor-media-cell-color-menu__input";
+  input.setAttribute("aria-label", labelText);
+  field.appendChild(input);
+
+  const value = document.createElement("span");
+  value.className = "wiki-editor-media-cell-color-menu__value";
+  field.appendChild(value);
+
+  function syncValue() {
+    value.textContent = input.value.toUpperCase();
+  }
+
+  input.addEventListener("input", syncValue);
+  syncValue();
+  return field;
+}
+
 function createMediaCellColorMenu(button, editor) {
   const existing = document.querySelector(".wiki-editor-media-cell-color-menu");
   if (existing && existing.parentNode) {
@@ -2163,23 +2207,16 @@ function createMediaCellColorMenu(button, editor) {
   menu.setAttribute("role", "dialog");
   menu.setAttribute("aria-label", "Media cell colors");
 
-  const backgroundWrap = document.createElement("label");
-  backgroundWrap.className = "wiki-editor-color-custom";
-  backgroundWrap.textContent = "Background";
+  const attrs = editor.getAttributes("mediaCell") || {};
   const backgroundInput = document.createElement("input");
   backgroundInput.type = "color";
-  backgroundInput.value = "#22172d";
-  backgroundWrap.appendChild(backgroundInput);
-  menu.appendChild(backgroundWrap);
+  backgroundInput.value = colorValueToInputHex(attrs.backgroundColor, "#22172d");
+  menu.appendChild(createMediaCellColorField("Background color", backgroundInput));
 
-  const borderWrap = document.createElement("label");
-  borderWrap.className = "wiki-editor-color-custom";
-  borderWrap.textContent = "Border";
   const borderInput = document.createElement("input");
   borderInput.type = "color";
-  borderInput.value = "#7b617f";
-  borderWrap.appendChild(borderInput);
-  menu.appendChild(borderWrap);
+  borderInput.value = colorValueToInputHex(attrs.borderColor, "#7b617f");
+  menu.appendChild(createMediaCellColorField("Border color", borderInput));
 
   const actions = document.createElement("div");
   actions.className = "wiki-editor-media-cell-color-menu__actions";
