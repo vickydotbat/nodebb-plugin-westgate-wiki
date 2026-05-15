@@ -159,6 +159,29 @@ test("sanitizeWikiHtml preserves wiki callout blocks and strips arbitrary styles
   assert.doesNotMatch(sanitized, /position:/);
 });
 
+test("sanitizeWikiHtml preserves topdata bot markers and generated HTML subset", function () {
+  const html = [
+    "<!-- sow-topdata-wiki:page=feat:power_attack -->",
+    '<!-- sow-topdata-wiki:managed:start hash="sha256:fixture" -->',
+    "<h1>Power Attack</h1>",
+    '<p class="wiki-callout wiki-callout--status">This feat has been altered from vanilla.</p>',
+    "<table><tbody><tr><th>Required Feats</th><td>[[Cleave]]</td></tr></tbody></table>",
+    "<!-- sow-topdata-wiki:managed:end -->",
+    '<!-- sow-topdata-wiki:manual:start id="notes" -->',
+    "<h2>Notes</h2><p></p>",
+    '<!-- sow-topdata-wiki:manual:end id="notes" -->',
+    '<script>alert(1)</script>'
+  ].join("\n");
+  const sanitized = wikiHtmlSanitizer.sanitizeWikiHtml(html);
+
+  assert.match(sanitized, /<!-- sow-topdata-wiki:page=feat:power_attack -->/);
+  assert.match(sanitized, /<!-- sow-topdata-wiki:managed:start hash="sha256:fixture" -->/);
+  assert.match(sanitized, /<!-- sow-topdata-wiki:manual:start id="notes" -->/);
+  assert.match(sanitized, /class="wiki-callout wiki-callout--status"/);
+  assert.match(sanitized, /\[\[Cleave\]\]/);
+  assert.doesNotMatch(sanitized, /script/);
+});
+
 test("hasMeaningfulWikiHtml accepts image-only content", function () {
   const html = '<img src="https://example.com/example.png" alt="Example" />';
   assert.equal(wikiHtmlSanitizer.hasMeaningfulWikiHtml(html), true);
