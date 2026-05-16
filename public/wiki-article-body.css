@@ -708,7 +708,6 @@
   box-sizing: border-box;
   position: relative;
   isolation: isolate;
-  overflow: hidden;
   border-radius: var(--bs-border-radius, 0.5rem);
   background: transparent;
   padding: 0;
@@ -719,7 +718,7 @@
   position: absolute;
   inset: -5% 1%;
   background: #00000059;
-  filter: blur(60px);
+  filter: blur(25px);
   z-index: 0;
   pointer-events: none;
 }
