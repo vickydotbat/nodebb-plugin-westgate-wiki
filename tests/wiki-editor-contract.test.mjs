@@ -21,7 +21,7 @@ function test(name, fn) {
 
 installJsdomGlobals();
 
-const [{ Editor }, StarterKitModule, HighlightModule, ImageModule, TableModule, TableCellModule, TableHeaderModule, TableRowModule, PreservedNodeAttributesModule, StyledSpanModule, ContainerBlockModule, MediaRowModule, ImageFigureModule, WikiAlignmentTableModule, WikiCalloutModule, WikiPoetryQuoteModule, WikiEditingKeymapModule, SlashCommandModule, WikiCodeBlockModule, WikiBlockBackgroundModule, WikiLinkModule, WikiEntitiesModule, toolbarSchemaModule, editorTocModule, linkInteractionsModule, imageResizeModule, mediaSelectionModule, legacyHtmlModule, sanitizerContractModule, colorContrastModule] = await Promise.all([
+const [{ Editor }, StarterKitModule, HighlightModule, ImageModule, TableModule, TableCellModule, TableHeaderModule, TableRowModule, PreservedNodeAttributesModule, StyledSpanModule, ContainerBlockModule, MediaRowModule, ImageFigureModule, WikiAlignmentTableModule, WikiCalloutModule, WikiPoetryQuoteModule, WikiEditingKeymapModule, SlashCommandModule, WikiCodeBlockModule, WikiBlockBackgroundModule, WikiLinkModule, WikiEntitiesModule, toolbarSchemaModule, editorTocModule, linkInteractionsModule, imageResizeModule, mediaSelectionModule, mediaCellSelectionModule, legacyHtmlModule, sanitizerContractModule, colorContrastModule] = await Promise.all([
   import("@tiptap/core"),
   import("@tiptap/starter-kit"),
   import("../tiptap/src/extensions/wiki-highlight.mjs"),
@@ -49,6 +49,7 @@ const [{ Editor }, StarterKitModule, HighlightModule, ImageModule, TableModule, 
   import("../tiptap/src/selection/link-interactions.mjs"),
   import("../tiptap/src/selection/image-resize.mjs"),
   import("../tiptap/src/selection/media-selection.mjs"),
+  import("../tiptap/src/selection/media-cell-selection.mjs"),
   import("../tiptap/src/normalization/legacy-html.mjs"),
   import("../tiptap/src/shared/sanitizer-contract.mjs"),
   import("../tiptap/src/shared/color-contrast.mjs")
@@ -64,7 +65,14 @@ const { TableRow } = TableRowModule;
 const PreservedNodeAttributes = PreservedNodeAttributesModule.default;
 const StyledSpan = StyledSpanModule.default;
 const ContainerBlock = ContainerBlockModule.default;
-const { MediaCell, MediaRow } = MediaRowModule;
+const {
+  MEDIA_CELL_STYLE_PRESETS,
+  MediaCell,
+  MediaRow,
+  clearMediaCellStyleAttrs,
+  getMediaCellStyleAttrs,
+  mergeMediaCellColorStyle
+} = MediaRowModule;
 const ImageFigure = ImageFigureModule.default;
 const WikiAlignmentTable = WikiAlignmentTableModule.default;
 const WikiCallout = WikiCalloutModule.default;
@@ -79,13 +87,25 @@ const { IMAGE_CONTEXT_BUTTON_IDS, TABLE_CELL_POPOVER_COMMAND_IDS, TABLE_CONTEXT_
 const { buildHeadingToc, navigateToHeading } = editorTocModule;
 const { installEditorLinkNavigationGuard, selectEditorLink } = linkInteractionsModule;
 const { calculateResizedImageWidth, getSelectedImageElement, setSelectedImageWidth } = imageResizeModule;
-const { focusMediaCell, isMediaCellSurfaceTarget, selectClickedImageNode } = mediaSelectionModule;
+const {
+  focusMediaCell,
+  handleMediaCellSelectionClick,
+  isMediaCellSurfaceTarget,
+  selectClickedImageNode
+} = mediaSelectionModule;
+const {
+  MEDIA_CELL_SELECTION_PLUGIN_KEY,
+  default: MediaCellSelection,
+  getSelectedMediaCellPositions,
+  getTargetMediaCellPositions,
+  toggleMediaCellSelectionAt
+} = mediaCellSelectionModule;
 const {
   detectUnsupportedContent,
   getNormalizationNotice,
   normalizeLegacyHtmlForTiptap
 } = legacyHtmlModule;
-const { sanitizeHtml } = sanitizerContractModule;
+const { sanitizeHtml, sanitizeStyleAttribute } = sanitizerContractModule;
 const { getReadableTextColor, normalizeHexColor } = colorContrastModule;
 const articleBodyCss = readFileSync(new URL("../public/wiki-article-body.css", import.meta.url), "utf8");
 const pluginJsonSource = readFileSync(new URL("../plugin.json", import.meta.url), "utf8");
@@ -130,6 +150,7 @@ function createEditor(content) {
       ContainerBlock,
       MediaCell,
       MediaRow,
+      MediaCellSelection,
       ImageFigure,
       WikiAlignmentTable,
       WikiCallout,
@@ -186,6 +207,22 @@ function findNodePositions(editor, typeName) {
     }
   });
   return positions;
+}
+
+function findJsonNode(node, typeName) {
+  if (!node) {
+    return null;
+  }
+  if (node.type === typeName) {
+    return node;
+  }
+  for (const child of node.content || []) {
+    const match = findJsonNode(child, typeName);
+    if (match) {
+      return match;
+    }
+  }
+  return null;
 }
 
 function findTextRange(editor, text) {
@@ -314,6 +351,82 @@ await test("sanitizeHtml preserves safe styles and removes unsafe ones on the cl
   assert.match(sanitized, /text-align:\s*center/);
   assert.match(sanitized, /color:\s*rgb\(10, 20, 30\)/);
   assert.doesNotMatch(sanitized, /position:/);
+});
+
+await test("sanitizeStyleAttribute collapses Chrome-expanded border side colors", function () {
+  const originalCreateElement = document.createElement.bind(document);
+  document.createElement = function (tagName) {
+    if (String(tagName).toLowerCase() !== "span") {
+      return originalCreateElement(tagName);
+    }
+
+    const properties = [
+      "border-top-color",
+      "border-right-color",
+      "border-bottom-color",
+      "border-left-color"
+    ];
+    return {
+      setAttribute: function () {},
+      style: {
+        0: properties[0],
+        1: properties[1],
+        2: properties[2],
+        3: properties[3],
+        length: properties.length,
+        getPropertyValue: function (propertyName) {
+          return properties.includes(propertyName) ? "rgb(212, 177, 106)" : "";
+        }
+      }
+    };
+  };
+
+  try {
+    assert.equal(
+      sanitizeStyleAttribute("border-color: rgb(212, 177, 106)", "div"),
+      "border-color: rgb(212, 177, 106)"
+    );
+  } finally {
+    document.createElement = originalCreateElement;
+  }
+});
+
+await test("sanitizeStyleAttribute collapses Chrome-expanded border side widths", function () {
+  const originalCreateElement = document.createElement.bind(document);
+  document.createElement = function (tagName) {
+    if (String(tagName).toLowerCase() !== "span") {
+      return originalCreateElement(tagName);
+    }
+
+    const properties = [
+      "border-top-width",
+      "border-right-width",
+      "border-bottom-width",
+      "border-left-width"
+    ];
+    return {
+      setAttribute: function () {},
+      style: {
+        0: properties[0],
+        1: properties[1],
+        2: properties[2],
+        3: properties[3],
+        length: properties.length,
+        getPropertyValue: function (propertyName) {
+          return properties.includes(propertyName) ? "4px" : "";
+        }
+      }
+    };
+  };
+
+  try {
+    assert.equal(
+      sanitizeStyleAttribute("border-width: 4px", "div"),
+      "border-width: 4px"
+    );
+  } finally {
+    document.createElement = originalCreateElement;
+  }
 });
 
 await test("sanitizeHtml preserves table cell vertical alignment on the client contract", function () {
@@ -504,6 +617,26 @@ await test("editor toolbar exposes highlight and text block background color pal
 await test("paragraph block backgrounds shrink to the text width in article and editor prose", function () {
   assert.match(articleBodyCss, /\.wiki-article-prose p\[style\*="background-color"\]\s*\{[^}]*display:\s*table/s);
   assert.match(articleBodyCss, /\.wiki-article-prose p\[style\*="background-color"\]\s*\{[^}]*width:\s*fit-content/s);
+});
+
+await test("media cell style css exists in article and editor prose", function () {
+  [articleBodyCss, editorCss].forEach(function (css) {
+    assert.match(css, /\.wiki-media-cell--shadow\s*\{/);
+    assert.match(css, /\.wiki-media-cell--gilded\s*\{/);
+    assert.match(css, /\.wiki-media-cell--custom\s*\{/);
+    assert.match(css, /\.wiki-media-cell--well\s*\{/);
+  });
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-media-cell\.wiki-media-cell--shadow\s*\{[\s\S]*position:\s*relative/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-media-cell\.wiki-media-cell--shadow::after\s*\{[\s\S]*filter:\s*blur\(60px\)/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-media-cell\.wiki-media-cell--shadow \.wiki-media-cell__shadow-content\s*\{[\s\S]*z-index:\s*1/);
+  assert.match(editorCss, /\.westgate-wiki-compose \.wiki-editor__content \.wiki-media-cell\.wiki-media-cell--shadow\s*\{[\s\S]*position:\s*relative/);
+  assert.match(editorCss, /\.westgate-wiki-compose \.wiki-editor__content \.wiki-media-cell\.wiki-media-cell--shadow::after\s*\{[\s\S]*filter:\s*blur\(60px\)/);
+  assert.match(editorCss, /\.westgate-wiki-compose \.wiki-editor__content \.wiki-media-cell\.wiki-media-cell--shadow \.wiki-media-cell__shadow-content\s*\{[\s\S]*z-index:\s*1/);
+  assert.match(editorCss, /\.wiki-media-cell--multi-selected\s*\{/);
+  assert.match(editorCss, /\.wiki-editor-media-cell-color-menu\s*\{/);
+  assert.match(editorCss, /\.wiki-editor-media-cell-color-menu__field\s*\{/);
+  assert.match(editorCss, /\.wiki-editor-media-cell-color-menu__input\s*\{/);
+  assert.match(editorCss, /\.wiki-editor-media-cell-color-menu__value\s*\{/);
 });
 
 await test("table cell block backgrounds keep their paired foreground color", function () {
@@ -879,6 +1012,238 @@ await test("mediaRow insert command renders bounded two- and three-cell layouts"
 
   assert.match(rendered, /data-wiki-node="media-row"/);
   assert.equal(cellCount, 3);
+  editor.destroy();
+});
+
+await test("mediaCell parses and renders supported style presets", function () {
+  const editor = createEditor(
+    '<div class="wiki-media-row"><div class="wiki-media-cell wiki-media-cell--shadow" data-wiki-node="media-cell"><p>Portrait</p></div><div class="wiki-media-cell wiki-media-cell--gilded" data-wiki-node="media-cell"><p>Frame</p></div><div class="wiki-media-cell wiki-media-cell--well" data-wiki-node="media-cell"><p>Notes</p></div></div>'
+  );
+  const json = editor.getJSON();
+  const rendered = editor.getHTML();
+
+  assert.equal(MEDIA_CELL_STYLE_PRESETS.includes("gilded"), true);
+  assert.equal(json.content[0].content[0].attrs.stylePreset, "shadow");
+  assert.equal(json.content[0].content[1].attrs.stylePreset, "gilded");
+  assert.equal(json.content[0].content[2].attrs.stylePreset, "well");
+  assert.match(rendered, /class="wiki-media-cell wiki-media-cell--shadow"[^>]*><div class="wiki-media-cell__shadow-content"><p>Portrait<\/p><\/div><\/div>/);
+  assert.match(rendered, /class="wiki-media-cell wiki-media-cell--gilded"/);
+  assert.match(rendered, /class="wiki-media-cell wiki-media-cell--well"/);
+  editor.destroy();
+});
+
+await test("mediaCell shadow content wrapper reparses without extra content nodes", function () {
+  const firstOpen = createEditor(
+    '<div class="wiki-media-row"><div class="wiki-media-cell wiki-media-cell--shadow" data-wiki-node="media-cell"><p>Shadowed</p></div></div>'
+  );
+  const rendered = firstOpen.getHTML();
+  firstOpen.destroy();
+
+  assert.match(rendered, /wiki-media-cell__shadow-content/);
+
+  const reopened = createEditor(sanitizeHtml(rendered));
+  const cell = findJsonNode(reopened.getJSON(), "mediaCell");
+
+  assert.ok(cell);
+  assert.equal(cell.attrs.stylePreset, "shadow");
+  assert.equal(cell.content[0].type, "paragraph");
+  assert.equal(cell.content[0].content[0].text, "Shadowed");
+  assert.doesNotMatch(JSON.stringify(cell), /containerBlock/);
+  reopened.destroy();
+});
+
+await test("mediaCell parses and renders custom background and border colors", function () {
+  const editor = createEditor(
+    '<div class="wiki-media-row"><div class="wiki-media-cell wiki-media-cell--custom" data-wiki-node="media-cell" style="background-color: #22172d; border-color: #7b617f; border-width: 4px; position: fixed"><p>Custom</p></div></div>'
+  );
+  const json = editor.getJSON();
+  const rendered = editor.getHTML();
+
+  assert.equal(json.content[0].content[0].attrs.stylePreset, "custom");
+  assert.equal(json.content[0].content[0].attrs.backgroundColor, "rgb(34, 23, 45)");
+  assert.equal(json.content[0].content[0].attrs.borderColor, "rgb(123, 97, 127)");
+  assert.equal(json.content[0].content[0].attrs.borderWidth, "4px");
+  assert.match(rendered, /class="wiki-media-cell wiki-media-cell--custom"/);
+  assert.match(rendered, /style="[^"]*background-color: rgb\(34, 23, 45\)/);
+  assert.match(rendered, /style="[^"]*border-color: rgb\(123, 97, 127\)/);
+  assert.match(rendered, /style="[^"]*border-width: 4px/);
+  assert.doesNotMatch(rendered, /position:/);
+  editor.destroy();
+});
+
+await test("mediaCell style helpers clear presets and custom colors", function () {
+  assert.deepEqual(getMediaCellStyleAttrs({ stylePreset: "shadow" }), {
+    stylePreset: "shadow",
+    backgroundColor: null,
+    borderColor: null,
+    borderWidth: null,
+    style: null
+  });
+  assert.deepEqual(getMediaCellStyleAttrs({
+    stylePreset: "custom",
+    backgroundColor: "#22172d",
+    borderColor: "#7b617f",
+    borderWidth: "4px"
+  }), {
+    stylePreset: "custom",
+    backgroundColor: "rgb(34, 23, 45)",
+    borderColor: "rgb(123, 97, 127)",
+    borderWidth: "4px",
+    style: "background-color: rgb(34, 23, 45); border-color: rgb(123, 97, 127); border-width: 4px"
+  });
+  assert.deepEqual(clearMediaCellStyleAttrs(), {
+    stylePreset: null,
+    backgroundColor: null,
+    borderColor: null,
+    borderWidth: null,
+    style: null
+  });
+  assert.equal(mergeMediaCellColorStyle("position: fixed; background-color: #111827", "#22172d", "#7b617f", "4px"), "background-color: rgb(34, 23, 45); border-color: rgb(123, 97, 127); border-width: 4px");
+  assert.equal(mergeMediaCellColorStyle("border-width: 3px", "#22172d", "#7b617f"), "background-color: rgb(34, 23, 45); border-color: rgb(123, 97, 127); border-width: 3px");
+});
+
+await test("media cell selection toggles individual cell positions", function () {
+  const editor = createEditor('<div class="wiki-media-row"><div class="wiki-media-cell"><p>A</p></div><div class="wiki-media-cell"><p>B</p></div></div>');
+  const cells = findNodePositions(editor, "mediaCell");
+
+  assert.ok(MEDIA_CELL_SELECTION_PLUGIN_KEY.getState(editor.state), "selection plugin state should be registered");
+
+  editor.view.dispatch(toggleMediaCellSelectionAt(editor.state.tr, cells[0]));
+  assert.deepEqual(getSelectedMediaCellPositions(editor.state), [cells[0]]);
+
+  editor.view.dispatch(toggleMediaCellSelectionAt(editor.state.tr, cells[1]));
+  assert.deepEqual(getSelectedMediaCellPositions(editor.state), [cells[0], cells[1]]);
+
+  editor.view.dispatch(toggleMediaCellSelectionAt(editor.state.tr, cells[0]));
+  assert.deepEqual(getSelectedMediaCellPositions(editor.state), [cells[1]]);
+  editor.destroy();
+});
+
+await test("media cell command targets selected cells before active cell", function () {
+  const editor = createEditor('<div class="wiki-media-row"><div class="wiki-media-cell"><p>A</p></div><div class="wiki-media-cell"><p>B</p></div></div>');
+  const cells = findNodePositions(editor, "mediaCell");
+
+  editor.view.dispatch(toggleMediaCellSelectionAt(editor.state.tr, cells[0]));
+  editor.view.dispatch(toggleMediaCellSelectionAt(editor.state.tr, cells[1]));
+  assert.deepEqual(getTargetMediaCellPositions(editor.state), cells);
+
+  assert.equal(editor.commands.setMediaCellStyle("shadow"), true);
+  const rendered = editor.getHTML();
+  assert.equal((rendered.match(/wiki-media-cell--shadow/g) || []).length, 2);
+  editor.destroy();
+});
+
+await test("media cell custom colors can apply to captured cells after selection moves", function () {
+  const editor = createEditor('<p>Intro</p><div class="wiki-media-row"><div class="wiki-media-cell"><p>A</p></div><div class="wiki-media-cell"><p>B</p></div></div><p>Outro</p>');
+  const cells = findNodePositions(editor, "mediaCell");
+  const outro = findTextRange(editor, "Outro");
+
+  editor.commands.setTextSelection(outro);
+
+  assert.equal(editor.commands.setMediaCellColorsAtPositions([cells[0]], {
+    backgroundColor: "#26a269",
+    borderColor: "#d4b16a",
+    borderWidth: "5px"
+  }), true);
+
+  const rendered = editor.getHTML();
+  assert.match(rendered, /<div class="wiki-media-cell wiki-media-cell--custom" data-wiki-node="media-cell" style="(?=[^"]*background-color: rgb\(38, 162, 105\))(?=[^"]*border-color: rgb\(212, 177, 106\))(?=[^"]*border-width: 5px)[^"]*"><p>A<\/p><\/div>/);
+  assert.match(rendered, /<div class="wiki-media-cell" data-wiki-node="media-cell"><p>B<\/p><\/div>/);
+  editor.destroy();
+});
+
+await test("media cell custom colors update the node style attribute directly", function () {
+  const editor = createEditor('<div class="wiki-media-row"><div class="wiki-media-cell wiki-media-cell--custom" data-wiki-node="media-cell" style="background-color: #26a269"><p>A</p></div></div>');
+  const cells = findNodePositions(editor, "mediaCell");
+
+  assert.equal(editor.commands.setMediaCellColorsAtPositions([cells[0]], {
+    borderColor: "#d4b16a",
+    borderWidth: "5px"
+  }), true);
+
+  const attrs = editor.getJSON().content[0].content[0].attrs;
+  assert.match(attrs.style, /background-color: rgb\(38, 162, 105\)/);
+  assert.match(attrs.style, /border-color: rgb\(212, 177, 106\)/);
+  assert.match(attrs.style, /border-width: 5px/);
+  assert.match(editor.getHTML(), /style="(?=[^"]*background-color: rgb\(38, 162, 105\))(?=[^"]*border-color: rgb\(212, 177, 106\))(?=[^"]*border-width: 5px)[^"]*"/);
+  editor.destroy();
+});
+
+await test("media cell color picker input updates the source without a separate apply click", async function () {
+  const { createWikiEditor } = await importEditorBundleForContract();
+  const host = document.createElement("div");
+  host.className = "westgate-wiki-compose";
+  document.body.appendChild(host);
+
+  const wikiEditor = await createWikiEditor(host, {
+    initialData: '<div class="wiki-media-row"><div class="wiki-media-cell wiki-media-cell--custom" data-wiki-node="media-cell" style="background-color: rgb(34, 23, 45)"><p>colorful</p></div></div>'
+  });
+
+  const cell = host.querySelector('[data-wiki-node="media-cell"]');
+  cell.dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true, view: window }));
+  await nextAnimationFrame();
+
+  const colorButton = host.querySelector('[data-toolbar-id="media-cell-style-colors"]');
+  assert.ok(colorButton, "media cell color button should exist");
+  colorButton.click();
+
+  const inputs = Array.from(document.querySelectorAll(".wiki-editor-media-cell-color-menu input[type='color']"));
+  assert.equal(inputs.length, 2);
+  inputs[1].value = "#d4b16a";
+  inputs[1].dispatchEvent(new window.Event("input", { bubbles: true }));
+
+  const widthInputs = Array.from(document.querySelectorAll(".wiki-editor-media-cell-color-menu input[type='number']"));
+  assert.equal(widthInputs.length, 1);
+  widthInputs[0].value = "6";
+  widthInputs[0].dispatchEvent(new window.Event("input", { bubbles: true }));
+
+  assert.match(wikiEditor.getHTML(), /style="(?=[^"]*background-color: rgb\(34, 23, 45\))(?=[^"]*border-color: rgb\(212, 177, 106\))(?=[^"]*border-width: 6px)[^"]*"/);
+
+  wikiEditor.destroy();
+  document.querySelector(".wiki-editor-media-cell-color-menu")?.remove();
+  host.remove();
+});
+
+await test("editor bundle wires media cell selection helpers and style controls", function () {
+  assert.match(editorBundleSource, /import\s+MediaCellSelection,\s*\{\s*getTargetMediaCellPositions\s*\}/);
+  assert.match(editorBundleSource, /handleMediaCellSelectionClick\(editor,\s*mediaCell,\s*event\)/);
+  assert.match(editorBundleSource, /id:\s*"media-cell-style-shadow"/);
+  assert.match(editorBundleSource, /id:\s*"media-cell-style-gilded"/);
+  assert.match(editorBundleSource, /id:\s*"media-cell-style-well"/);
+  assert.match(editorBundleSource, /id:\s*"media-cell-style-colors"/);
+  assert.match(editorBundleSource, /id:\s*"media-cell-style-clear"/);
+  assert.match(editorBundleSource, /setMediaCellStyle\("shadow"\)/);
+  assert.match(editorBundleSource, /setMediaCellColorsAtPositions\(targetPositions,/);
+  assert.match(editorBundleSource, /clearMediaCellStyleAtPositions\(targetPositions\)/);
+});
+
+await test("media cell color menu uses labelled color picker fields", function () {
+  const match = editorBundleSource.match(/function createMediaCellColorMenu\(button, editor\) \{[\s\S]*?\nfunction createMediaRowContextToolbar/);
+  assert.ok(match, "media cell color menu source should be present");
+  assert.match(editorBundleSource, /function createMediaCellColorField/);
+  assert.match(editorBundleSource, /wiki-editor-media-cell-color-menu__field/);
+  assert.match(editorBundleSource, /wiki-editor-media-cell-color-menu__input/);
+  assert.match(editorBundleSource, /wiki-editor-media-cell-color-menu__number/);
+  assert.match(editorBundleSource, /wiki-editor-media-cell-color-menu__value/);
+  assert.match(match[0], /Background color/);
+  assert.match(match[0], /Border color/);
+  assert.match(match[0], /Border size/);
+  assert.doesNotMatch(match[0], /className\s*=\s*"wiki-editor-color-custom"/);
+});
+
+await test("media cell style click helper toggles multi-selection on modified click", function () {
+  const editor = createEditor('<div class="wiki-media-row"><div class="wiki-media-cell"><p>A</p></div><div class="wiki-media-cell"><p>B</p></div></div>');
+  const firstCell = editor.view.dom.querySelector('[data-wiki-node="media-cell"]');
+  const handled = handleMediaCellSelectionClick(editor, firstCell, {
+    ctrlKey: true,
+    metaKey: false,
+    shiftKey: false,
+    preventDefault: function () {},
+    stopPropagation: function () {}
+  });
+
+  assert.equal(handled, true);
+  assert.deepEqual(getSelectedMediaCellPositions(editor.state), [findNodePositions(editor, "mediaCell")[0]]);
   editor.destroy();
 });
 

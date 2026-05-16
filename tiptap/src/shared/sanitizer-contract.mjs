@@ -30,6 +30,20 @@ function getAllowedAttributesList() {
 }
 
 export const COMPILED_ALLOWED_STYLES = compileAllowedStylesMap(sanitizerConfig.allowedStyles);
+const BORDER_SHORTHAND_SIDE_PROPERTIES = {
+  "border-color": [
+    "border-top-color",
+    "border-right-color",
+    "border-bottom-color",
+    "border-left-color"
+  ],
+  "border-width": [
+    "border-top-width",
+    "border-right-width",
+    "border-bottom-width",
+    "border-left-width"
+  ]
+};
 
 export const DOMPURIFY_OPTIONS = {
   ALLOWED_TAGS: sanitizerConfig.allowedTags,
@@ -52,6 +66,10 @@ export function sanitizeStyleAttribute(styleValue, tagName) {
   const allowedForAnyTag = COMPILED_ALLOWED_STYLES["*"] || {};
   const allowedForTag = COMPILED_ALLOWED_STYLES[String(tagName || "").toLowerCase()] || {};
   const entries = [];
+  const borderSideValues = new Map(Object.keys(BORDER_SHORTHAND_SIDE_PROPERTIES).map(function (propertyName) {
+    return [propertyName, new Map()];
+  }));
+  const emittedBorderShorthands = new Set();
 
   for (let i = 0; i < probe.style.length; i += 1) {
     const propertyName = String(probe.style[i] || "").trim().toLowerCase();
@@ -61,7 +79,20 @@ export function sanitizeStyleAttribute(styleValue, tagName) {
 
     const rawValue = probe.style.getPropertyValue(propertyName).trim();
     const propertyAllowlist = allowedForTag[propertyName] || allowedForAnyTag[propertyName];
+    const borderShorthandName = Object.keys(BORDER_SHORTHAND_SIDE_PROPERTIES).find(function (shorthandName) {
+      return BORDER_SHORTHAND_SIDE_PROPERTIES[shorthandName].includes(propertyName);
+    });
+    const borderShorthandAllowlist = borderShorthandName ? allowedForTag[borderShorthandName] || allowedForAnyTag[borderShorthandName] : null;
     if (!propertyAllowlist || !rawValue) {
+      if (borderShorthandName && borderShorthandAllowlist && rawValue) {
+        const normalizedValue = rawValue.replace(/\s+/g, " ").trim();
+        const allowed = borderShorthandAllowlist.some(function (pattern) {
+          return pattern.test(normalizedValue);
+        });
+        if (allowed) {
+          borderSideValues.get(borderShorthandName).set(propertyName, normalizedValue);
+        }
+      }
       continue;
     }
 
@@ -71,8 +102,25 @@ export function sanitizeStyleAttribute(styleValue, tagName) {
     });
     if (allowed) {
       entries.push(`${propertyName}: ${normalizedValue}`);
+      if (BORDER_SHORTHAND_SIDE_PROPERTIES[propertyName]) {
+        emittedBorderShorthands.add(propertyName);
+      }
     }
   }
+
+  Object.entries(BORDER_SHORTHAND_SIDE_PROPERTIES).forEach(function ([shorthandName, sideProperties]) {
+    const sideValues = borderSideValues.get(shorthandName);
+    if (emittedBorderShorthands.has(shorthandName) || sideValues.size !== sideProperties.length) {
+      return;
+    }
+    const values = sideProperties.map(function (propertyName) {
+      return sideValues.get(propertyName);
+    });
+    const [firstValue] = values;
+    if (firstValue && values.every(function (value) { return value === firstValue; })) {
+      entries.push(`${shorthandName}: ${firstValue}`);
+    }
+  });
 
   return entries.join("; ");
 }

@@ -1,3 +1,10 @@
+import { NodeSelection } from "@tiptap/pm/state";
+
+import {
+  getSelectedMediaCellPositions,
+  setMediaCellSelection,
+  toggleMediaCellSelectionAt
+} from "./media-cell-selection.mjs";
 import { getImageLayoutClassForNode, getImageSizeClassForNode } from "../shared/image-class-contract.mjs";
 
 export function getActiveImageNodeName(editor) {
@@ -101,6 +108,56 @@ export function isMediaCellSurfaceTarget(cellElement, target) {
   return target.parentElement === cellElement &&
     target.matches &&
     target.matches('[data-wiki-node="media-row"], .wiki-media-row');
+}
+
+function getSiblingMediaCellPositions(editor, cellElement) {
+  const row = cellElement && cellElement.closest('[data-wiki-node="media-row"]');
+  return Array.from(row ? row.querySelectorAll('[data-wiki-node="media-cell"]') : [])
+    .map(function (cell) {
+      return findNodeSelectionPos(editor, cell, ["mediaCell"]);
+    })
+    .filter(function (pos) {
+      return pos != null;
+    });
+}
+
+export function handleMediaCellSelectionClick(editor, cellElement, event) {
+  if (!editor || !cellElement || !event) {
+    return false;
+  }
+
+  const pos = findNodeSelectionPos(editor, cellElement, ["mediaCell"]);
+  if (pos == null) {
+    return false;
+  }
+
+  if (event.ctrlKey || event.metaKey) {
+    event.preventDefault();
+    event.stopPropagation();
+    const tr = toggleMediaCellSelectionAt(editor.state.tr, pos);
+    tr.setSelection(NodeSelection.create(tr.doc, pos));
+    editor.view.dispatch(tr.scrollIntoView());
+    return true;
+  }
+
+  if (event.shiftKey) {
+    event.preventDefault();
+    event.stopPropagation();
+    const rowPositions = getSiblingMediaCellPositions(editor, cellElement);
+    const selected = getSelectedMediaCellPositions(editor.state);
+    const anchor = selected.length ? selected[selected.length - 1] : rowPositions[0];
+    const start = rowPositions.indexOf(anchor);
+    const end = rowPositions.indexOf(pos);
+    const positions = start === -1 || end === -1 ?
+      [pos] :
+      rowPositions.slice(Math.min(start, end), Math.max(start, end) + 1);
+    const tr = setMediaCellSelection(editor.state.tr, positions, anchor);
+    tr.setSelection(NodeSelection.create(tr.doc, pos));
+    editor.view.dispatch(tr.scrollIntoView());
+    return true;
+  }
+
+  return false;
 }
 
 export function focusMediaCell(editor, cellElement) {

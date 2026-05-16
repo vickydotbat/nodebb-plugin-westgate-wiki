@@ -1,6 +1,16 @@
 import { Node } from "@tiptap/core";
 import { Selection } from "@tiptap/pm/state";
 
+import { getTargetMediaCellPositions } from "../selection/media-cell-selection.mjs";
+import { sanitizeStyleAttribute } from "../shared/sanitizer-contract.mjs";
+
+export const MEDIA_CELL_STYLE_PRESETS = ["shadow", "gilded", "custom", "well"];
+
+const MEDIA_CELL_STYLE_CLASS_PREFIX = "wiki-media-cell--";
+const MEDIA_CELL_STYLE_CLASS_MAP = new Map(MEDIA_CELL_STYLE_PRESETS.map(function (preset) {
+  return [`${MEDIA_CELL_STYLE_CLASS_PREFIX}${preset}`, preset];
+}));
+
 function selectionContainsNode(selection, pos, node) {
   return selection.from >= pos && selection.to <= pos + node.nodeSize;
 }
@@ -57,19 +67,210 @@ function deleteMediaRowFromContext(state, dispatch, context) {
   return true;
 }
 
+function sanitizeMediaCellStyleValue(value, propertyName) {
+  const sanitized = sanitizeStyleAttribute(`${propertyName}: ${value}`, "div");
+  const match = sanitized.match(new RegExp(`(?:^|;\\s*)${propertyName}:\\s*([^;]+)`, "i"));
+  return match ? match[1].trim() : "";
+}
+
+function readMediaCellPreset(element) {
+  const classList = element && element.classList ? Array.from(element.classList) : [];
+  const token = classList.find(function (className) {
+    return MEDIA_CELL_STYLE_CLASS_MAP.has(className);
+  });
+  return token ? MEDIA_CELL_STYLE_CLASS_MAP.get(token) : "";
+}
+
+function getMediaCellContentElement(element) {
+  if (readMediaCellPreset(element) !== "shadow") {
+    return element;
+  }
+  const shadowContent = Array.from(element && element.children || []).find(function (child) {
+    return child.classList && child.classList.contains("wiki-media-cell__shadow-content");
+  });
+  return shadowContent || element;
+}
+
+function readMediaCellStyleValue(element, propertyName) {
+  if (!element) {
+    return "";
+  }
+  return sanitizeMediaCellStyleValue(element.style.getPropertyValue(propertyName), propertyName);
+}
+
+function readStyleValue(styleValue, propertyName) {
+  const safeStyleValue = sanitizeStyleAttribute(styleValue, "div");
+  return sanitizeMediaCellStyleValue((safeStyleValue.match(new RegExp(`(?:^|;\\s*)${propertyName}:\\s*([^;]+)`, "i")) || [])[1], propertyName);
+}
+
+export function mergeMediaCellColorStyle(styleValue, backgroundColor, borderColor, borderWidth) {
+  const safeStyleValue = sanitizeStyleAttribute(styleValue, "div");
+  const safeBackground = sanitizeMediaCellStyleValue(backgroundColor, "background-color") ||
+    sanitizeMediaCellStyleValue((safeStyleValue.match(/(?:^|;\s*)background-color:\s*([^;]+)/i) || [])[1], "background-color");
+  const safeBorder = sanitizeMediaCellStyleValue(borderColor, "border-color") ||
+    sanitizeMediaCellStyleValue((safeStyleValue.match(/(?:^|;\s*)border-color:\s*([^;]+)/i) || [])[1], "border-color");
+  const safeBorderWidth = sanitizeMediaCellStyleValue(borderWidth, "border-width") ||
+    sanitizeMediaCellStyleValue((safeStyleValue.match(/(?:^|;\s*)border-width:\s*([^;]+)/i) || [])[1], "border-width");
+  const entries = [];
+
+  if (safeBackground) {
+    entries.push(["background-color", safeBackground]);
+  }
+  if (safeBorder) {
+    entries.push(["border-color", safeBorder]);
+  }
+  if (safeBorderWidth) {
+    entries.push(["border-width", safeBorderWidth]);
+  }
+
+  return entries.map(function ([propertyName, value]) {
+    return `${propertyName}: ${value}`;
+  }).join("; ");
+}
+
+export function getMediaCellStyleAttrs(options) {
+  const preset = MEDIA_CELL_STYLE_PRESETS.includes(options && options.stylePreset) ? options.stylePreset : "";
+  if (preset === "custom") {
+    const style = mergeMediaCellColorStyle(options && options.style, options && options.backgroundColor, options && options.borderColor, options && options.borderWidth);
+    return {
+      stylePreset: "custom",
+      backgroundColor: readStyleValue(style, "background-color") || null,
+      borderColor: readStyleValue(style, "border-color") || null,
+      borderWidth: readStyleValue(style, "border-width") || null,
+      style: style || null
+    };
+  }
+  return {
+    stylePreset: preset || null,
+    backgroundColor: null,
+    borderColor: null,
+    borderWidth: null,
+    style: null
+  };
+}
+
+export function clearMediaCellStyleAttrs() {
+  return {
+    stylePreset: null,
+    backgroundColor: null,
+    borderColor: null,
+    borderWidth: null,
+    style: null
+  };
+}
+
+function normalizeMediaCellPositions(state, positions) {
+  const seen = new Set();
+  return (positions || []).filter(function (pos) {
+    if (typeof pos !== "number" || seen.has(pos)) {
+      return false;
+    }
+    const node = state.doc.nodeAt(pos);
+    if (!node || node.type.name !== "mediaCell") {
+      return false;
+    }
+    seen.add(pos);
+    return true;
+  }).sort(function (a, b) {
+    return a - b;
+  });
+}
+
+function updateMediaCellsAtPositions(state, dispatch, positions, attrsOrResolver) {
+  const targetPositions = normalizeMediaCellPositions(state, positions);
+  if (!targetPositions.length) {
+    return false;
+  }
+
+  if (dispatch) {
+    const tr = state.tr;
+    targetPositions.forEach(function (pos) {
+      const node = tr.doc.nodeAt(pos);
+      if (node && node.type.name === "mediaCell") {
+        const attrs = typeof attrsOrResolver === "function" ? attrsOrResolver(node) : attrsOrResolver;
+        tr.setNodeMarkup(pos, undefined, {
+          ...node.attrs,
+          ...attrs
+        }, node.marks);
+      }
+    });
+    dispatch(tr.scrollIntoView());
+  }
+  return true;
+}
+
+function updateTargetMediaCells(state, dispatch, attrs) {
+  const positions = getTargetMediaCellPositions(state);
+  if (!positions.length) {
+    return false;
+  }
+
+  return updateMediaCellsAtPositions(state, dispatch, positions, attrs);
+}
+
 export const MediaCell = Node.create({
   name: "mediaCell",
   content: "block+",
   defining: true,
+  addAttributes() {
+    return {
+      stylePreset: {
+        default: null,
+        parseHTML: function (element) {
+          return readMediaCellPreset(element) || null;
+        }
+      },
+      backgroundColor: {
+        default: null,
+        parseHTML: function (element) {
+          return readMediaCellPreset(element) === "custom" ? readMediaCellStyleValue(element, "background-color") || null : null;
+        }
+      },
+      borderColor: {
+        default: null,
+        parseHTML: function (element) {
+          return readMediaCellPreset(element) === "custom" ? readMediaCellStyleValue(element, "border-color") || null : null;
+        }
+      },
+      borderWidth: {
+        default: null,
+        parseHTML: function (element) {
+          return readMediaCellPreset(element) === "custom" ? readMediaCellStyleValue(element, "border-width") || null : null;
+        }
+      }
+    };
+  },
   parseHTML() {
     return [
-      { tag: "div.wiki-media-cell" },
-      { tag: "section.wiki-media-cell" },
-      { tag: "article.wiki-media-cell" }
+      { tag: "div.wiki-media-cell", contentElement: getMediaCellContentElement },
+      { tag: "section.wiki-media-cell", contentElement: getMediaCellContentElement },
+      { tag: "article.wiki-media-cell", contentElement: getMediaCellContentElement }
     ];
   },
-  renderHTML() {
-    return ["div", { class: "wiki-media-cell", "data-wiki-node": "media-cell" }, 0];
+  renderHTML({ HTMLAttributes }) {
+    const attrs = getMediaCellStyleAttrs(HTMLAttributes || {});
+    const classes = ["wiki-media-cell"];
+    const outputAttrs = {
+      class: classes.join(" "),
+      "data-wiki-node": "media-cell"
+    };
+
+    if (attrs.stylePreset) {
+      classes.push(`${MEDIA_CELL_STYLE_CLASS_PREFIX}${attrs.stylePreset}`);
+      outputAttrs.class = classes.join(" ");
+    }
+    if (attrs.stylePreset === "custom") {
+      const style = mergeMediaCellColorStyle("", attrs.backgroundColor, attrs.borderColor, attrs.borderWidth);
+      if (style) {
+        outputAttrs.style = style;
+      }
+    }
+
+    if (attrs.stylePreset === "shadow") {
+      return ["div", outputAttrs, ["div", { class: "wiki-media-cell__shadow-content" }, 0]];
+    }
+
+    return ["div", outputAttrs, 0];
   }
 });
 
@@ -94,6 +295,37 @@ export const MediaRow = Node.create({
             })
           });
         },
+      setMediaCellStyle:
+        (stylePreset) =>
+        ({ state, dispatch }) => updateTargetMediaCells(state, dispatch, getMediaCellStyleAttrs({ stylePreset })),
+      setMediaCellColors:
+        (colors) =>
+        ({ state, dispatch }) => updateTargetMediaCells(state, dispatch, function (node) {
+          return getMediaCellStyleAttrs({
+            stylePreset: "custom",
+            style: node && node.attrs && node.attrs.style,
+            backgroundColor: colors && colors.backgroundColor,
+            borderColor: colors && colors.borderColor,
+            borderWidth: colors && colors.borderWidth
+          });
+        }),
+      setMediaCellColorsAtPositions:
+        (positions, colors) =>
+        ({ state, dispatch }) => updateMediaCellsAtPositions(state, dispatch, positions, function (node) {
+          return getMediaCellStyleAttrs({
+            stylePreset: "custom",
+            style: node && node.attrs && node.attrs.style,
+            backgroundColor: colors && colors.backgroundColor,
+            borderColor: colors && colors.borderColor,
+            borderWidth: colors && colors.borderWidth
+          });
+        }),
+      clearMediaCellStyle:
+        () =>
+        ({ state, dispatch }) => updateTargetMediaCells(state, dispatch, clearMediaCellStyleAttrs()),
+      clearMediaCellStyleAtPositions:
+        (positions) =>
+        ({ state, dispatch }) => updateMediaCellsAtPositions(state, dispatch, positions, clearMediaCellStyleAttrs()),
       addMediaCellBefore:
         () =>
         ({ state, dispatch }) => {
