@@ -2196,6 +2196,50 @@ function createMediaCellColorField(labelText, input) {
   return field;
 }
 
+function createMediaCellNumberField(labelText, input, suffixText) {
+  const field = document.createElement("label");
+  field.className = "wiki-editor-media-cell-color-menu__field";
+
+  const label = document.createElement("span");
+  label.className = "wiki-editor-media-cell-color-menu__label";
+  label.textContent = labelText;
+  field.appendChild(label);
+
+  input.className = "wiki-editor-media-cell-color-menu__input wiki-editor-media-cell-color-menu__number";
+  input.setAttribute("aria-label", labelText);
+  field.appendChild(input);
+
+  const value = document.createElement("span");
+  value.className = "wiki-editor-media-cell-color-menu__value";
+  field.appendChild(value);
+
+  function syncValue() {
+    value.textContent = `${input.value || "0"}${suffixText || ""}`;
+  }
+
+  input.addEventListener("input", syncValue);
+  syncValue();
+  return field;
+}
+
+function borderWidthValueToInputNumber(value, fallback) {
+  const match = String(value || "").trim().match(/^(\d+(?:\.\d+)?)(?:px)?$/i);
+  if (!match) {
+    return fallback;
+  }
+  return String(Math.max(0, Math.min(12, parseFloat(match[1]) || 0)));
+}
+
+function borderWidthInputToStyleValue(value) {
+  const parsed = parseFloat(String(value || "").trim());
+  if (!Number.isFinite(parsed)) {
+    return "";
+  }
+  const clamped = Math.max(0, Math.min(12, parsed));
+  const rounded = Math.round(clamped * 10) / 10;
+  return `${rounded}px`;
+}
+
 function createMediaCellColorMenu(button, editor) {
   const existing = document.querySelector(".wiki-editor-media-cell-color-menu");
   if (existing && existing.parentNode) {
@@ -2205,7 +2249,7 @@ function createMediaCellColorMenu(button, editor) {
   const menu = document.createElement("div");
   menu.className = "wiki-editor-color-menu wiki-editor-media-cell-color-menu";
   menu.setAttribute("role", "dialog");
-  menu.setAttribute("aria-label", "Media cell colors");
+  menu.setAttribute("aria-label", "Media cell custom style");
 
   const targetPositions = getTargetMediaCellPositions(editor.state);
   const attrs = editor.getAttributes("mediaCell") || {};
@@ -2219,14 +2263,24 @@ function createMediaCellColorMenu(button, editor) {
   borderInput.value = colorValueToInputHex(attrs.borderColor, "#7b617f");
   menu.appendChild(createMediaCellColorField("Border color", borderInput));
 
+  const borderWidthInput = document.createElement("input");
+  borderWidthInput.type = "number";
+  borderWidthInput.min = "0";
+  borderWidthInput.max = "12";
+  borderWidthInput.step = "0.5";
+  borderWidthInput.inputMode = "decimal";
+  borderWidthInput.value = borderWidthValueToInputNumber(attrs.borderWidth, "1");
+  menu.appendChild(createMediaCellNumberField("Border size", borderWidthInput, "px"));
+
   function applyColorValues() {
     editor.commands.setMediaCellColorsAtPositions(targetPositions, {
       backgroundColor: backgroundInput.value,
-      borderColor: borderInput.value
+      borderColor: borderInput.value,
+      borderWidth: borderWidthInputToStyleValue(borderWidthInput.value)
     });
   }
 
-  [backgroundInput, borderInput].forEach(function (input) {
+  [backgroundInput, borderInput, borderWidthInput].forEach(function (input) {
     input.addEventListener("input", applyColorValues);
     input.addEventListener("change", applyColorValues);
   });
@@ -2342,7 +2396,7 @@ function createMediaRowContextToolbar(surface, editor) {
   });
   const styleColors = createButton({
     id: "media-cell-style-colors",
-    title: "Media cell colors",
+    title: "Media cell custom style",
     action: function ({ button }) {
       createMediaCellColorMenu(button, editor);
     }

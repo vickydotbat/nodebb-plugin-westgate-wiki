@@ -375,6 +375,44 @@ await test("sanitizeStyleAttribute collapses Chrome-expanded border side colors"
   }
 });
 
+await test("sanitizeStyleAttribute collapses Chrome-expanded border side widths", function () {
+  const originalCreateElement = document.createElement.bind(document);
+  document.createElement = function (tagName) {
+    if (String(tagName).toLowerCase() !== "span") {
+      return originalCreateElement(tagName);
+    }
+
+    const properties = [
+      "border-top-width",
+      "border-right-width",
+      "border-bottom-width",
+      "border-left-width"
+    ];
+    return {
+      setAttribute: function () {},
+      style: {
+        0: properties[0],
+        1: properties[1],
+        2: properties[2],
+        3: properties[3],
+        length: properties.length,
+        getPropertyValue: function (propertyName) {
+          return properties.includes(propertyName) ? "4px" : "";
+        }
+      }
+    };
+  };
+
+  try {
+    assert.equal(
+      sanitizeStyleAttribute("border-width: 4px", "div"),
+      "border-width: 4px"
+    );
+  } finally {
+    document.createElement = originalCreateElement;
+  }
+});
+
 await test("sanitizeHtml preserves table cell vertical alignment on the client contract", function () {
   const sanitized = sanitizeHtml('<table><tbody><tr><td style="vertical-align: middle; position: fixed">Middle</td><td style="vertical-align: bottom">Bottom</td></tr></tbody></table>');
 
@@ -972,7 +1010,7 @@ await test("mediaCell parses and renders supported style presets", function () {
 
 await test("mediaCell parses and renders custom background and border colors", function () {
   const editor = createEditor(
-    '<div class="wiki-media-row"><div class="wiki-media-cell wiki-media-cell--custom" data-wiki-node="media-cell" style="background-color: #22172d; border-color: #7b617f; position: fixed"><p>Custom</p></div></div>'
+    '<div class="wiki-media-row"><div class="wiki-media-cell wiki-media-cell--custom" data-wiki-node="media-cell" style="background-color: #22172d; border-color: #7b617f; border-width: 4px; position: fixed"><p>Custom</p></div></div>'
   );
   const json = editor.getJSON();
   const rendered = editor.getHTML();
@@ -980,8 +1018,11 @@ await test("mediaCell parses and renders custom background and border colors", f
   assert.equal(json.content[0].content[0].attrs.stylePreset, "custom");
   assert.equal(json.content[0].content[0].attrs.backgroundColor, "rgb(34, 23, 45)");
   assert.equal(json.content[0].content[0].attrs.borderColor, "rgb(123, 97, 127)");
+  assert.equal(json.content[0].content[0].attrs.borderWidth, "4px");
   assert.match(rendered, /class="wiki-media-cell wiki-media-cell--custom"/);
-  assert.match(rendered, /style="background-color: rgb\(34, 23, 45\); border-color: rgb\(123, 97, 127\);?"/);
+  assert.match(rendered, /style="[^"]*background-color: rgb\(34, 23, 45\)/);
+  assert.match(rendered, /style="[^"]*border-color: rgb\(123, 97, 127\)/);
+  assert.match(rendered, /style="[^"]*border-width: 4px/);
   assert.doesNotMatch(rendered, /position:/);
   editor.destroy();
 });
@@ -991,25 +1032,30 @@ await test("mediaCell style helpers clear presets and custom colors", function (
     stylePreset: "shadow",
     backgroundColor: null,
     borderColor: null,
+    borderWidth: null,
     style: null
   });
   assert.deepEqual(getMediaCellStyleAttrs({
     stylePreset: "custom",
     backgroundColor: "#22172d",
-    borderColor: "#7b617f"
+    borderColor: "#7b617f",
+    borderWidth: "4px"
   }), {
     stylePreset: "custom",
     backgroundColor: "rgb(34, 23, 45)",
     borderColor: "rgb(123, 97, 127)",
-    style: "background-color: rgb(34, 23, 45); border-color: rgb(123, 97, 127)"
+    borderWidth: "4px",
+    style: "background-color: rgb(34, 23, 45); border-color: rgb(123, 97, 127); border-width: 4px"
   });
   assert.deepEqual(clearMediaCellStyleAttrs(), {
     stylePreset: null,
     backgroundColor: null,
     borderColor: null,
+    borderWidth: null,
     style: null
   });
-  assert.equal(mergeMediaCellColorStyle("position: fixed; background-color: #111827", "#22172d", "#7b617f"), "background-color: rgb(34, 23, 45); border-color: rgb(123, 97, 127)");
+  assert.equal(mergeMediaCellColorStyle("position: fixed; background-color: #111827", "#22172d", "#7b617f", "4px"), "background-color: rgb(34, 23, 45); border-color: rgb(123, 97, 127); border-width: 4px");
+  assert.equal(mergeMediaCellColorStyle("border-width: 3px", "#22172d", "#7b617f"), "background-color: rgb(34, 23, 45); border-color: rgb(123, 97, 127); border-width: 3px");
 });
 
 await test("media cell selection toggles individual cell positions", function () {
@@ -1052,11 +1098,12 @@ await test("media cell custom colors can apply to captured cells after selection
 
   assert.equal(editor.commands.setMediaCellColorsAtPositions([cells[0]], {
     backgroundColor: "#26a269",
-    borderColor: "#d4b16a"
+    borderColor: "#d4b16a",
+    borderWidth: "5px"
   }), true);
 
   const rendered = editor.getHTML();
-  assert.match(rendered, /<div class="wiki-media-cell wiki-media-cell--custom" data-wiki-node="media-cell" style="[^"]*background-color: rgb\(38, 162, 105\);[^"]*border-color: rgb\(212, 177, 106\);?[^"]*"><p>A<\/p><\/div>/);
+  assert.match(rendered, /<div class="wiki-media-cell wiki-media-cell--custom" data-wiki-node="media-cell" style="(?=[^"]*background-color: rgb\(38, 162, 105\))(?=[^"]*border-color: rgb\(212, 177, 106\))(?=[^"]*border-width: 5px)[^"]*"><p>A<\/p><\/div>/);
   assert.match(rendered, /<div class="wiki-media-cell" data-wiki-node="media-cell"><p>B<\/p><\/div>/);
   editor.destroy();
 });
@@ -1066,13 +1113,15 @@ await test("media cell custom colors update the node style attribute directly", 
   const cells = findNodePositions(editor, "mediaCell");
 
   assert.equal(editor.commands.setMediaCellColorsAtPositions([cells[0]], {
-    borderColor: "#d4b16a"
+    borderColor: "#d4b16a",
+    borderWidth: "5px"
   }), true);
 
   const attrs = editor.getJSON().content[0].content[0].attrs;
   assert.match(attrs.style, /background-color: rgb\(38, 162, 105\)/);
   assert.match(attrs.style, /border-color: rgb\(212, 177, 106\)/);
-  assert.match(editor.getHTML(), /style="[^"]*background-color: rgb\(38, 162, 105\);[^"]*border-color: rgb\(212, 177, 106\);?[^"]*"/);
+  assert.match(attrs.style, /border-width: 5px/);
+  assert.match(editor.getHTML(), /style="(?=[^"]*background-color: rgb\(38, 162, 105\))(?=[^"]*border-color: rgb\(212, 177, 106\))(?=[^"]*border-width: 5px)[^"]*"/);
   editor.destroy();
 });
 
@@ -1099,7 +1148,12 @@ await test("media cell color picker input updates the source without a separate 
   inputs[1].value = "#d4b16a";
   inputs[1].dispatchEvent(new window.Event("input", { bubbles: true }));
 
-  assert.match(wikiEditor.getHTML(), /style="[^"]*background-color: rgb\(34, 23, 45\);[^"]*border-color: rgb\(212, 177, 106\);?[^"]*"/);
+  const widthInputs = Array.from(document.querySelectorAll(".wiki-editor-media-cell-color-menu input[type='number']"));
+  assert.equal(widthInputs.length, 1);
+  widthInputs[0].value = "6";
+  widthInputs[0].dispatchEvent(new window.Event("input", { bubbles: true }));
+
+  assert.match(wikiEditor.getHTML(), /style="(?=[^"]*background-color: rgb\(34, 23, 45\))(?=[^"]*border-color: rgb\(212, 177, 106\))(?=[^"]*border-width: 6px)[^"]*"/);
 
   wikiEditor.destroy();
   document.querySelector(".wiki-editor-media-cell-color-menu")?.remove();
@@ -1125,9 +1179,11 @@ await test("media cell color menu uses labelled color picker fields", function (
   assert.match(editorBundleSource, /function createMediaCellColorField/);
   assert.match(editorBundleSource, /wiki-editor-media-cell-color-menu__field/);
   assert.match(editorBundleSource, /wiki-editor-media-cell-color-menu__input/);
+  assert.match(editorBundleSource, /wiki-editor-media-cell-color-menu__number/);
   assert.match(editorBundleSource, /wiki-editor-media-cell-color-menu__value/);
   assert.match(match[0], /Background color/);
   assert.match(match[0], /Border color/);
+  assert.match(match[0], /Border size/);
   assert.doesNotMatch(match[0], /className\s*=\s*"wiki-editor-color-custom"/);
 });
 
