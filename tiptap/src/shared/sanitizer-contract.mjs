@@ -30,6 +30,12 @@ function getAllowedAttributesList() {
 }
 
 export const COMPILED_ALLOWED_STYLES = compileAllowedStylesMap(sanitizerConfig.allowedStyles);
+const BORDER_COLOR_SIDE_PROPERTIES = [
+  "border-top-color",
+  "border-right-color",
+  "border-bottom-color",
+  "border-left-color"
+];
 
 export const DOMPURIFY_OPTIONS = {
   ALLOWED_TAGS: sanitizerConfig.allowedTags,
@@ -52,6 +58,8 @@ export function sanitizeStyleAttribute(styleValue, tagName) {
   const allowedForAnyTag = COMPILED_ALLOWED_STYLES["*"] || {};
   const allowedForTag = COMPILED_ALLOWED_STYLES[String(tagName || "").toLowerCase()] || {};
   const entries = [];
+  const borderSideColors = new Map();
+  let hasBorderColor = false;
 
   for (let i = 0; i < probe.style.length; i += 1) {
     const propertyName = String(probe.style[i] || "").trim().toLowerCase();
@@ -61,7 +69,18 @@ export function sanitizeStyleAttribute(styleValue, tagName) {
 
     const rawValue = probe.style.getPropertyValue(propertyName).trim();
     const propertyAllowlist = allowedForTag[propertyName] || allowedForAnyTag[propertyName];
+    const borderSideIndex = BORDER_COLOR_SIDE_PROPERTIES.indexOf(propertyName);
+    const borderColorAllowlist = allowedForTag["border-color"] || allowedForAnyTag["border-color"];
     if (!propertyAllowlist || !rawValue) {
+      if (borderSideIndex !== -1 && borderColorAllowlist && rawValue) {
+        const normalizedValue = rawValue.replace(/\s+/g, " ").trim();
+        const allowed = borderColorAllowlist.some(function (pattern) {
+          return pattern.test(normalizedValue);
+        });
+        if (allowed) {
+          borderSideColors.set(propertyName, normalizedValue);
+        }
+      }
       continue;
     }
 
@@ -71,6 +90,19 @@ export function sanitizeStyleAttribute(styleValue, tagName) {
     });
     if (allowed) {
       entries.push(`${propertyName}: ${normalizedValue}`);
+      if (propertyName === "border-color") {
+        hasBorderColor = true;
+      }
+    }
+  }
+
+  if (!hasBorderColor && borderSideColors.size === BORDER_COLOR_SIDE_PROPERTIES.length) {
+    const values = BORDER_COLOR_SIDE_PROPERTIES.map(function (propertyName) {
+      return borderSideColors.get(propertyName);
+    });
+    const [firstValue] = values;
+    if (firstValue && values.every(function (value) { return value === firstValue; })) {
+      entries.push(`border-color: ${firstValue}`);
     }
   }
 

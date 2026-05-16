@@ -105,7 +105,7 @@ const {
   getNormalizationNotice,
   normalizeLegacyHtmlForTiptap
 } = legacyHtmlModule;
-const { sanitizeHtml } = sanitizerContractModule;
+const { sanitizeHtml, sanitizeStyleAttribute } = sanitizerContractModule;
 const { getReadableTextColor, normalizeHexColor } = colorContrastModule;
 const articleBodyCss = readFileSync(new URL("../public/wiki-article-body.css", import.meta.url), "utf8");
 const pluginJsonSource = readFileSync(new URL("../plugin.json", import.meta.url), "utf8");
@@ -335,6 +335,44 @@ await test("sanitizeHtml preserves safe styles and removes unsafe ones on the cl
   assert.match(sanitized, /text-align:\s*center/);
   assert.match(sanitized, /color:\s*rgb\(10, 20, 30\)/);
   assert.doesNotMatch(sanitized, /position:/);
+});
+
+await test("sanitizeStyleAttribute collapses Chrome-expanded border side colors", function () {
+  const originalCreateElement = document.createElement.bind(document);
+  document.createElement = function (tagName) {
+    if (String(tagName).toLowerCase() !== "span") {
+      return originalCreateElement(tagName);
+    }
+
+    const properties = [
+      "border-top-color",
+      "border-right-color",
+      "border-bottom-color",
+      "border-left-color"
+    ];
+    return {
+      setAttribute: function () {},
+      style: {
+        0: properties[0],
+        1: properties[1],
+        2: properties[2],
+        3: properties[3],
+        length: properties.length,
+        getPropertyValue: function (propertyName) {
+          return properties.includes(propertyName) ? "rgb(212, 177, 106)" : "";
+        }
+      }
+    };
+  };
+
+  try {
+    assert.equal(
+      sanitizeStyleAttribute("border-color: rgb(212, 177, 106)", "div"),
+      "border-color: rgb(212, 177, 106)"
+    );
+  } finally {
+    document.createElement = originalCreateElement;
+  }
 });
 
 await test("sanitizeHtml preserves table cell vertical alignment on the client contract", function () {
