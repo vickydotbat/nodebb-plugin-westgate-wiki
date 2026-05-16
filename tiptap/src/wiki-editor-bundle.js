@@ -2275,6 +2275,7 @@ function createMediaCellColorMenu(button, editor) {
   function applyColorValues() {
     editor.commands.setMediaCellColorsAtPositions(targetPositions, {
       backgroundColor: backgroundInput.value,
+      textColor: getReadableTextColor(backgroundInput.value),
       borderColor: borderInput.value,
       borderWidth: borderWidthInputToStyleValue(borderWidthInput.value)
     });

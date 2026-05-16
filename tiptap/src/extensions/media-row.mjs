@@ -2,6 +2,7 @@ import { Node } from "@tiptap/core";
 import { Selection } from "@tiptap/pm/state";
 
 import { getTargetMediaCellPositions } from "../selection/media-cell-selection.mjs";
+import { getReadableTextColor, normalizeHexColor } from "../shared/color-contrast.mjs";
 import { sanitizeStyleAttribute } from "../shared/sanitizer-contract.mjs";
 
 export const MEDIA_CELL_STYLE_PRESETS = ["shadow", "gilded", "custom", "well"];
@@ -103,10 +104,38 @@ function readStyleValue(styleValue, propertyName) {
   return sanitizeMediaCellStyleValue((safeStyleValue.match(new RegExp(`(?:^|;\\s*)${propertyName}:\\s*([^;]+)`, "i")) || [])[1], propertyName);
 }
 
-export function mergeMediaCellColorStyle(styleValue, backgroundColor, borderColor, borderWidth) {
+function rgbColorToHex(value) {
+  const match = String(value || "").trim().match(/^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})/i);
+  if (!match) {
+    return "";
+  }
+  return `#${match.slice(1, 4).map(function (channel) {
+    return Math.max(0, Math.min(255, parseInt(channel, 10) || 0)).toString(16).padStart(2, "0");
+  }).join("")}`;
+}
+
+function getReadableMediaCellTextColor(backgroundColor) {
+  const readableBackground = normalizeHexColor(backgroundColor) || rgbColorToHex(backgroundColor);
+  return sanitizeMediaCellStyleValue(getReadableTextColor(readableBackground || backgroundColor), "color");
+}
+
+function readMediaCellTextColor(element) {
+  const textColor = readMediaCellStyleValue(element, "color");
+  if (textColor) {
+    return textColor;
+  }
+  const backgroundColor = readMediaCellStyleValue(element, "background-color");
+  return backgroundColor ? getReadableMediaCellTextColor(backgroundColor) : "";
+}
+
+export function mergeMediaCellColorStyle(styleValue, backgroundColor, borderColor, borderWidth, textColor) {
   const safeStyleValue = sanitizeStyleAttribute(styleValue, "div");
   const safeBackground = sanitizeMediaCellStyleValue(backgroundColor, "background-color") ||
     sanitizeMediaCellStyleValue((safeStyleValue.match(/(?:^|;\s*)background-color:\s*([^;]+)/i) || [])[1], "background-color");
+  const safeText = safeBackground ? (
+    sanitizeMediaCellStyleValue(textColor, "color") ||
+    getReadableMediaCellTextColor(backgroundColor || safeBackground)
+  ) : "";
   const safeBorder = sanitizeMediaCellStyleValue(borderColor, "border-color") ||
     sanitizeMediaCellStyleValue((safeStyleValue.match(/(?:^|;\s*)border-color:\s*([^;]+)/i) || [])[1], "border-color");
   const safeBorderWidth = sanitizeMediaCellStyleValue(borderWidth, "border-width") ||
@@ -115,6 +144,9 @@ export function mergeMediaCellColorStyle(styleValue, backgroundColor, borderColo
 
   if (safeBackground) {
     entries.push(["background-color", safeBackground]);
+  }
+  if (safeText) {
+    entries.push(["color", safeText]);
   }
   if (safeBorder) {
     entries.push(["border-color", safeBorder]);
@@ -131,10 +163,11 @@ export function mergeMediaCellColorStyle(styleValue, backgroundColor, borderColo
 export function getMediaCellStyleAttrs(options) {
   const preset = MEDIA_CELL_STYLE_PRESETS.includes(options && options.stylePreset) ? options.stylePreset : "";
   if (preset === "custom") {
-    const style = mergeMediaCellColorStyle(options && options.style, options && options.backgroundColor, options && options.borderColor, options && options.borderWidth);
+    const style = mergeMediaCellColorStyle(options && options.style, options && options.backgroundColor, options && options.borderColor, options && options.borderWidth, options && options.textColor);
     return {
       stylePreset: "custom",
       backgroundColor: readStyleValue(style, "background-color") || null,
+      textColor: readStyleValue(style, "color") || null,
       borderColor: readStyleValue(style, "border-color") || null,
       borderWidth: readStyleValue(style, "border-width") || null,
       style: style || null
@@ -143,6 +176,7 @@ export function getMediaCellStyleAttrs(options) {
   return {
     stylePreset: preset || null,
     backgroundColor: null,
+    textColor: null,
     borderColor: null,
     borderWidth: null,
     style: null
@@ -153,6 +187,7 @@ export function clearMediaCellStyleAttrs() {
   return {
     stylePreset: null,
     backgroundColor: null,
+    textColor: null,
     borderColor: null,
     borderWidth: null,
     style: null
@@ -226,6 +261,12 @@ export const MediaCell = Node.create({
           return readMediaCellPreset(element) === "custom" ? readMediaCellStyleValue(element, "background-color") || null : null;
         }
       },
+      textColor: {
+        default: null,
+        parseHTML: function (element) {
+          return readMediaCellPreset(element) === "custom" ? readMediaCellTextColor(element) || null : null;
+        }
+      },
       borderColor: {
         default: null,
         parseHTML: function (element) {
@@ -260,7 +301,7 @@ export const MediaCell = Node.create({
       outputAttrs.class = classes.join(" ");
     }
     if (attrs.stylePreset === "custom") {
-      const style = mergeMediaCellColorStyle("", attrs.backgroundColor, attrs.borderColor, attrs.borderWidth);
+      const style = mergeMediaCellColorStyle("", attrs.backgroundColor, attrs.borderColor, attrs.borderWidth, attrs.textColor);
       if (style) {
         outputAttrs.style = style;
       }
@@ -305,6 +346,7 @@ export const MediaRow = Node.create({
             stylePreset: "custom",
             style: node && node.attrs && node.attrs.style,
             backgroundColor: colors && colors.backgroundColor,
+            textColor: colors && colors.textColor,
             borderColor: colors && colors.borderColor,
             borderWidth: colors && colors.borderWidth
           });
@@ -316,6 +358,7 @@ export const MediaRow = Node.create({
             stylePreset: "custom",
             style: node && node.attrs && node.attrs.style,
             backgroundColor: colors && colors.backgroundColor,
+            textColor: colors && colors.textColor,
             borderColor: colors && colors.borderColor,
             borderWidth: colors && colors.borderWidth
           });

@@ -626,12 +626,19 @@ await test("media cell style css exists in article and editor prose", function (
     assert.match(css, /\.wiki-media-cell--custom\s*\{/);
     assert.match(css, /\.wiki-media-cell--well\s*\{/);
   });
-  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-media-cell\.wiki-media-cell--shadow\s*\{[\s\S]*position:\s*relative/);
-  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-media-cell\.wiki-media-cell--shadow::after\s*\{[\s\S]*filter:\s*blur\(60px\)/);
-  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-media-cell\.wiki-media-cell--shadow \.wiki-media-cell__shadow-content\s*\{[\s\S]*z-index:\s*1/);
-  assert.match(editorCss, /\.westgate-wiki-compose \.wiki-editor__content \.wiki-media-cell\.wiki-media-cell--shadow\s*\{[\s\S]*position:\s*relative/);
-  assert.match(editorCss, /\.westgate-wiki-compose \.wiki-editor__content \.wiki-media-cell\.wiki-media-cell--shadow::after\s*\{[\s\S]*filter:\s*blur\(60px\)/);
-  assert.match(editorCss, /\.westgate-wiki-compose \.wiki-editor__content \.wiki-media-cell\.wiki-media-cell--shadow \.wiki-media-cell__shadow-content\s*\{[\s\S]*z-index:\s*1/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-media-cell\.wiki-media-cell--shadow\s*\{[^}]*position:\s*relative/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-media-cell\.wiki-media-cell--shadow::after\s*\{[^}]*filter:\s*blur\(25px\)/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-media-cell\.wiki-media-cell--shadow \.wiki-media-cell__shadow-content\s*\{[^}]*z-index:\s*1/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-media-cell\.wiki-media-cell--well\s*\{[^}]*background:\s*linear-gradient\(145deg,\s*rgba\(31,\s*18,\s*35,\s*0\.82\),\s*rgba\(8,\s*7,\s*10,\s*0\.92\)\)/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-media-cell\.wiki-media-cell--well\s*\{[^}]*box-shadow:\s*inset\s+0\s+1px\s+0\s+rgba\(255,\s*244,\s*214,\s*0\.045\),\s*0\s+0\.85rem\s+2rem\s+rgba\(0,\s*0,\s*0,\s*0\.34\)/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-media-cell\[style\*="color"\] :where\(p,\s*li\)\s*\{[^}]*color:\s*inherit/);
+  assert.match(editorCss, /\.westgate-wiki-compose \.wiki-editor__content \.wiki-media-cell\.wiki-media-cell--shadow\s*\{[^}]*position:\s*relative/);
+  assert.match(editorCss, /\.westgate-wiki-compose \.wiki-editor__content \.wiki-media-cell\.wiki-media-cell--shadow::after\s*\{[^}]*filter:\s*blur\(60px\)/);
+  assert.match(editorCss, /\.westgate-wiki-compose \.wiki-editor__content \.wiki-media-cell\.wiki-media-cell--shadow \.wiki-media-cell__shadow-content\s*\{[^}]*z-index:\s*1/);
+  assert.match(editorCss, /\.westgate-wiki-compose \.wiki-editor__content \.wiki-media-cell\.wiki-media-cell--well\s*\{[^}]*border-color:\s*color-mix\(in srgb,\s*var\(--wiki-editor-focus-border,\s*var\(--bs-primary,\s*#0d6efd\)\)\s*36%,\s*transparent\)/);
+  assert.match(editorCss, /\.westgate-wiki-compose \.wiki-editor__content \.wiki-media-cell\.wiki-media-cell--well\s*\{[^}]*background:\s*linear-gradient\(145deg,\s*rgba\(31,\s*18,\s*35,\s*0\.82\),\s*rgba\(8,\s*7,\s*10,\s*0\.92\)\)/);
+  assert.match(editorCss, /\.westgate-wiki-compose \.wiki-editor__content \.wiki-media-cell\.wiki-media-cell--well\s*\{[^}]*box-shadow:\s*inset\s+0\s+1px\s+0\s+rgba\(255,\s*244,\s*214,\s*0\.045\),\s*0\s+0\.85rem\s+2rem\s+rgba\(0,\s*0,\s*0,\s*0\.34\)/);
+  assert.match(editorCss, /\.westgate-wiki-compose \.wiki-editor__content \.wiki-media-cell\[style\*="color"\] :where\(p,\s*li\)\s*\{[^}]*color:\s*inherit/);
   assert.match(editorCss, /\.wiki-media-cell--multi-selected\s*\{/);
   assert.match(editorCss, /\.wiki-editor-media-cell-color-menu\s*\{/);
   assert.match(editorCss, /\.wiki-editor-media-cell-color-menu__field\s*\{/);
@@ -1052,7 +1059,7 @@ await test("mediaCell shadow content wrapper reparses without extra content node
   reopened.destroy();
 });
 
-await test("mediaCell parses and renders custom background and border colors", function () {
+await test("mediaCell parses and renders custom background, text, and border colors", function () {
   const editor = createEditor(
     '<div class="wiki-media-row"><div class="wiki-media-cell wiki-media-cell--custom" data-wiki-node="media-cell" style="background-color: #22172d; border-color: #7b617f; border-width: 4px; position: fixed"><p>Custom</p></div></div>'
   );
@@ -1061,10 +1068,12 @@ await test("mediaCell parses and renders custom background and border colors", f
 
   assert.equal(json.content[0].content[0].attrs.stylePreset, "custom");
   assert.equal(json.content[0].content[0].attrs.backgroundColor, "rgb(34, 23, 45)");
+  assert.equal(json.content[0].content[0].attrs.textColor, "rgb(249, 250, 251)");
   assert.equal(json.content[0].content[0].attrs.borderColor, "rgb(123, 97, 127)");
   assert.equal(json.content[0].content[0].attrs.borderWidth, "4px");
   assert.match(rendered, /class="wiki-media-cell wiki-media-cell--custom"/);
   assert.match(rendered, /style="[^"]*background-color: rgb\(34, 23, 45\)/);
+  assert.match(rendered, /style="[^"]*color: rgb\(249, 250, 251\)/);
   assert.match(rendered, /style="[^"]*border-color: rgb\(123, 97, 127\)/);
   assert.match(rendered, /style="[^"]*border-width: 4px/);
   assert.doesNotMatch(rendered, /position:/);
@@ -1075,6 +1084,7 @@ await test("mediaCell style helpers clear presets and custom colors", function (
   assert.deepEqual(getMediaCellStyleAttrs({ stylePreset: "shadow" }), {
     stylePreset: "shadow",
     backgroundColor: null,
+    textColor: null,
     borderColor: null,
     borderWidth: null,
     style: null
@@ -1087,19 +1097,21 @@ await test("mediaCell style helpers clear presets and custom colors", function (
   }), {
     stylePreset: "custom",
     backgroundColor: "rgb(34, 23, 45)",
+    textColor: "rgb(249, 250, 251)",
     borderColor: "rgb(123, 97, 127)",
     borderWidth: "4px",
-    style: "background-color: rgb(34, 23, 45); border-color: rgb(123, 97, 127); border-width: 4px"
+    style: "background-color: rgb(34, 23, 45); color: rgb(249, 250, 251); border-color: rgb(123, 97, 127); border-width: 4px"
   });
   assert.deepEqual(clearMediaCellStyleAttrs(), {
     stylePreset: null,
     backgroundColor: null,
+    textColor: null,
     borderColor: null,
     borderWidth: null,
     style: null
   });
-  assert.equal(mergeMediaCellColorStyle("position: fixed; background-color: #111827", "#22172d", "#7b617f", "4px"), "background-color: rgb(34, 23, 45); border-color: rgb(123, 97, 127); border-width: 4px");
-  assert.equal(mergeMediaCellColorStyle("border-width: 3px", "#22172d", "#7b617f"), "background-color: rgb(34, 23, 45); border-color: rgb(123, 97, 127); border-width: 3px");
+  assert.equal(mergeMediaCellColorStyle("position: fixed; background-color: #111827", "#22172d", "#7b617f", "4px"), "background-color: rgb(34, 23, 45); color: rgb(249, 250, 251); border-color: rgb(123, 97, 127); border-width: 4px");
+  assert.equal(mergeMediaCellColorStyle("border-width: 3px", "#22172d", "#7b617f"), "background-color: rgb(34, 23, 45); color: rgb(249, 250, 251); border-color: rgb(123, 97, 127); border-width: 3px");
 });
 
 await test("media cell selection toggles individual cell positions", function () {
@@ -1147,7 +1159,7 @@ await test("media cell custom colors can apply to captured cells after selection
   }), true);
 
   const rendered = editor.getHTML();
-  assert.match(rendered, /<div class="wiki-media-cell wiki-media-cell--custom" data-wiki-node="media-cell" style="(?=[^"]*background-color: rgb\(38, 162, 105\))(?=[^"]*border-color: rgb\(212, 177, 106\))(?=[^"]*border-width: 5px)[^"]*"><p>A<\/p><\/div>/);
+  assert.match(rendered, /<div class="wiki-media-cell wiki-media-cell--custom" data-wiki-node="media-cell" style="(?=[^"]*background-color: rgb\(38, 162, 105\))(?=[^"]*color: rgb\(17, 24, 39\))(?=[^"]*border-color: rgb\(212, 177, 106\))(?=[^"]*border-width: 5px)[^"]*"><p>A<\/p><\/div>/);
   assert.match(rendered, /<div class="wiki-media-cell" data-wiki-node="media-cell"><p>B<\/p><\/div>/);
   editor.destroy();
 });
@@ -1163,9 +1175,10 @@ await test("media cell custom colors update the node style attribute directly", 
 
   const attrs = editor.getJSON().content[0].content[0].attrs;
   assert.match(attrs.style, /background-color: rgb\(38, 162, 105\)/);
+  assert.match(attrs.style, /color: rgb\(17, 24, 39\)/);
   assert.match(attrs.style, /border-color: rgb\(212, 177, 106\)/);
   assert.match(attrs.style, /border-width: 5px/);
-  assert.match(editor.getHTML(), /style="(?=[^"]*background-color: rgb\(38, 162, 105\))(?=[^"]*border-color: rgb\(212, 177, 106\))(?=[^"]*border-width: 5px)[^"]*"/);
+  assert.match(editor.getHTML(), /style="(?=[^"]*background-color: rgb\(38, 162, 105\))(?=[^"]*color: rgb\(17, 24, 39\))(?=[^"]*border-color: rgb\(212, 177, 106\))(?=[^"]*border-width: 5px)[^"]*"/);
   editor.destroy();
 });
 
@@ -1197,7 +1210,7 @@ await test("media cell color picker input updates the source without a separate 
   widthInputs[0].value = "6";
   widthInputs[0].dispatchEvent(new window.Event("input", { bubbles: true }));
 
-  assert.match(wikiEditor.getHTML(), /style="(?=[^"]*background-color: rgb\(34, 23, 45\))(?=[^"]*border-color: rgb\(212, 177, 106\))(?=[^"]*border-width: 6px)[^"]*"/);
+  assert.match(wikiEditor.getHTML(), /style="(?=[^"]*background-color: rgb\(34, 23, 45\))(?=[^"]*color: rgb\(249, 250, 251\))(?=[^"]*border-color: rgb\(212, 177, 106\))(?=[^"]*border-width: 6px)[^"]*"/);
 
   wikiEditor.destroy();
   document.querySelector(".wiki-editor-media-cell-color-menu")?.remove();
@@ -1213,6 +1226,7 @@ await test("editor bundle wires media cell selection helpers and style controls"
   assert.match(editorBundleSource, /id:\s*"media-cell-style-colors"/);
   assert.match(editorBundleSource, /id:\s*"media-cell-style-clear"/);
   assert.match(editorBundleSource, /setMediaCellStyle\("shadow"\)/);
+  assert.match(editorBundleSource, /textColor:\s*getReadableTextColor\(backgroundInput\.value\)/);
   assert.match(editorBundleSource, /setMediaCellColorsAtPositions\(targetPositions,/);
   assert.match(editorBundleSource, /clearMediaCellStyleAtPositions\(targetPositions\)/);
 });
