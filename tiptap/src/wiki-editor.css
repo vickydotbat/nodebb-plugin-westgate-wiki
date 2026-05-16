@@ -1050,6 +1050,10 @@
   margin-bottom: 0;
 }
 
+.westgate-wiki-compose .wiki-editor__content .wiki-media-cell[style*="color"] :where(p, li) {
+  color: inherit;
+}
+
 .westgate-wiki-compose .wiki-editor__content .wiki-media-cell__shadow-content > :first-child {
   margin-top: 0;
 }

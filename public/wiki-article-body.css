@@ -704,6 +704,10 @@
   margin-bottom: 0;
 }
 
+.wiki-article-prose .wiki-media-cell[style*="color"] :where(p, li) {
+  color: inherit;
+}
+
 .wiki-article-prose .wiki-media-cell.wiki-media-cell--shadow {
   box-sizing: border-box;
   position: relative;
