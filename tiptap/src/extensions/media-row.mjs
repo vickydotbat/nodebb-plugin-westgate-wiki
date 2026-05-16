@@ -81,6 +81,16 @@ function readMediaCellPreset(element) {
   return token ? MEDIA_CELL_STYLE_CLASS_MAP.get(token) : "";
 }
 
+function getMediaCellContentElement(element) {
+  if (readMediaCellPreset(element) !== "shadow") {
+    return element;
+  }
+  const shadowContent = Array.from(element && element.children || []).find(function (child) {
+    return child.classList && child.classList.contains("wiki-media-cell__shadow-content");
+  });
+  return shadowContent || element;
+}
+
 function readMediaCellStyleValue(element, propertyName) {
   if (!element) {
     return "";
@@ -232,9 +242,9 @@ export const MediaCell = Node.create({
   },
   parseHTML() {
     return [
-      { tag: "div.wiki-media-cell" },
-      { tag: "section.wiki-media-cell" },
-      { tag: "article.wiki-media-cell" }
+      { tag: "div.wiki-media-cell", contentElement: getMediaCellContentElement },
+      { tag: "section.wiki-media-cell", contentElement: getMediaCellContentElement },
+      { tag: "article.wiki-media-cell", contentElement: getMediaCellContentElement }
     ];
   },
   renderHTML({ HTMLAttributes }) {
@@ -254,6 +264,10 @@ export const MediaCell = Node.create({
       if (style) {
         outputAttrs.style = style;
       }
+    }
+
+    if (attrs.stylePreset === "shadow") {
+      return ["div", outputAttrs, ["div", { class: "wiki-media-cell__shadow-content" }, 0]];
     }
 
     return ["div", outputAttrs, 0];

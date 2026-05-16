@@ -209,6 +209,22 @@ function findNodePositions(editor, typeName) {
   return positions;
 }
 
+function findJsonNode(node, typeName) {
+  if (!node) {
+    return null;
+  }
+  if (node.type === typeName) {
+    return node;
+  }
+  for (const child of node.content || []) {
+    const match = findJsonNode(child, typeName);
+    if (match) {
+      return match;
+    }
+  }
+  return null;
+}
+
 function findTextRange(editor, text) {
   let range = null;
   editor.state.doc.descendants(function (node, pos) {
@@ -610,6 +626,12 @@ await test("media cell style css exists in article and editor prose", function (
     assert.match(css, /\.wiki-media-cell--custom\s*\{/);
     assert.match(css, /\.wiki-media-cell--well\s*\{/);
   });
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-media-cell\.wiki-media-cell--shadow\s*\{[\s\S]*position:\s*relative/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-media-cell\.wiki-media-cell--shadow::after\s*\{[\s\S]*filter:\s*blur\(60px\)/);
+  assert.match(articleBodyCss, /\.wiki-article-prose \.wiki-media-cell\.wiki-media-cell--shadow \.wiki-media-cell__shadow-content\s*\{[\s\S]*z-index:\s*1/);
+  assert.match(editorCss, /\.westgate-wiki-compose \.wiki-editor__content \.wiki-media-cell\.wiki-media-cell--shadow\s*\{[\s\S]*position:\s*relative/);
+  assert.match(editorCss, /\.westgate-wiki-compose \.wiki-editor__content \.wiki-media-cell\.wiki-media-cell--shadow::after\s*\{[\s\S]*filter:\s*blur\(60px\)/);
+  assert.match(editorCss, /\.westgate-wiki-compose \.wiki-editor__content \.wiki-media-cell\.wiki-media-cell--shadow \.wiki-media-cell__shadow-content\s*\{[\s\S]*z-index:\s*1/);
   assert.match(editorCss, /\.wiki-media-cell--multi-selected\s*\{/);
   assert.match(editorCss, /\.wiki-editor-media-cell-color-menu\s*\{/);
   assert.match(editorCss, /\.wiki-editor-media-cell-color-menu__field\s*\{/);
@@ -995,17 +1017,39 @@ await test("mediaRow insert command renders bounded two- and three-cell layouts"
 
 await test("mediaCell parses and renders supported style presets", function () {
   const editor = createEditor(
-    '<div class="wiki-media-row"><div class="wiki-media-cell wiki-media-cell--gilded" data-wiki-node="media-cell"><p>Portrait</p></div><div class="wiki-media-cell wiki-media-cell--well" data-wiki-node="media-cell"><p>Notes</p></div></div>'
+    '<div class="wiki-media-row"><div class="wiki-media-cell wiki-media-cell--shadow" data-wiki-node="media-cell"><p>Portrait</p></div><div class="wiki-media-cell wiki-media-cell--gilded" data-wiki-node="media-cell"><p>Frame</p></div><div class="wiki-media-cell wiki-media-cell--well" data-wiki-node="media-cell"><p>Notes</p></div></div>'
   );
   const json = editor.getJSON();
   const rendered = editor.getHTML();
 
   assert.equal(MEDIA_CELL_STYLE_PRESETS.includes("gilded"), true);
-  assert.equal(json.content[0].content[0].attrs.stylePreset, "gilded");
-  assert.equal(json.content[0].content[1].attrs.stylePreset, "well");
+  assert.equal(json.content[0].content[0].attrs.stylePreset, "shadow");
+  assert.equal(json.content[0].content[1].attrs.stylePreset, "gilded");
+  assert.equal(json.content[0].content[2].attrs.stylePreset, "well");
+  assert.match(rendered, /class="wiki-media-cell wiki-media-cell--shadow"[^>]*><div class="wiki-media-cell__shadow-content"><p>Portrait<\/p><\/div><\/div>/);
   assert.match(rendered, /class="wiki-media-cell wiki-media-cell--gilded"/);
   assert.match(rendered, /class="wiki-media-cell wiki-media-cell--well"/);
   editor.destroy();
+});
+
+await test("mediaCell shadow content wrapper reparses without extra content nodes", function () {
+  const firstOpen = createEditor(
+    '<div class="wiki-media-row"><div class="wiki-media-cell wiki-media-cell--shadow" data-wiki-node="media-cell"><p>Shadowed</p></div></div>'
+  );
+  const rendered = firstOpen.getHTML();
+  firstOpen.destroy();
+
+  assert.match(rendered, /wiki-media-cell__shadow-content/);
+
+  const reopened = createEditor(sanitizeHtml(rendered));
+  const cell = findJsonNode(reopened.getJSON(), "mediaCell");
+
+  assert.ok(cell);
+  assert.equal(cell.attrs.stylePreset, "shadow");
+  assert.equal(cell.content[0].type, "paragraph");
+  assert.equal(cell.content[0].content[0].text, "Shadowed");
+  assert.doesNotMatch(JSON.stringify(cell), /containerBlock/);
+  reopened.destroy();
 });
 
 await test("mediaCell parses and renders custom background and border colors", function () {
